@@ -451,6 +451,28 @@ safety posture (no-auth warning, secrets policy, content-safety linter, rate lim
   spend limit** as the real hard backstop (sift's own `budgetCapUsd` is only a soft app-level
   guard that requires the app to be running and the check logic to be correct).
 
+## Phase 3: Plan definition — LOCKED (2026-07-16)
+All 8 features designed and documented; `_architecture.md` written for real (was TBD). Moving
+to implementation-phase planning. 5 phases, ordered by dependency:
+
+1. **Data Foundation** — STORAGE-HISTORY (schema/migrations, 4 tables) + CONFIG-UI's config-file
+   layer (JSON read/write utilities + seed defaults, not the full UI yet).
+2. **Core Pipeline** — INGESTION -> CURATION-ENGINE -> DRAFT-GENERATOR, runnable end-to-end via
+   script/CLI. DISTRIBUTION-TRUST's `--llm-cost-safety` (pre-call budget check) and rate-
+   limiting are built INTO this phase, not deferred — this is a deliberate decision: building
+   the pipeline once without cost safety and retrofitting later is wasteful and leaves a window
+   where a bug could run up real API spend uncapped.
+3. **Human Interface** — REVIEW-WORKSPACE (edit/discard/copy-post + the two Regenerate actions)
+   + CONFIG-UI's full 3-page UI. NOTE: the shared `isRunning` concurrency guard SCHEDULER
+   canonically owns gets introduced HERE (it's trivial — a module-level boolean + a check
+   function) since REVIEW-WORKSPACE's regenerate buttons need it before SCHEDULER (phase 4)
+   exists. SCHEDULER later just adds more trigger sources (cron, catch-up) to the same
+   already-built guard — this is an implementation-ordering detail, not a design change.
+4. **Automation** — SCHEDULER (node-cron registration, 24h missed-run catch-up, manual Run Now
+   wiring on CONFIG-UI's Settings page).
+5. **Safety & Distribution** — DISTRIBUTION-TRUST's `--oss-packaging` only (Docker, compose,
+   README, LICENSE, CONTRIBUTING, SECURITY.md) — the safety half already landed in phase 2.
+
 ## Minimum model capability floor (locked, small addition to Distribution & Trust scope)
 Since any user can plug in any model (including tiny/weak local ones), DISTRIBUTION-TRUST
 will document a recommended minimum tier (roughly Llama-3-8B / GPT-3.5-turbo class or
