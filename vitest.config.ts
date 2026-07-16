@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     passWithNoTests: true,
+    exclude: ["**/node_modules/**", "**/.claude/worktrees/**"],
   },
 });
 
