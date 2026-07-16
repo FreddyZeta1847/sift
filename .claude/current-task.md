@@ -351,6 +351,106 @@ Final table set: `candidates`, `posts` (renamed from `drafts`), `llm_calls`, `pi
 - **CONFIG-UI**: add "Run Now" button to `--settings-page`, next to `scheduleDays` — distinct
   from the two Regenerate buttons, which live on REVIEW-WORKSPACE instead.
 
+## Feature: DISTRIBUTION-TRUST — LOCKED (2026-07-16), all open questions resolved
+Fully discussed. This is the last of the 8 originally-planned features. Two components:
+`--llm-cost-safety` (already named, its canonical home per earlier decisions) and
+`--oss-packaging` (new). Default --security/--resilience sub-features carry the cross-cutting
+safety posture (no-auth warning, secrets policy, content-safety linter, rate limiting).
+
+### --llm-cost-safety
+- Enforcement algorithm (this is the actual "how", synthesizing everything locked earlier):
+  before each LLM call, compute `sum(estimatedCost from llm_calls WHERE timestamp in current
+  UTC calendar month) + cost(prompt_tokens_this_call) + cost(configured max_output_tokens)`;
+  if that total would exceed `budgetCapUsd`, ABORT before making the call (no partial output,
+  already-locked abort semantics, log to `pipeline_runs`/`llm_calls` as already designed).
+  **Critical detail that was previously missing**: the pre-call check MUST use an upper-bound
+  estimate (prompt tokens + max_output_tokens), not wait for the real output token count —
+  actual output tokens aren't known until after the call completes, so checking only against
+  known-so-far cost would let a call complete and only be discovered as over-cap after the
+  money's already spent. "Current month" = UTC calendar month specifically (matches how
+  providers report usage on their own dashboards, avoids timezone ambiguity for a self-hosted
+  app that could run anywhere). No concurrency race to worry about — SCHEDULER's `isRunning`
+  guard already prevents overlapping pipeline runs, so no concurrent writers to `llm_calls`.
+- Minimum model capability floor: documented recommendation (not enforced beyond the
+  already-built CONFIG-UI test-button), roughly Llama-3-8B/GPT-3.5-turbo-class or stronger.
+  Framing tightened to tie directly to the actual failure mode: "models below this tier often
+  fail structured-JSON output — if the CONFIG-UI test button fails, try a stronger model."
+
+### --oss-packaging
+- **Docker as the primary/blessed path**: multi-stage build — `deps` (npm ci) -> `build`
+  (`next build`, `output: 'standalone'`) -> slim `runner` on `node:22-slim` (explicitly NOT
+  alpine — `better-sqlite3` is a native module and alpine's musl libc causes real
+  node-gyp/compilation pain; slim avoids that at modest size cost). Runs as non-root.
+  `docker-compose.yml` is the actual one-command front door (`docker compose up -d`) — one
+  service, one `.env` for keys (optional, see first-run below), port mapped.
+- **Paths (locked — kept SEPARATE, not consolidated)**: `SIFT_DB_PATH` (already locked,
+  defaults to `data/sift.db`) and `config/` (already locked, gitignored JSON files) stay as
+  two distinct paths/env vars, each its own Docker volume mount if desired — explicitly
+  rejected the alternative of merging both under one `SIFT_DATA_DIR` parent directory. Pin the
+  shipped compose file to a specific image version tag, not `latest`, so upgrades are
+  deliberate. Consider publishing to GHCR so users can pull a prebuilt image instead of a local
+  native-module compile.
+- **First-run experience**: the app MUST boot successfully with zero configuration — API keys
+  are entered through CONFIG-UI's API Config page after startup, never required as an env var
+  at boot (this is already consistent with CONFIG-UI--resilience's locked "auto-create config/
+  with sensible defaults, don't crash on missing config" behavior — this is a confirmation,
+  not a new decision). Migrations auto-run on startup (already locked, idempotent). Surface the
+  single reachable URL (e.g. `http://localhost:3000`) as the "you're done" signal in the
+  README. `.env.example` documents every recognized var with safe defaults; `.env` is optional
+  since keys can be entered entirely in-app.
+- **Non-Docker path**: `npm ci && npm run build && npm start` stays a fully supported fallback
+  (same `migrate()`-on-start behavior), positioned second to Docker in the README. Explicitly
+  call out the native-module C-toolchain requirement for `better-sqlite3` as the #1 friction
+  point for non-Docker self-hosters (especially Windows) — this is worth a prominent README
+  note, not just a passing mention. No OS-specific service wrappers (systemd units etc.) — out
+  of scope for a single-user tool.
+- **LICENSE (locked)**: MIT. Maximally permissive, standard for a self-hosted dev tool, zero
+  friction for people running/modifying it on their own machines. (AGPL was considered and
+  explicitly rejected — that tradeoff, anti-SaaS-resale protection, isn't a priority here.)
+- **README**: house header format (centered title/tagline/description/tech badges — already
+  documented in global CLAUDE.md conventions, don't redesign it). Quick Start leads with
+  `docker compose up -d`, notes the optional `.env`/in-app key entry, the single URL, the
+  non-Docker fallback second, and an explicit "your data lives in the mounted volume(s), safe
+  across upgrades" callout. Badges: Next.js, TypeScript, SQLite, Docker, License-MIT.
+- **CONTRIBUTING.md**: local dev via the non-Docker path, the native-module build prereq, the
+  Drizzle migration workflow (`drizzle-kit generate`, migrations checked into `drizzle/`, never
+  hand-edit an applied migration), a "run `npm run build` before PR" check.
+- **SECURITY.md (new, not previously discussed)**: a private vulnerability-disclosure contact —
+  worth having specifically because sift handles users' LLM API keys and (see below) has no
+  built-in auth; gives people a responsible channel instead of an open GitHub issue leaking a
+  live exploit.
+
+### Cross-cutting safety posture (--security / --resilience, default sub-features)
+- **No authentication anywhere — the single most important undocumented gap, now documented.**
+  This isn't a new decision, it's a direct consequence of choices already locked across
+  CONFIG-UI/REVIEW-WORKSPACE (single local user, no auth, by design). If a self-hoster exposes
+  sift beyond localhost (a VPS, a NAS with port-forwarding), anyone who reaches it can view or
+  replace API keys via CONFIG-UI with zero barrier. README needs an explicit, prominent
+  warning: only run on a trusted local network, or put your own auth/reverse-proxy in front if
+  exposing it publicly.
+- **Content-safety guardrail on LLM output (LOCKED — build it, user confirmed "yes")**: a
+  lightweight, non-blocking regex-based leakage linter — flags drafted post text containing
+  obvious prompt-injection-leakage tells ("ignore previous instructions", "as an AI language
+  model", "system prompt", etc.) with a warning badge on the card in REVIEW-WORKSPACE. No LLM
+  call, no abort, purely draws the eye during the review step that already exists (a human
+  reads every post before copy/post — that's the real guardrail; this is a cheap assist on top,
+  not a replacement). RIPPLE: REVIEW-WORKSPACE--draft-review-ui.md needs a small addition
+  describing this badge.
+- **Rate limiting (new, previously undesigned)**: sequential (not concurrent) fetches with a
+  fixed ~500ms-1s delay between requests, plus an honest identifying `User-Agent` (naming sift
+  + a repo URL) — applies to both INGESTION's source fetches and DRAFT-GENERATOR's per-article
+  enrichment fetches. No token-bucket/concurrency-cap system needed at this scale (5-10
+  sources, 4-5x/week). RIPPLE: light cross-reference addition to INGESTION and DRAFT-
+  GENERATOR's --technologies files pointing at this as the shared fetch-etiquette policy,
+  rather than each feature re-describing it.
+- **Secrets handling — practical README policy** (storage itself already locked: plaintext in
+  `config/providers.json`, gitignored, no encryption-at-rest — no real key-management story
+  exists for a lone local file, so encryption would be theater): check `git status` before your
+  first commit on a fork; if a key ever leaks, rotate it at the provider (deleting locally
+  doesn't revoke it); use a sift-scoped key, not your main provider key; set a **provider-side
+  spend limit** as the real hard backstop (sift's own `budgetCapUsd` is only a soft app-level
+  guard that requires the app to be running and the check logic to be correct).
+
 ## Minimum model capability floor (locked, small addition to Distribution & Trust scope)
 Since any user can plug in any model (including tiny/weak local ones), DISTRIBUTION-TRUST
 will document a recommended minimum tier (roughly Llama-3-8B / GPT-3.5-turbo class or
