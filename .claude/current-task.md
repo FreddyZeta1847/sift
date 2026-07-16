@@ -158,6 +158,199 @@ component). Locked design summary (authoritative version lives in the vault):
   frontend-architect's original recommendation, adopted by default (light pass) — flag if this
   needs revisiting later.
 
+## Feature: STORAGE-HISTORY — DONE
+Fully discussed and written to vault-sift/features/STORAGE-HISTORY/. Locked design summary
+(authoritative version lives in the vault):
+- **Tooling (locked)**: Drizzle ORM over the `better-sqlite3` driver (sync, matching the
+  locked single-process pipeline model). NOT raw `better-sqlite3` alone, NOT `node:sqlite`
+  (still experimental), NOT Prisma (too heavy — codegen binary + engine process, unneeded for
+  a local file DB).
+  - **Why (this is the part that matters, write it into --technologies, don't just state the
+    choice)**: sift is meant to be self-hosted by other people, not run once on the author's
+    own machine. Every future schema change (more columns/tables as SCHEDULER, CONFIG-UI,
+    DISTRIBUTION-TRUST get designed) has to apply cleanly to databases that ALREADY EXIST on
+    other users' machines, exactly once, when they update the app. Drizzle tracks which
+    migrations have already been applied inside each user's own .db file and auto-applies only
+    what's new on startup — solving that bookkeeping automatically instead of the maintainer
+    hand-writing idempotent `ALTER TABLE` checks for every change, forever, for every user.
+    It also catches column-name typos at compile time (TypeScript) instead of at runtime (raw
+    SQL strings). Cost: one extra (lightweight) dependency, judged worth it given the
+    multi-user self-hosted context — NOT decided in a vacuum, this is a real project constraint.
+- **Three tables (a 4th, `pipeline_runs`, was proposed and explicitly REJECTED as premature —
+  it only existed to serve SCHEDULER's not-yet-designed missed-run catch-up logic; add it
+  later as its own migration if/when SCHEDULER's dedicated pass actually decides it's needed)**:
+  - `seen_items` — INGESTION's dedup hashes (id, urlHash UNIQUE, source, firstSeenAt). Indefinite
+    retention — tiny rows (~10k/yr), no pruning need, and pruning here would risk re-surfacing
+    old "unseen-again" articles.
+  - `drafts` — matches the row shape already locked during REVIEW-WORKSPACE: id, runDate, url,
+    originalText, editedText, imagePrompt, discarded, posted, postedAt. The ONLY table with
+    configurable retention (last N runs, or unlimited via CONFIG-UI) — pruning here is a UX
+    cleanliness choice (avoid clutter in the review view), not a storage necessity (~1-2MB/yr
+    unpruned is trivial).
+  - `llm_calls` — cost ledger from the cost-safe-LLM-calls decision: timestamp, provider,
+    model, inputTokens, outputTokens, estimatedCost, plus a nullable `runId`-shaped link for
+    future per-run cost breakdowns. Indefinite retention (~1-2k rows/yr). Used to sum current
+    month's spend against DISTRIBUTION-TRUST's budget cap.
+- **Migrations (locked)**: `drizzle-kit generate` produces migration SQL files checked into the
+  repo (e.g. `drizzle/`). App calls Drizzle's `migrate()` once on server startup, before serving
+  — idempotent, applies only unapplied migrations. No manual migration step for end users
+  beyond `npm start`.
+- **DB file location (locked)**: `data/sift.db` at repo root, gitignored, directory
+  auto-created on bootstrap. Path configurable via `SIFT_DB_PATH` env var (default
+  `data/sift.db`) so DISTRIBUTION-TRUST's future Docker packaging can mount it as a volume
+  without a breaking change later.
+- Every other feature that touches persistence (INGESTION for seen_items, DRAFT-GENERATOR/
+  REVIEW-WORKSPACE for drafts, CURATION-ENGINE/DRAFT-GENERATOR for llm_calls) reads/writes
+  through STORAGE-HISTORY's schema rather than owning any table itself — matches the
+  already-established pattern (e.g. REVIEW-WORKSPACE--architecture.md already forward-links
+  here for the drafts table's canonical definition).
+
+## Feature: CONFIG-UI — DONE
+Fully discussed and written to vault-sift/features/CONFIG-UI/. Locked design summary
+(authoritative version lives in the vault):
+- **Naming note**: feature folder/file identifiers stay `CONFIG-UI` (preserves existing
+  `[[CONFIG-UI]]` wikilinks already written into INGESTION--sources.md and elsewhere — renaming
+  the identifier now would mean chasing down every cross-link for no functional gain). Display
+  title in the doc itself is **"Config & UI"** per the user's naming preference, to avoid the
+  "configuration of the UI" (theme/layout) misreading — this feature is the UI *used to
+  configure sift*, backed by config files, not settings about the UI's own appearance.
+- **Scope boundary (important, keep these two mental models separate)**: CONFIG-UI owns
+  everything that controls HOW SIFT BEHAVES (user-authored, small, rarely changes). STORAGE-
+  HISTORY owns everything that records WHAT HAS HAPPENED (grows over time, gets queried/pruned).
+  These are deliberately two different persistence mechanisms, not one system pretending to be
+  two — config lives in flat JSON files, history lives in SQLite.
+- **Storage (locked)**: a `config/` folder at repo root, plain JSON files, NOT SQLite/Drizzle.
+  Files: `providers.json` (list — id, label, baseUrl, apiKey, kind), `sources.json` (reuses
+  INGESTION's already-speced schema exactly: name, url, category, enabled — CONFIG-UI is just
+  the UI for this pre-existing schema, not a new one), `settings.json` (scalars: budgetCapUsd,
+  draftsRetentionRuns [nullable = unlimited], scheduleDays, voiceProfile [single JSON object,
+  not a list — {toneNotes, examplePosts[], interests[]} per DRAFT-GENERATOR--voice-profile.md]),
+  and model-assignment fields (curationProviderId/curationModel/draftingProviderId/
+  draftingModel) folded into settings.json rather than a separate table/file — resolved from
+  the earlier "dedicated table vs KV" debate once the whole feature moved off SQLite entirely.
+  **`config/` MUST be gitignored** (holds plaintext API keys) — same lesson already applied to
+  `data/`. Rationale for JSON-not-SQLite: config data doesn't need SQL query power (small,
+  loaded whole into memory), and keeping it physically separate from STORAGE-HISTORY's DB
+  reinforces the "config vs history" conceptual split rather than blurring it.
+- **Three pages (locked)**, same Next.js app as REVIEW-WORKSPACE, Server Actions only (no
+  separate API route layer, matching the established pattern):
+  1. **API Config** (`--api-config-page`) — providers list (add/edit/remove), per-stage model
+     assignment (curation vs drafting), the "test this model" button (structured-output probe,
+     per the "Minimum model capability floor" decision below).
+  2. **Settings** (`--settings-page`) — sources (enable/disable/add, reusing INGESTION's
+     schema), schedule (which days the pipeline runs — saving this re-registers the in-process
+     `node-cron` job live via a Server Action, NOT an app restart), voice profile editor,
+     drafts retention (last N runs / unlimited — STORAGE-HISTORY's pruning setting).
+  3. **Costs Management** (`--costs-page`) — budget cap (writes to settings.json) PLUS cost
+     history viewing (reads from STORAGE-HISTORY's `llm_calls` SQLite table via the same
+     Drizzle client — a genuine read-from-one-system/write-to-another split within one page,
+     worth documenting clearly in --architecture so it isn't mistaken for a CONFIG-UI-owned
+     table).
+  - NOTE: the "Posts" page is REVIEW-WORKSPACE, a separate already-completed feature — not
+    part of CONFIG-UI despite living in the same app/navigation.
+- **Security**: API keys stored plaintext in `config/providers.json`, gitignored, not
+  web-served — consistent with STORAGE-HISTORY's already-locked precedent (no encryption-at-
+  rest, no key-management story needed for a local single-user file). Explicit note: a leaked
+  API key is an ongoing $ liability on the user's own provider account, not just leaked local
+  data — flag prominently when DISTRIBUTION-TRUST's cross-cutting security posture is written.
+- **Deferred as overkill**: auth, settings versioning/audit log, config import/export as a
+  first-class feature, a secrets vault/KMS integration.
+
+## Feature: SCHEDULER + regenerate design + STORAGE-HISTORY schema revision — LOCKED (2026-07-16)
+This is a big, coupled change — read this section in full before touching any vault file, since
+it revises INGESTION, CURATION-ENGINE, DRAFT-GENERATOR, REVIEW-WORKSPACE, and STORAGE-HISTORY,
+plus writes SCHEDULER fresh and adds one piece to CONFIG-UI. Everything below supersedes any
+earlier conflicting description in those features' existing vault files.
+
+### SCHEDULER (locked)
+- In-process `node-cron` inside the same long-lived Next.js server process (already established
+  — not a GitHub Action). Fires the full pipeline on `scheduleDays` (from CONFIG-UI's
+  settings.json).
+- **Missed-run catch-up**: on app startup, check the most recent scheduled slot that should
+  already have occurred (via `pipeline_runs`, see schema below). If no run exists for that slot
+  AND it's within the last 24h, fire one catch-up run immediately. Older than 24h → silently
+  skip, wait for the next natural slot. Reason: sift curates trending news — a multi-day-stale
+  catch-up would draft posts about news that's no longer current, worse than just skipping.
+- **Concurrency**: a single in-memory `isRunning` boolean in the server process, checked by
+  every trigger source (cron, startup catch-up, manual "Run Now", and the two regenerate
+  actions below) before starting. A trigger arriving while busy is a silent no-op (console log
+  only). No DB-backed lock needed — single process, and a restart already means nothing was
+  really running (matches the existing "abort entirely, no partial output, no resume"
+  semantics).
+- **Manual "Run Now"**: a button on CONFIG-UI's Settings page (next to the schedule config,
+  distinct from the two regenerate actions below, which live on REVIEW-WORKSPACE) — triggers a
+  full pipeline run (fresh ingestion through drafting) outside the schedule, using the same
+  concurrency guard.
+- **No auto-retry** on a failed/aborted run — wait for the next natural scheduled slot, or use
+  "Run Now" once whatever broke is fixed. `budget_cap` aborts would fail again immediately
+  (cap is monthly); `api_error` aborts need a human to look before retrying.
+
+### Regenerate (new — lives on REVIEW-WORKSPACE, not Settings)
+Two distinct buttons on the review page, both using the same concurrency guard as SCHEDULER:
+- **Regenerate Posts** (cheap) — re-runs DRAFT-GENERATOR only, on the *same* 3 already-chosen
+  candidates. New wording/phrasing for the same topics (LLM output isn't deterministic).
+  Overwrites the current `posts` rows for this run (no versioning/history of prior drafts —
+  already-locked "no edit-history" decision covers this).
+- **Regenerate Topics** — re-runs CURATION-ENGINE on the remaining ~37 un-chosen candidates from
+  the *same* run (no re-ingestion), picks a new 3, then drafts those. Replaces the current
+  `posts` rows.
+- Both create a new `pipeline_runs` row tagged `type: 'regenerate-posts'` or
+  `type: 'regenerate-topics'` (see schema below) — explicitly NOT counted as satisfying a
+  scheduled slot for missed-run detection.
+
+### STORAGE-HISTORY schema — REVISED (supersedes the earlier 3-table design)
+Final table set: `candidates`, `posts` (renamed from `drafts`), `llm_calls`, `pipeline_runs`.
+`seen_items` is DROPPED — merged into `candidates` (see rationale below).
+
+- **`pipeline_runs`**: `id, startedAt, finishedAt, status ('success'|'aborted'), abortReason
+  ('budget_cap'|'api_error', nullable), type ('scheduled'|'catchup'|'manual'|
+  'regenerate-posts'|'regenerate-topics')`. One row per pipeline execution of any kind. Every
+  other run-scoped table links back via `runId`. Justification (this was previously asserted
+  without explanation — here's the real one): (1) SCHEDULER's missed-run check queries this
+  table for "was there a run for the expected slot", (2) it's the home for abort-reason logging
+  that the cost-safety design already committed to but had nowhere to land before (a
+  budget-cap abort happens before any LLM call, so it can't piggyback on an `llm_calls` row),
+  (3) it's the anchor `candidates`/`posts`/`llm_calls` reference to know which run they belong
+  to, including telling a full run apart from a regenerate action.
+- **`candidates`**: `id, runId, url, sourceRecap, chosen (bool), createdAt`. ALL items INGESTION
+  hands to CURATION-ENGINE (~40), not just the 3 picked — permanent, never wiped (storage size
+  is trivial at this scale, so there's no real reason to delete old runs' candidates). Serves
+  TWO purposes with one table: (1) **dedup** — INGESTION checks "does this URL already exist in
+  `candidates`, any run, ever" instead of a separate hash table; (2) **regenerate-topics** —
+  query `WHERE runId = currentRun AND chosen = false` for the remaining pool to re-curate from.
+  This replaces the earlier "~40 candidates are memory-only, never persisted" decision (logged
+  under "Pipeline execution model" above) — that decision is SUPERSEDED, candidates now persist
+  specifically to support Regenerate Topics.
+- **`posts`** (renamed from `drafts`): `id, candidateId (FK -> candidates.id), runId, url,
+  originalText, editedText, imagePrompt, discarded, posted, postedAt`. The 3 candidates that
+  got curated+drafted, plus drafting-specific fields. `originalText`/`editedText` are the
+  *drafted post text* (a generated artifact), distinct from `candidates.sourceRecap` (the raw
+  article content the draft was based on) — not a duplicate, a different kind of data.
+  Display rule unchanged: `editedText ?? originalText`.
+- **`llm_calls`**: unchanged from the original design — `id, timestamp, runId, provider, model,
+  inputTokens, outputTokens, estimatedCost`. `runId` now has a real, always-populated target
+  in `pipeline_runs` (previously spec'd as nullable/"for future use", now just a plain FK).
+- **Retention**: `pipeline_runs`, `candidates`, `llm_calls` — indefinite (all trivial row/size
+  counts, per the earlier STORAGE-HISTORY sizing analysis). `posts` — the only table with
+  configurable N-run retention (CONFIG-UI setting), unchanged from the original design.
+
+### Ripple effects to propagate (all supersede current vault content in these features)
+- **INGESTION**: dedup now checks against `candidates` (all runs, any status) instead of a
+  separate `seen_items` hash table. INGESTION writes the ~40-candidate batch directly into
+  `candidates` (tagged with the current `runId`) as its handoff to CURATION-ENGINE, rather than
+  passing them in-memory only.
+- **CURATION-ENGINE**: reads its input pool from `candidates` (not an in-memory array), marks
+  `chosen = true` on the 3 it picks. Must support being re-invoked standalone for Regenerate
+  Topics (same `runId`, `WHERE chosen = false` pool, no re-ingestion).
+- **DRAFT-GENERATOR**: writes to `posts` (renamed from `drafts`), each row referencing its
+  `candidateId`. Must support being re-invoked standalone for Regenerate Posts (same 3
+  `candidateId`s, fresh LLM call, overwrite the existing `posts` rows for this run).
+- **REVIEW-WORKSPACE**: rename `drafts` -> `posts` throughout (route/UI copy can still say
+  "posts" casually, that's already the natural term). Add the two Regenerate buttons described
+  above to the page/card UI.
+- **CONFIG-UI**: add "Run Now" button to `--settings-page`, next to `scheduleDays` — distinct
+  from the two Regenerate buttons, which live on REVIEW-WORKSPACE instead.
+
 ## Minimum model capability floor (locked, small addition to Distribution & Trust scope)
 Since any user can plug in any model (including tiny/weak local ones), DISTRIBUTION-TRUST
 will document a recommended minimum tier (roughly Llama-3-8B / GPT-3.5-turbo class or
