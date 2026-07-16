@@ -1,4 +1,4 @@
-import { and, gte, sum, eq } from "drizzle-orm";
+import { gte, sum } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { llmCallsTable } from "../db/schema";
 import { getSettings } from "../config/settings";
