@@ -10,4 +10,4 @@ dist/
 build/
 .DS_Store
 data/
-config/
+/config/
