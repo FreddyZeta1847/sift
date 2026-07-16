@@ -2,6 +2,7 @@ vault-sift/
 .env
 .env.*
 node_modules/
+.next/
 __pycache__/
 *.pyc
 .venv/
@@ -9,5 +10,5 @@ dist/
 build/
 .DS_Store
 data/
-config/
+/config/
 .claude/worktrees/
