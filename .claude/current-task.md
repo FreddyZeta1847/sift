@@ -473,6 +473,34 @@ to implementation-phase planning. 5 phases, ordered by dependency:
 5. **Safety & Distribution** — DISTRIBUTION-TRUST's `--oss-packaging` only (Docker, compose,
    README, LICENSE, CONTRIBUTING, SECURITY.md) — the safety half already landed in phase 2.
 
+## Phase 1 review — provider deletion guard (locked 2026-07-16)
+Found during Phase 1 review: nothing in CONFIG-UI's docs covered what happens if a provider
+currently assigned to `curationProviderId`/`draftingProviderId` (in `settings.json`) gets
+deleted from `providers.json` — since these are separate JSON files, nothing enforced that
+reference. **Locked: block deletion.** If a provider's `id` matches either assignment field,
+the delete action on the API Config page refuses with a clear message (reassign the stage to a
+different provider first). Matches the project's established "fail loudly / catch mistakes at
+the moment they're made" pattern rather than letting a dangling reference surface later as a
+run-time failure. RIPPLE: CONFIG-UI--api-config-page.md (the delete action) and
+CONFIG-UI--resilience.md (add as a new failure-mode entry, same shape as its existing ones).
+
+## DEFERRED — provider catalog UX (Phase 3, not yet locked)
+Raised during Phase 1 review, explicitly deferred to a later discussion (does not block Phase 1
+— no schema change involved). Direction: a curated catalog picker in CONFIG-UI's API Config
+page (pre-fills baseUrl/kind for known providers: NVIDIA NIM, OpenRouter, Gemini, DeepSeek,
+Mistral, Mistral Codestral, OpenCode Zen/Go, Wafer, Kimi, Cerebras, Groq, Fireworks, Z.ai
+[flagged not essential for v1], plus local endpoints LM Studio/llama.cpp/Ollama with a
+reachability "Test" instead of a key), a "Refresh models" live call to `{baseUrl}/models` to
+populate a real model dropdown instead of free-typing, and status badges (Configured/Missing
+key/Offline/Reachable) derived from existing data — no new providers.json/settings.json fields
+needed for any of this. Open question to resolve later: full catalog now vs. a trimmed starter
+set (NVIDIA NIM/OpenRouter/DeepSeek/Gemini + the 3 local ones). One clarification already
+locked regardless of catalog scope: `curationModel`/`draftingModel` store the RAW model string
+as that specific provider's own API expects it (e.g. `moonshotai/kimi-k2.6` for NVIDIA NIM),
+NOT prefixed with a provider name (`nvidia_nim/...`) — sift already disambiguates provider via
+`curationProviderId`/`draftingProviderId` separately, so a prefixed string would be sent
+verbatim to the provider's API as an invalid model name.
+
 ## Minimum model capability floor (locked, small addition to Distribution & Trust scope)
 Since any user can plug in any model (including tiny/weak local ones), DISTRIBUTION-TRUST
 will document a recommended minimum tier (roughly Llama-3-8B / GPT-3.5-turbo class or
