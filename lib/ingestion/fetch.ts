@@ -10,14 +10,7 @@ export interface RawFeedItem {
   summary?: string;
 }
 
-let rssParser: Parser | null = null;
-
-function getRssParser(): Parser {
-  if (!rssParser) {
-    rssParser = new Parser({ headers: { "User-Agent": SIFT_USER_AGENT } });
-  }
-  return rssParser;
-}
+const rssParser = new Parser({ headers: { "User-Agent": SIFT_USER_AGENT } });
 
 async function fetchTldrPage(source: Source): Promise<RawFeedItem[]> {
   const res = await fetch(source.url, { headers: { "User-Agent": SIFT_USER_AGENT } });
@@ -38,8 +31,7 @@ export async function fetchSource(source: Source & { isTldr?: boolean }): Promis
   if (source.isTldr) {
     return fetchTldrPage(source);
   }
-  const parser = getRssParser();
-  const feed = await parser.parseURL(source.url);
+  const feed = await rssParser.parseURL(source.url);
   return (feed.items ?? []).map((item) => ({
     title: item.title ?? "",
     link: item.link ?? "",

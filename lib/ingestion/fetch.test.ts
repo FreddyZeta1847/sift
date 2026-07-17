@@ -1,57 +1,50 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
+import nock from "nock";
 import type { Source } from "../config/types";
-
-// Mock rss-parser to use mocked fetch
-vi.mock("rss-parser", () => {
-  return {
-    default: class MockParser {
-      constructor(_options: any) {}
-      async parseURL(url: string) {
-        const response = await fetch(url);
-        const text = await response.text();
-        // Very simple RSS parser for testing
-        const titleMatch = text.match(/<title>([^<]+)<\/title>/);
-        const linkMatch = text.match(/<link>([^<]+)<\/link>/);
-        const pubDateMatch = text.match(/<pubDate>([^<]+)<\/pubDate>/);
-        const descMatch = text.match(/<description>([^<]+)<\/description>/);
-
-        if (titleMatch && linkMatch) {
-          return {
-            items: [
-              {
-                title: titleMatch[1],
-                link: linkMatch[1],
-                pubDate: pubDateMatch ? pubDateMatch[1] : undefined,
-                contentSnippet: descMatch ? descMatch[1] : undefined,
-              },
-            ],
-          };
-        }
-        return { items: [] };
-      }
-    },
-  };
-});
-
 import { fetchSource } from "./fetch";
 
 describe("fetchSource", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeAll(() => {
+    nock.disableNetConnect();
   });
 
-  it("parses an RSS feed source", async () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    nock.cleanAll();
+  });
+
+  afterAll(() => {
+    nock.enableNetConnect();
+  });
+
+  it("parses an RSS feed source with the real rss-parser pipeline", async () => {
     const source: Source = { name: "Test RSS", url: "https://example.test/feed.xml", category: "ai-ml", enabled: true };
     const rssXml = `<?xml version="1.0"?><rss version="2.0"><channel>
-      <item><title>Item One</title><link>https://example.test/one</link><pubDate>Mon, 01 Jan 2026 00:00:00 GMT</pubDate><description>Summary one</description></item>
+      <title>Test Feed</title>
+      <item>
+        <title><![CDATA[Item One <special>]]></title>
+        <link>https://example.test/one</link>
+        <pubDate>Mon, 01 Jan 2026 00:00:00 GMT</pubDate>
+        <description>Summary one</description>
+      </item>
+      <item>
+        <title>Item Two</title>
+        <link>https://example.test/two</link>
+        <pubDate>Tue, 02 Jan 2026 00:00:00 GMT</pubDate>
+        <content:encoded xmlns:content="http://purl.org/rss/1.0/modules/content/"><![CDATA[<p>Full content two</p>]]></content:encoded>
+        <description>Summary two</description>
+      </item>
     </channel></rss>`;
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(rssXml, { status: 200, headers: { "Content-Type": "application/rss+xml" } }));
+    nock("https://example.test").get("/feed.xml").reply(200, rssXml, { "Content-Type": "application/rss+xml" });
 
     const items = await fetchSource(source);
 
-    expect(items).toHaveLength(1);
-    expect(items[0].title).toBe("Item One");
+    expect(items).toHaveLength(2);
+    expect(items[0].title).toBe("Item One <special>");
     expect(items[0].link).toBe("https://example.test/one");
+    expect(items[0].summary).toBe("Summary one");
+    expect(items[1].title).toBe("Item Two");
+    expect(items[1].link).toBe("https://example.test/two");
   });
 
   it("parses a TLDR archive page source via HTML", async () => {
