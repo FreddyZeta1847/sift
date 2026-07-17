@@ -91,6 +91,31 @@ describe("runDraftGenerator", () => {
     expect(result.written).toBe(1);
   });
 
+  it("drops entries whose id doesn't resolve to a real item, including non-numeric ids that would NaN the insert", async () => {
+    const db = getDb();
+    const [second] = await db
+      .insert(candidatesTable)
+      .values({ runId, url: "https://a.test/2", sourceRecap: "Item B", chosen: true, createdAt: new Date() })
+      .returning({ id: candidatesTable.id, url: candidatesTable.url });
+    const twoItems = [...items, { id: second.id, url: second.url, sourceRecap: "Item B", whyPicked: "relevant" }];
+
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: JSON.stringify([
+        { id: String(items[0].id), text: "Good post", imagePrompt: "prompt" },
+        { id: "item-3", text: "Hallucinated non-numeric id", imagePrompt: "prompt" },
+        { id: "9999999", text: "Hallucinated numeric id", imagePrompt: "prompt" },
+      ]),
+      inputTokens: 800, outputTokens: 200,
+    });
+
+    const result = await runDraftGenerator(twoItems, runId);
+
+    expect(result.written).toBe(1);
+    const rows = await db.select().from(postsTable).where(eq(postsTable.runId, runId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].candidateId).toBe(items[0].id);
+  });
+
   it("hard failure: propagates BudgetCapAbort and writes nothing", async () => {
     vi.spyOn(costSafetyModule, "assertBudgetAvailable").mockRejectedValue(new costSafetyModule.BudgetCapAbort());
 

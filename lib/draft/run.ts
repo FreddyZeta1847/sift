@@ -64,25 +64,29 @@ export async function runDraftGenerator(
   });
 
   const parsed: unknown[] = JSON.parse(result.content);
-  const valid = parsed.filter(isValidDraftEntry);
+  const resolved: { match: EnrichedItem; entry: DraftEntry }[] = [];
+  for (const entry of parsed) {
+    if (!isValidDraftEntry(entry)) continue;
+    const match = enriched.find((e) => String(e.id) === entry.id);
+    if (match) {
+      resolved.push({ match, entry });
+    }
+  }
 
   const db = getDb();
-  if (valid.length > 0) {
+  if (resolved.length > 0) {
     await db.insert(postsTable).values(
-      valid.map((entry) => {
-        const source = enriched.find((e) => String(e.id) === entry.id);
-        return {
-          candidateId: Number(entry.id),
-          runId,
-          url: source?.url ?? "",
-          originalText: entry.text,
-          imagePrompt: entry.imagePrompt,
-        };
-      })
+      resolved.map(({ match, entry }) => ({
+        candidateId: match.id,
+        runId,
+        url: match.url,
+        originalText: entry.text,
+        imagePrompt: entry.imagePrompt,
+      }))
     );
   }
 
-  return { written: valid.length };
+  return { written: resolved.length };
 }
 
 function buildDraftingPrompt(
