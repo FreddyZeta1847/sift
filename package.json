@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx lib/db/migrate.ts",
-    "pipeline": "tsx scripts/run-pipeline.ts"
+    "pipeline": "tsx scripts/run-pipeline.ts",
+    "view-posts": "tsx scripts/view-posts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.1",
