@@ -1,0 +1,16 @@
+/*
+ * Global stylesheet for the Human Interface (Phase 3).
+ * Deliberately minimal: plain CSS, no framework (no Tailwind), no
+ * CSS-in-JS — consistent with this project's "no new dependency where
+ * plain code suffices" pattern. Extend with more rules as later tasks
+ * add UI (e.g. the interactive review card); do not introduce a CSS
+ * framework or CSS-in-JS library.
+ */
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; max-width: 720px; }
+.card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.card.muted { opacity: 0.5; }
+textarea { width: 100%; min-height: 120px; font: inherit; }
+.badge { display: inline-block; background: #f5c542; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.pending-compare { border-top: 1px dashed #999; margin-top: 12px; padding-top: 12px; }
+.empty-state { color: #666; }
