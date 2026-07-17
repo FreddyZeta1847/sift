@@ -514,3 +514,28 @@ Dispatch vault-architect to write CURATION-ENGINE and DRAFT-GENERATOR together (
 tightly coupled via the shared voice/interest profile). Then continue light pass:
 REVIEW-WORKSPACE, CONFIG-UI, STORAGE-HISTORY. Deep focus still pending: SCHEDULER,
 DISTRIBUTION-TRUST (including llm-cost-safety and the min-model-capability note above).
+
+(STALE as of Phase 2 implementation — all of the above is long done. See below for the
+Phase 2 implementation-time decision that reverses part of the locked INGESTION design.)
+
+## TLDR source dropped from v1 (locked 2026-07-17, reverses part of INGESTION--sources.md)
+During Phase 2 implementation (Task 3, Ingestion fetch/normalize), the final whole-branch
+review caught that TLDR was never actually delivered end-to-end — Task 3 built an HTML-parsing
+function (`fetchTldrPage`, via `cheerio`) but the `isTldr` discriminator was only a test-only
+type cast, never added to the real `Source` type from Phase 1's `lib/config/types.ts`, and
+`SEED_SOURCES` never got a real TLDR entry (per the Phase-1-era deferral comment, which assumed
+Phase 2's real INGESTION implementation would finish the date-based `tldr.tech/<category>/<date>`
+URL construction). Net effect: dead, unreachable code masquerading as a delivered feature.
+
+**Decision: drop TLDR entirely from v1** — not "finish it now," not "defer with a clearer
+comment," just cut it. RIPPLE:
+- Code (Phase 2 branch): remove `fetchTldrPage`, the `isTldr` branch, and its test case from
+  `lib/ingestion/fetch.ts`/`fetch.test.ts`; remove the now-unused `cheerio` dependency.
+- Vault (locked spec): `INGESTION--sources.md`'s "Starter source list (locked for v1)" needs
+  TLDR removed (4 categories instead of 5 for v1: arXiv, Hacker News, cybersecurity, robotics).
+  `INGESTION--technologies.md`'s cheerio/TLDR mention needs the same correction. Update
+  `vault-sift/_index.md`/`_features.md` only if either references the 5-category count directly
+  (check before assuming).
+- INGESTION's recap (`ingestion--recap.html`) will be stale after this vault edit — rebuild it.
+- Not a "come back to this later" TODO — if TLDR is ever wanted post-v1, it needs a fresh
+  design pass (the date-URL construction was never actually worked out, just gestured at).
