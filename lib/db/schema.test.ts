@@ -35,6 +35,7 @@ describe("postsTable", () => {
         "discarded",
         "posted",
         "postedAt",
+        "pending",
       ])
     );
   });

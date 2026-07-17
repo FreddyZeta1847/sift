@@ -38,6 +38,7 @@ export const postsTable = sqliteTable("posts", {
   discarded: integer("discarded", { mode: "boolean" }).notNull().default(false),
   posted: integer("posted", { mode: "boolean" }).notNull().default(false),
   postedAt: integer("posted_at", { mode: "timestamp" }),
+  pending: integer("pending", { mode: "boolean" }).notNull().default(false),
 });
 
 export const llmCallsTable = sqliteTable("llm_calls", {

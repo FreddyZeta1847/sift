@@ -1,0 +1,1 @@
+ALTER TABLE `posts` ADD `pending` integer DEFAULT false NOT NULL;

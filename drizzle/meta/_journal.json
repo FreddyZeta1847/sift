@@ -15,6 +15,13 @@
       "when": 1784318387999,
       "tag": "0001_bumpy_wendell_rand",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784327164524,
+      "tag": "0002_unknown_king_cobra",
+      "breakpoints": true
     }
   ]
 }
