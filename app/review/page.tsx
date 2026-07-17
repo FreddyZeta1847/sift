@@ -1,13 +1,13 @@
 /**
  * Review Workspace route (`/review?date=YYYY-MM-DD`).
  *
- * Read-only for now: resolves the pipeline run for the given date (default
- * today) via lib/review/queries and renders its posts as a plain list.
- * The interactive card (edit/discard/copy/regenerate) is intentionally
- * NOT built here — it lands in later tasks once its Server Actions exist,
- * so this route only needs to prove the data layer wires up end to end.
+ * Resolves the pipeline run for the given date (default today) via
+ * lib/review/queries and renders its posts as interactive DraftCards
+ * (edit-with-autosave, discard, copy-and-mark-posted). Regenerate is not
+ * built here — it lands in a later task once its Server Action exists.
  */
 import { resolveRunIdForDate, getPostsForRun } from "../../lib/review/queries";
+import { DraftCard } from "./DraftCard";
 
 export default async function ReviewPage({
   searchParams,
@@ -43,11 +43,9 @@ export default async function ReviewPage({
     <main>
       <h1>Review — {resolvedDate}</h1>
       <p>Run #{runId} — {posts.length} post(s)</p>
-      <ul>
-        {posts.map((p) => (
-          <li key={p.id}>{p.url} {p.pendingVersion ? "(has a pending regenerate)" : ""}</li>
-        ))}
-      </ul>
+      {posts.map((post) => (
+        <DraftCard key={post.id} post={post} />
+      ))}
     </main>
   );
 }
