@@ -56,6 +56,17 @@ describe("callLLM — openai-compatible", () => {
       callLLM(provider, "gpt-4o-mini", [{ role: "user", content: "hi" }], { maxOutputTokens: 100 })
     ).rejects.toThrow(/500/);
   });
+
+  it("includes the response body in the thrown error, so the real reason isn't lost", async () => {
+    const provider: Provider = { id: "p1", label: "Test", baseUrl: "https://example.test/v1", apiKey: "k", kind: "openai-compatible" };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Function not found for account" }), { status: 404 })
+    );
+
+    await expect(
+      callLLM(provider, "gpt-4o-mini", [{ role: "user", content: "hi" }], { maxOutputTokens: 100 })
+    ).rejects.toThrow(/Function not found for account/);
+  });
 });
 
 describe("callLLM — anthropic", () => {

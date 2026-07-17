@@ -43,7 +43,8 @@ async function callOpenAICompatible(
   });
 
   if (!res.ok) {
-    throw new Error(`LLM call failed: ${provider.baseUrl} returned ${res.status}`);
+    const body = await res.text();
+    throw new Error(`LLM call failed: ${provider.baseUrl} returned ${res.status}: ${body}`);
   }
 
   const data = await res.json();

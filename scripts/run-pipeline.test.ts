@@ -35,11 +35,12 @@ describe("runPipeline", () => {
     const curationSpy = vi.spyOn(curationModule, "runCuration").mockResolvedValue([{ id: 1, url: "u", sourceRecap: "r", whyPicked: "w" }]);
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator").mockResolvedValue({ written: 1 });
 
-    await runPipeline("manual");
+    const result = await runPipeline("manual");
 
     expect(ingestionSpy).toHaveBeenCalled();
     expect(curationSpy).toHaveBeenCalled();
     expect(draftSpy).toHaveBeenCalled();
+    expect(result).toEqual({ status: "success" });
 
     const db = getDb();
     const [run] = await db.select().from(pipelineRunsTable);
@@ -53,20 +54,24 @@ describe("runPipeline", () => {
     vi.spyOn(curationModule, "runCuration").mockRejectedValue(new BudgetCapAbort());
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator");
 
-    await runPipeline("manual");
+    const result = await runPipeline("manual");
 
     expect(draftSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: "aborted", abortReason: "budget_cap" });
     const db = getDb();
     const [run] = await db.select().from(pipelineRunsTable);
     expect(run.status).toBe("aborted");
     expect(run.abortReason).toBe("budget_cap");
   });
 
-  it("marks the run aborted with reason api_error on any other stage failure", async () => {
+  it("marks the run aborted with reason api_error on any other stage failure, and logs the real error", async () => {
     vi.spyOn(ingestionModule, "runIngestion").mockRejectedValue(new Error("network down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await runPipeline("manual");
+    const result = await runPipeline("manual");
 
+    expect(result).toEqual({ status: "aborted", abortReason: "api_error" });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("network down"));
     const db = getDb();
     const [run] = await db.select().from(pipelineRunsTable);
     expect(run.status).toBe("aborted");
