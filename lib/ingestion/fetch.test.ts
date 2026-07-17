@@ -46,18 +46,4 @@ describe("fetchSource", () => {
     expect(items[1].title).toBe("Item Two");
     expect(items[1].link).toBe("https://example.test/two");
   });
-
-  it("parses a TLDR archive page source via HTML", async () => {
-    const source: Source = { name: "TLDR", url: "https://tldr.tech/ai", category: "ai-ml", enabled: true, isTldr: true } as Source;
-    const html = `<html><body>
-      <article><h3><a href="https://tldr.tech/ai/2026-01-01/one">Headline One</a></h3><p>Blurb one.</p></article>
-    </body></html>`;
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(html, { status: 200, headers: { "Content-Type": "text/html" } }));
-
-    const items = await fetchSource(source);
-
-    expect(items).toHaveLength(1);
-    expect(items[0].title).toBe("Headline One");
-    expect(items[0].link).toBe("https://tldr.tech/ai/2026-01-01/one");
-  });
 });

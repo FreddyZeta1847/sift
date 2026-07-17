@@ -1,5 +1,4 @@
 import Parser from "rss-parser";
-import * as cheerio from "cheerio";
 import type { Source } from "../config/types";
 import { SIFT_USER_AGENT } from "./rate-limit";
 
@@ -12,25 +11,7 @@ export interface RawFeedItem {
 
 const rssParser = new Parser({ headers: { "User-Agent": SIFT_USER_AGENT } });
 
-async function fetchTldrPage(source: Source): Promise<RawFeedItem[]> {
-  const res = await fetch(source.url, { headers: { "User-Agent": SIFT_USER_AGENT } });
-  const html = await res.text();
-  const $ = cheerio.load(html);
-  const items: RawFeedItem[] = [];
-  $("article").each((_, el) => {
-    const link = $(el).find("h3 a").first();
-    const title = link.text().trim();
-    const href = link.attr("href");
-    const summary = $(el).find("p").first().text().trim();
-    if (title && href) items.push({ title, link: href, summary });
-  });
-  return items;
-}
-
-export async function fetchSource(source: Source & { isTldr?: boolean }): Promise<RawFeedItem[]> {
-  if (source.isTldr) {
-    return fetchTldrPage(source);
-  }
+export async function fetchSource(source: Source): Promise<RawFeedItem[]> {
   const feed = await rssParser.parseURL(source.url);
   return (feed.items ?? []).map((item) => ({
     title: item.title ?? "",

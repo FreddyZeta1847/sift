@@ -17,7 +17,6 @@
     "@anthropic-ai/sdk": "^0.112.1",
     "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^11.8.1",
-    "cheerio": "^1.2.0",
     "drizzle-orm": "^0.38.4",
     "jsdom": "^29.1.1",
     "next": "^15.1.0",
