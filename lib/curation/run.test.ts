@@ -83,6 +83,31 @@ describe("runCuration", () => {
     expect(rows.every((r) => !r.chosen)).toBe(true);
   });
 
+  it("parses a code-fence-wrapped JSON response", async () => {
+    const db = getDb();
+    const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: "```json\n" + JSON.stringify({ selected: [{ id: String(rows[0].id), whyPicked: "relevant" }] }) + "\n```",
+      inputTokens: 500, outputTokens: 50,
+    });
+
+    const result = await runCuration(runId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].whyPicked).toBe("relevant");
+  });
+
+  it("soft-degrades to an empty result on unparseable content instead of throwing", async () => {
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: "not json at all",
+      inputTokens: 500, outputTokens: 50,
+    });
+
+    const result = await runCuration(runId);
+
+    expect(result).toEqual([]);
+  });
+
   it("poolFilter='unchosen' scopes to WHERE chosen = false", async () => {
     const db = getDb();
     const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));

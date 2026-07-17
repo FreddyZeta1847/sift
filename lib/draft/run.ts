@@ -16,6 +16,11 @@ interface DraftEntry {
 
 const MAX_OUTPUT_TOKENS = 4000;
 
+function extractJson(content: string): string {
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  return (fenced ? fenced[1] : content).trim();
+}
+
 function isValidDraftEntry(entry: unknown): entry is DraftEntry {
   return (
     typeof entry === "object" &&
@@ -63,7 +68,12 @@ export async function runDraftGenerator(
     outputTokens: result.outputTokens,
   });
 
-  const parsed: unknown[] = JSON.parse(result.content);
+  let parsed: unknown[];
+  try {
+    parsed = JSON.parse(extractJson(result.content));
+  } catch {
+    return { written: 0 };
+  }
   const resolved: { match: EnrichedItem; entry: DraftEntry }[] = [];
   for (const entry of parsed) {
     if (!isValidDraftEntry(entry)) continue;

@@ -20,6 +20,11 @@ interface RankingResponse {
 const MAX_OUTPUT_TOKENS = 1000;
 const INPUT_GUARD_LIMIT = 40;
 
+function extractJson(content: string): string {
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  return (fenced ? fenced[1] : content).trim();
+}
+
 export async function runCuration(
   runId: number,
   poolFilter: "all" | "unchosen" = "all"
@@ -64,7 +69,12 @@ export async function runCuration(
     outputTokens: result.outputTokens,
   });
 
-  const parsed: RankingResponse = JSON.parse(result.content);
+  let parsed: RankingResponse;
+  try {
+    parsed = JSON.parse(extractJson(result.content));
+  } catch {
+    return [];
+  }
   const resolved: CuratedItem[] = [];
   for (const sel of parsed.selected) {
     const match = guarded.find((row) => String(row.id) === sel.id);

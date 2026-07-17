@@ -11,6 +11,7 @@ import * as providerModule from "../llm/provider";
 import * as costSafetyModule from "../llm/cost-safety";
 import * as settingsModule from "../config/settings";
 import * as providersModule from "../config/providers";
+import * as rateLimitModule from "../ingestion/rate-limit";
 
 const testDbPath = "data/test-draft-run.db";
 
@@ -31,6 +32,7 @@ describe("runDraftGenerator", () => {
     items = [{ id: inserted[0].id, url: inserted[0].url, sourceRecap: "Item A", whyPicked: "relevant" }];
 
     vi.spyOn(enrichModule, "enrichWithArticleContent").mockImplementation(async (item) => ({ ...item, articleText: `enriched ${item.sourceRecap}` }));
+    vi.spyOn(rateLimitModule, "delayBetweenFetches").mockResolvedValue(undefined);
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
       budgetCapUsd: null, postsRetentionRuns: null, scheduleDays: [], voiceProfile: { toneNotes: "casual", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
@@ -114,6 +116,34 @@ describe("runDraftGenerator", () => {
     const rows = await db.select().from(postsTable).where(eq(postsTable.runId, runId));
     expect(rows).toHaveLength(1);
     expect(rows[0].candidateId).toBe(items[0].id);
+  });
+
+  it("parses a code-fence-wrapped JSON response", async () => {
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: "```json\n" + JSON.stringify([{ id: String(items[0].id), text: "Drafted post text", imagePrompt: "A robot writing" }]) + "\n```",
+      inputTokens: 800, outputTokens: 200,
+    });
+
+    const result = await runDraftGenerator(items, runId);
+
+    expect(result.written).toBe(1);
+    const db = getDb();
+    const rows = await db.select().from(postsTable).where(eq(postsTable.runId, runId));
+    expect(rows[0].originalText).toBe("Drafted post text");
+  });
+
+  it("soft-degrades to written: 0 on unparseable content instead of throwing", async () => {
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: "not json at all",
+      inputTokens: 800, outputTokens: 200,
+    });
+
+    const result = await runDraftGenerator(items, runId);
+
+    expect(result.written).toBe(0);
+    const db = getDb();
+    const rows = await db.select().from(postsTable).where(eq(postsTable.runId, runId));
+    expect(rows).toHaveLength(0);
   });
 
   it("hard failure: propagates BudgetCapAbort and writes nothing", async () => {
