@@ -44,6 +44,12 @@ describe("runIngestion", () => {
     const result = await runIngestion(sources, runId);
 
     expect(result.written).toBe(2);
+    expect(result.perSource).toEqual(
+      expect.arrayContaining([
+        { source: "A", fetched: 1, written: 1 },
+        { source: "B", fetched: 1, written: 1 },
+      ])
+    );
     const db = getDb();
     const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
     expect(rows).toHaveLength(2);
@@ -79,6 +85,12 @@ describe("runIngestion", () => {
     expect(result.skippedSources).toEqual(["Dead"]);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Dead"));
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("network error"));
+    expect(result.perSource).toEqual(
+      expect.arrayContaining([
+        { source: "Dead", fetched: 0, written: 0 },
+        { source: "Alive", fetched: 1, written: 1 },
+      ])
+    );
   });
 
   it("deduplicates items with the same url returned by two different sources in the same run", async () => {

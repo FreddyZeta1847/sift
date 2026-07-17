@@ -10,19 +10,32 @@ function toSourceRecap(item: NormalizedItem): string {
   return `${item.title} — ${item.source} (${item.category}): ${item.summary}`;
 }
 
-export async function runIngestion(
-  sources: Source[],
-  runId: number
-): Promise<{ fetched: number; written: number; skippedSources: string[] }> {
+export interface SourceBreakdown {
+  source: string;
+  fetched: number;
+  written: number;
+}
+
+export interface IngestionResult {
+  fetched: number;
+  written: number;
+  skippedSources: string[];
+  perSource: SourceBreakdown[];
+}
+
+export async function runIngestion(sources: Source[], runId: number): Promise<IngestionResult> {
   const db = getDb();
   const enabled = sources.filter((s) => s.enabled);
   const normalized: NormalizedItem[] = [];
   const skippedSources: string[] = [];
+  const fetchedBySource = new Map<string, number>();
 
   for (const source of enabled) {
     try {
       const raw = await fetchSource(source);
-      normalized.push(...raw.map((item) => normalize(item, source)));
+      const items = raw.map((item) => normalize(item, source));
+      normalized.push(...items);
+      fetchedBySource.set(source.name, items.length);
     } catch (err) {
       console.error(`[sift] Ingestion: source "${source.name}" failed: ${(err as Error).message}`);
       skippedSources.push(source.name);
@@ -40,6 +53,11 @@ export async function runIngestion(
     return true;
   });
 
+  const writtenBySource = new Map<string, number>();
+  for (const item of surviving) {
+    writtenBySource.set(item.source, (writtenBySource.get(item.source) ?? 0) + 1);
+  }
+
   if (surviving.length > 0) {
     await db.insert(candidatesTable).values(
       surviving.map((item) => ({
@@ -52,5 +70,11 @@ export async function runIngestion(
     );
   }
 
-  return { fetched: normalized.length, written: surviving.length, skippedSources };
+  const perSource: SourceBreakdown[] = enabled.map((s) => ({
+    source: s.name,
+    fetched: fetchedBySource.get(s.name) ?? 0,
+    written: writtenBySource.get(s.name) ?? 0,
+  }));
+
+  return { fetched: normalized.length, written: surviving.length, skippedSources, perSource };
 }

@@ -31,11 +31,17 @@ describe("runPipeline", () => {
     }
   });
 
-  it("creates a pipeline_runs row, prunes stale candidates, runs all three stages in order, and marks success", async () => {
+  it("creates a pipeline_runs row, prunes stale candidates, runs all three stages in order, marks success, and logs progress", async () => {
     const pruneSpy = vi.spyOn(retentionModule, "pruneStaleCandidates").mockResolvedValue({ deleted: 0 });
-    const ingestionSpy = vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 5, written: 5, skippedSources: [] });
-    const curationSpy = vi.spyOn(curationModule, "runCuration").mockResolvedValue([{ id: 1, url: "u", sourceRecap: "r", whyPicked: "w" }]);
+    const ingestionSpy = vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({
+      fetched: 5,
+      written: 5,
+      skippedSources: [],
+      perSource: [{ source: "Hacker News", fetched: 5, written: 5 }],
+    });
+    const curationSpy = vi.spyOn(curationModule, "runCuration").mockResolvedValue([{ id: 1, url: "https://example.test/a", sourceRecap: "r", whyPicked: "w" }]);
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator").mockResolvedValue({ written: 1 });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = await runPipeline("manual");
 
@@ -44,6 +50,11 @@ describe("runPipeline", () => {
     expect(curationSpy).toHaveBeenCalled();
     expect(draftSpy).toHaveBeenCalled();
     expect(result).toEqual({ status: "success" });
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("5 new candidate(s)"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Hacker News: 5 new / 5 fetched"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("chose 1 topic(s)"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("https://example.test/a"));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("wrote 1 post(s)"));
 
     const db = getDb();
     const [run] = await db.select().from(pipelineRunsTable);
@@ -53,7 +64,7 @@ describe("runPipeline", () => {
   });
 
   it("marks the run aborted with reason budget_cap when a stage throws BudgetCapAbort", async () => {
-    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 0, written: 0, skippedSources: [] });
+    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 0, written: 0, skippedSources: [], perSource: [] });
     vi.spyOn(curationModule, "runCuration").mockRejectedValue(new BudgetCapAbort());
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator");
 
@@ -83,7 +94,7 @@ describe("runPipeline", () => {
   });
 
   it("skips drafting when curation returns zero items, still marks success", async () => {
-    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 3, written: 3, skippedSources: [] });
+    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 3, written: 3, skippedSources: [], perSource: [] });
     vi.spyOn(curationModule, "runCuration").mockResolvedValue([]);
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator");
 
@@ -115,7 +126,7 @@ describe("runPipeline — fresh, never-migrated database", () => {
     // and proves runPipeline's own internal call is what makes this work.
     expect(existsSync(freshDbPath)).toBe(false);
     vi.spyOn(sourcesModule, "getSources").mockResolvedValue([]);
-    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 0, written: 0, skippedSources: [] });
+    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 0, written: 0, skippedSources: [], perSource: [] });
     vi.spyOn(curationModule, "runCuration").mockResolvedValue([]);
 
     await runPipeline("manual");

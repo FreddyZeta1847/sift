@@ -30,11 +30,34 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
 
   try {
     const sources = await getSources();
-    await runIngestion(sources, runId);
+    const ingested = await runIngestion(sources, runId);
+    // eslint-disable-next-line no-console
+    console.log(
+      `[sift] Ingestion: ${ingested.written} new candidate(s) (${ingested.fetched} fetched, ${ingested.fetched - ingested.written} already seen).`
+    );
+    for (const s of ingested.perSource) {
+      // eslint-disable-next-line no-console
+      console.log(`  - ${s.source}: ${s.written} new / ${s.fetched} fetched`);
+    }
+    if (ingested.skippedSources.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[sift] Skipped sources (fetch failed): ${ingested.skippedSources.join(", ")}`);
+    }
 
     const curated = await runCuration(runId);
     if (curated.length > 0) {
-      await runDraftGenerator(curated, runId);
+      // eslint-disable-next-line no-console
+      console.log(`[sift] Curation: chose ${curated.length} topic(s):`);
+      for (const item of curated) {
+        // eslint-disable-next-line no-console
+        console.log(`  - ${item.url}`);
+      }
+      const drafted = await runDraftGenerator(curated, runId);
+      // eslint-disable-next-line no-console
+      console.log(`[sift] Draft Generator: wrote ${drafted.written} post(s).`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log("[sift] Curation: no topics chosen — nothing to draft.");
     }
 
     await db
