@@ -1,10 +1,17 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { getProviders } from "./providers";
 
+const testConfigDir = "data/test-config-providers";
+
 describe("getProviders", () => {
+  beforeEach(() => {
+    process.env.SIFT_CONFIG_DIR = testConfigDir;
+  });
+
   afterEach(() => {
-    if (existsSync("config")) rmSync("config", { recursive: true, force: true });
+    delete process.env.SIFT_CONFIG_DIR;
+    if (existsSync(testConfigDir)) rmSync(testConfigDir, { recursive: true, force: true });
   });
 
   it("returns an empty array by default", async () => {
@@ -13,9 +20,9 @@ describe("getProviders", () => {
   });
 
   it("returns configured providers", async () => {
-    mkdirSync("config", { recursive: true });
+    mkdirSync(testConfigDir, { recursive: true });
     writeFileSync(
-      "config/providers.json",
+      `${testConfigDir}/providers.json`,
       JSON.stringify([{ id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" }])
     );
     const result = await getProviders();

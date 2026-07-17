@@ -1,10 +1,17 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { getSettings } from "./settings";
 
+const testConfigDir = "data/test-config-settings";
+
 describe("getSettings", () => {
+  beforeEach(() => {
+    process.env.SIFT_CONFIG_DIR = testConfigDir;
+  });
+
   afterEach(() => {
-    if (existsSync("config")) rmSync("config", { recursive: true, force: true });
+    delete process.env.SIFT_CONFIG_DIR;
+    if (existsSync(testConfigDir)) rmSync(testConfigDir, { recursive: true, force: true });
   });
 
   it("returns blank defaults by default", async () => {
