@@ -23,7 +23,8 @@ export async function runIngestion(
     try {
       const raw = await fetchSource(source);
       normalized.push(...raw.map((item) => normalize(item, source)));
-    } catch {
+    } catch (err) {
+      console.error(`[sift] Ingestion: source "${source.name}" failed: ${(err as Error).message}`);
       skippedSources.push(source.name);
     }
     await delayBetweenFetches();
@@ -32,7 +33,12 @@ export async function runIngestion(
   const existingUrls = new Set(
     (await db.select({ url: candidatesTable.url }).from(candidatesTable)).map((r) => r.url)
   );
-  const surviving = normalized.filter((item) => !existingUrls.has(item.url));
+  const seenInThisRun = new Set<string>();
+  const surviving = normalized.filter((item) => {
+    if (existingUrls.has(item.url) || seenInThisRun.has(item.url)) return false;
+    seenInThisRun.add(item.url);
+    return true;
+  });
 
   if (surviving.length > 0) {
     await db.insert(candidatesTable).values(

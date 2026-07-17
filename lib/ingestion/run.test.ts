@@ -64,6 +64,7 @@ describe("runIngestion", () => {
   });
 
   it("skips a source that fails to fetch and continues with the rest", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(fetchModule, "fetchSource")
       .mockRejectedValueOnce(new Error("network error"))
       .mockResolvedValueOnce([{ title: "Item B", link: "https://example.test/B", summary: "s" }]);
@@ -76,6 +77,29 @@ describe("runIngestion", () => {
 
     expect(result.written).toBe(1);
     expect(result.skippedSources).toEqual(["Dead"]);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Dead"));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("network error"));
+  });
+
+  it("deduplicates items with the same url returned by two different sources in the same run", async () => {
+    vi.spyOn(fetchModule, "fetchSource")
+      .mockResolvedValueOnce([{ title: "Item from A", link: "https://example.test/dupe", summary: "s" }])
+      .mockResolvedValueOnce([{ title: "Item from B", link: "https://example.test/dupe", summary: "s" }]);
+    const sources: Source[] = [
+      { name: "A", url: "https://a.test/feed", category: "ai-ml", enabled: true },
+      { name: "B", url: "https://b.test/feed", category: "cybersecurity", enabled: true },
+    ];
+
+    const result = await runIngestion(sources, runId);
+
+    expect(result.written).toBe(1);
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(candidatesTable)
+      .where(eq(candidatesTable.runId, runId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].url).toBe("https://example.test/dupe");
   });
 
   it("only fetches enabled sources", async () => {
