@@ -606,7 +606,7 @@ Create `lib/review/queries.ts`:
 
 ```typescript
 // lib/review/queries.ts
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, desc, eq, gte, lt } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { pipelineRunsTable, postsTable } from "../db/schema";
 
@@ -623,7 +623,7 @@ export async function resolveRunIdForDate(date: string): Promise<number | null> 
     .select({ id: pipelineRunsTable.id })
     .from(pipelineRunsTable)
     .where(and(gte(pipelineRunsTable.startedAt, dayStart), lt(pipelineRunsTable.startedAt, dayEnd)))
-    .orderBy(pipelineRunsTable.id)
+    .orderBy(desc(pipelineRunsTable.id))
     .limit(1);
   return run ? run.id : null;
 }

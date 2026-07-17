@@ -82,4 +82,20 @@ describe("review queries", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].pendingVersion).toBeUndefined();
   });
+
+  it("resolveRunIdForDate returns the most recent run on the same date", async () => {
+    const db = getDb();
+    const [earlyRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-18T08:00:00.000Z"), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+    const [lateRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-18T16:00:00.000Z"), type: "regenerate-posts" })
+      .returning({ id: pipelineRunsTable.id });
+
+    const resolved = await resolveRunIdForDate("2026-07-18");
+
+    expect(resolved).toBe(lateRun.id);
+  });
 });
