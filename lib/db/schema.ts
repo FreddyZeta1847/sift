@@ -6,6 +6,7 @@ export const pipelineRunsTable = sqliteTable("pipeline_runs", {
   finishedAt: integer("finished_at", { mode: "timestamp" }),
   status: text("status", { enum: ["success", "aborted"] }),
   abortReason: text("abort_reason", { enum: ["budget_cap", "api_error"] }),
+  errorMessage: text("error_message"),
   type: text("type", {
     enum: ["scheduled", "catchup", "manual", "regenerate-posts", "regenerate-topics"],
   }).notNull(),

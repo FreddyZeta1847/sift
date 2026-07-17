@@ -76,6 +76,7 @@ describe("runPipeline", () => {
     const [run] = await db.select().from(pipelineRunsTable);
     expect(run.status).toBe("aborted");
     expect(run.abortReason).toBe("api_error");
+    expect(run.errorMessage).toBe("network down");
   });
 
   it("skips drafting when curation returns zero items, still marks success", async () => {

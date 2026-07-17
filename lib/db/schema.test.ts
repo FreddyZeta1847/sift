@@ -6,7 +6,7 @@ describe("pipelineRunsTable", () => {
   it("has the expected columns", () => {
     const columns = Object.keys(getTableColumns(pipelineRunsTable));
     expect(columns).toEqual(
-      expect.arrayContaining(["id", "startedAt", "finishedAt", "status", "abortReason", "type"])
+      expect.arrayContaining(["id", "startedAt", "finishedAt", "status", "abortReason", "errorMessage", "type"])
     );
   });
 });
