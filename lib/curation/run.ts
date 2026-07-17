@@ -41,6 +41,9 @@ export async function runCuration(
     );
 
   const guarded = pool.slice(0, INPUT_GUARD_LIMIT);
+  if (guarded.length === 0) {
+    return [];
+  }
 
   const settings = await getSettings();
   const providers = await getProviders();

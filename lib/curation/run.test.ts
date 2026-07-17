@@ -108,6 +108,19 @@ describe("runCuration", () => {
     expect(result).toEqual([]);
   });
 
+  it("skips the LLM call entirely when the candidate pool is empty", async () => {
+    const db = getDb();
+    await db.delete(candidatesTable).where(eq(candidatesTable.runId, runId));
+    const callSpy = vi.spyOn(providerModule, "callLLM");
+    const budgetSpy = vi.spyOn(costSafetyModule, "assertBudgetAvailable");
+
+    const result = await runCuration(runId);
+
+    expect(result).toEqual([]);
+    expect(callSpy).not.toHaveBeenCalled();
+    expect(budgetSpy).not.toHaveBeenCalled();
+  });
+
   it("poolFilter='unchosen' scopes to WHERE chosen = false", async () => {
     const db = getDb();
     const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
