@@ -34,7 +34,7 @@ describe("runDraftGenerator", () => {
     vi.spyOn(enrichModule, "enrichWithArticleContent").mockImplementation(async (item) => ({ ...item, articleText: `enriched ${item.sourceRecap}` }));
     vi.spyOn(rateLimitModule, "delayBetweenFetches").mockResolvedValue(undefined);
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, scheduleDays: [], voiceProfile: { toneNotes: "casual", examplePosts: [], interests: [] },
+      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], voiceProfile: { toneNotes: "casual", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([

@@ -4,6 +4,7 @@ import type { Settings } from "./types";
 const DEFAULT_SETTINGS: Settings = {
   budgetCapUsd: null,
   postsRetentionRuns: null,
+  candidateRetentionDays: null,
   scheduleDays: [],
   voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
   curationProviderId: null,

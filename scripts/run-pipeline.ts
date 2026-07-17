@@ -8,6 +8,7 @@ import { runIngestion } from "../lib/ingestion/run";
 import { runCuration } from "../lib/curation/run";
 import { runDraftGenerator } from "../lib/draft/run";
 import { BudgetCapAbort } from "../lib/llm/cost-safety";
+import { pruneStaleCandidates } from "../lib/candidates/retention";
 
 export type PipelineOutcome =
   | { status: "success" }
@@ -18,6 +19,7 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
   // (first-ever run, a new clone, a fresh Docker volume) works with zero
   // manual setup, per the locked "boots with zero configuration" requirement.
   runMigrations();
+  await pruneStaleCandidates();
 
   const db = getDb();
   const [run] = await db

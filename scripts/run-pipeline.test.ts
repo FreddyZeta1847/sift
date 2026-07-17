@@ -10,6 +10,7 @@ import * as ingestionModule from "../lib/ingestion/run";
 import * as curationModule from "../lib/curation/run";
 import * as draftModule from "../lib/draft/run";
 import * as sourcesModule from "../lib/config/sources";
+import * as retentionModule from "../lib/candidates/retention";
 import { BudgetCapAbort } from "../lib/llm/cost-safety";
 
 const testDbPath = "data/test-run-pipeline.db";
@@ -30,13 +31,15 @@ describe("runPipeline", () => {
     }
   });
 
-  it("creates a pipeline_runs row, runs all three stages in order, and marks success", async () => {
+  it("creates a pipeline_runs row, prunes stale candidates, runs all three stages in order, and marks success", async () => {
+    const pruneSpy = vi.spyOn(retentionModule, "pruneStaleCandidates").mockResolvedValue({ deleted: 0 });
     const ingestionSpy = vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 5, written: 5, skippedSources: [] });
     const curationSpy = vi.spyOn(curationModule, "runCuration").mockResolvedValue([{ id: 1, url: "u", sourceRecap: "r", whyPicked: "w" }]);
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator").mockResolvedValue({ written: 1 });
 
     const result = await runPipeline("manual");
 
+    expect(pruneSpy).toHaveBeenCalled();
     expect(ingestionSpy).toHaveBeenCalled();
     expect(curationSpy).toHaveBeenCalled();
     expect(draftSpy).toHaveBeenCalled();

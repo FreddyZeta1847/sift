@@ -13,7 +13,8 @@
     "db:migrate": "tsx lib/db/migrate.ts",
     "pipeline": "tsx scripts/run-pipeline.ts",
     "view-posts": "tsx scripts/view-posts.ts",
-    "view-runs": "tsx scripts/view-runs.ts"
+    "view-runs": "tsx scripts/view-runs.ts",
+    "regenerate-posts": "tsx scripts/regenerate-posts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.1",

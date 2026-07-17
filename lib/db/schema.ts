@@ -8,7 +8,7 @@ export const pipelineRunsTable = sqliteTable("pipeline_runs", {
   abortReason: text("abort_reason", { enum: ["budget_cap", "api_error"] }),
   errorMessage: text("error_message"),
   type: text("type", {
-    enum: ["scheduled", "catchup", "manual", "regenerate-posts", "regenerate-topics"],
+    enum: ["scheduled", "catchup", "manual", "regenerate-posts"],
   }).notNull(),
 });
 
