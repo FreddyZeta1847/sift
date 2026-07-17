@@ -1,6 +1,7 @@
 // scripts/run-pipeline.ts
 import { eq } from "drizzle-orm";
 import { getDb } from "../lib/db/client";
+import { runMigrations } from "../lib/db/migrate";
 import { pipelineRunsTable } from "../lib/db/schema";
 import { getSources } from "../lib/config/sources";
 import { runIngestion } from "../lib/ingestion/run";
@@ -9,6 +10,11 @@ import { runDraftGenerator } from "../lib/draft/run";
 import { BudgetCapAbort } from "../lib/llm/cost-safety";
 
 export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Promise<void> {
+  // Idempotent — safe to call on every run. Ensures a fresh `data/` directory
+  // (first-ever run, a new clone, a fresh Docker volume) works with zero
+  // manual setup, per the locked "boots with zero configuration" requirement.
+  runMigrations();
+
   const db = getDb();
   const [run] = await db
     .insert(pipelineRunsTable)

@@ -86,3 +86,33 @@ describe("runPipeline", () => {
     expect(run.status).toBe("success");
   });
 });
+
+describe("runPipeline — fresh, never-migrated database", () => {
+  const freshDbPath = "data/test-run-pipeline-fresh.db";
+
+  afterEach(() => {
+    closeDb();
+    delete process.env.SIFT_DB_PATH;
+    vi.restoreAllMocks();
+    for (const suffix of ["", "-wal", "-shm"]) {
+      if (existsSync(freshDbPath + suffix)) rmSync(freshDbPath + suffix);
+    }
+  });
+
+  it("runs migrations itself against a fresh data/ directory, without a manual db:migrate step first", async () => {
+    process.env.SIFT_DB_PATH = freshDbPath;
+    // Deliberately do NOT call runMigrations() here — this reproduces the
+    // real bug (a fresh clone / fresh Docker volume with no prior migration)
+    // and proves runPipeline's own internal call is what makes this work.
+    expect(existsSync(freshDbPath)).toBe(false);
+    vi.spyOn(sourcesModule, "getSources").mockResolvedValue([]);
+    vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 0, written: 0, skippedSources: [] });
+    vi.spyOn(curationModule, "runCuration").mockResolvedValue([]);
+
+    await runPipeline("manual");
+
+    const db = getDb();
+    const [run] = await db.select().from(pipelineRunsTable);
+    expect(run.status).toBe("success");
+  });
+});
