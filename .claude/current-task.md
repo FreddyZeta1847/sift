@@ -539,3 +539,111 @@ comment," just cut it. RIPPLE:
 - INGESTION's recap (`ingestion--recap.html`) will be stale after this vault edit — rebuild it.
 - Not a "come back to this later" TODO — if TLDR is ever wanted post-v1, it needs a fresh
   design pass (the date-URL construction was never actually worked out, just gestured at).
+
+## "Regenerate Topics" eliminated as a separate action (locked 2026-07-17, reverses part of
+## the "Regenerate" decision above and part of STORAGE-HISTORY's candidates rationale)
+
+Found and fixed during real-world pipeline testing (NVIDIA NIM): CURATION-ENGINE's candidate
+pool was scoped `WHERE runId = currentRun`, so any candidate ingested successfully but never
+curated (run aborted before curation ran, or a later run found zero NEW candidates because
+dedup had already claimed those URLs) became permanently invisible — dedup ensures it's never
+re-ingested as "new", and curation never looked past its own runId to find it.
+
+**Fix (already shipped in code, `lib/curation/run.ts`):** the candidate pool is now every
+`chosen = false` candidate regardless of which run originally ingested it, oldest first.
+`runId` on a `candidates` row is provenance (which run discovered it), not an eligibility
+window.
+
+**Consequence — this makes "Regenerate Topics" redundant as a distinct action.** The old design
+(see "Regenerate" section above) had it re-curate the *same run's* leftover ~37 candidates,
+no re-ingestion. The user's actual intent, restated directly: re-ingest (pick up anything new,
+skip if nothing's new — never blocks either way), then re-curate over the pool of unchosen
+candidates. Since curation's pool already spans all runs and already permanently excludes
+anything with `chosen = true`, **a plain pipeline re-run already does exactly this** — there is
+no scenario where a dedicated "Regenerate Topics" action would behave differently from calling
+the pipeline again. **Decision: eliminate it as a concept.** Only two user-facing actions exist:
+run/re-run the pipeline, and regenerate posts (see below).
+
+RIPPLE:
+- `pipeline_runs.type` enum: drop `'regenerate-topics'` — only
+  `'scheduled'|'catchup'|'manual'|'regenerate-posts'` remain (already shipped,
+  `lib/db/schema.ts`; TS-level only, no migration needed since drizzle's sqlite `enum` isn't a
+  DB CHECK constraint).
+- `STORAGE-HISTORY--architecture.md`'s `candidates` rationale: purpose (2) "regenerate-topics —
+  query WHERE runId = currentRun AND chosen = false" is WRONG on two counts now — no runId
+  scoping, and it's not a special "regenerate-topics" query, it's just CURATION-ENGINE's normal
+  pool query, used identically by every run type. Reword purpose (2) as "cross-run backlog":
+  any candidate that outlives its own run's curation attempt remains eligible for the very next
+  run, scheduled or manual, with no special action needed.
+- `REVIEW-WORKSPACE--architecture.md` / `REVIEW-WORKSPACE--draft-review-ui.md`: remove the
+  "Regenerate Topics" button entirely. Only "Regenerate Posts" remains as a REVIEW-WORKSPACE
+  action (see below for its own revision). "Get different topics" is just "run the pipeline
+  again" — likely surfaced via the same "Run Now" affordance already documented under SCHEDULER,
+  not a REVIEW-WORKSPACE-specific control.
+- `CURATION-ENGINE--architecture.md` / `CURATION-ENGINE--ranking-logic.md`: remove any mention
+  of a runId-scoped pool or a separate regenerate-topics code path — one pool query, always.
+- `DRAFT-GENERATOR--architecture.md`, `SCHEDULER--architecture.md`, `_architecture.md`: check
+  each of these for a runId-scoped-pool or two-regenerate-buttons mention and correct to match.
+- `plans/PHASE-3-HUMAN-INTERFACE--regenerate-actions.md`: rewrite — one regenerate action
+  (posts), not two. See below for what Regenerate Posts actually needs to do.
+- `plans/PHASE-4-AUTOMATION.md`: check for a regenerate-topics mention tied to SCHEDULER's
+  missed-run detection and correct.
+- Recaps for CURATION-ENGINE, REVIEW-WORKSPACE, SCHEDULER, STORAGE-HISTORY are now stale —
+  rebuild after the source sub-features are corrected.
+- CLI reality check (already shipped, `scripts/run-pipeline.ts`): `pruneStaleCandidates()` now
+  runs at the top of every pipeline call — new, unrelated to this decision but touches the same
+  `candidates` table, see next entry.
+
+## Regenerate Posts — revised behavior (locked 2026-07-17, supersedes the "overwrite, no
+## edit-history" decision in the "Regenerate" section above)
+
+Original locked decision: Regenerate Posts re-runs DRAFT-GENERATOR on all 3 already-chosen
+candidates at once and overwrites the current `posts` rows in place (no draft history).
+Revised after discussion: **regenerates one post at a time, not all 3.** The user looks at the
+3 current posts, picks the one they don't like, and only that one gets a new draft generated.
+The new draft sits alongside the old one as a proposal — not committed yet. The user then picks
+which of the two versions to keep; whichever is not picked is deleted. No accumulation of draft
+history beyond that single old-vs-new comparison at any time.
+
+This is explicitly a REVIEW-WORKSPACE UI behavior, not a batch/CLI one — "propose a new version,
+let a human pick, delete the loser" requires an actual interactive surface (two drafts shown
+side by side, a pick action) that doesn't exist until Phase 3 is built. **Decision: hold this as
+the locked Phase 3 design; do not retrofit it into the CLI.**
+
+The CLI script shipped for manual testing right now (`scripts/regenerate-posts.ts`,
+`npm run regenerate-posts -- <sourceRunId>`) does NOT match this design — it regenerates every
+candidate from a given run at once and always inserts new rows without ever deleting the old
+ones. That's intentional as a rough testing tool for now, not a preview of final behavior — do
+not treat its current shape as spec. When Phase 3 is actually implemented, this script's logic
+should be replaced by the real one-post-at-a-time propose/pick/delete flow described above.
+
+RIPPLE:
+- `plans/PHASE-3-HUMAN-INTERFACE--regenerate-actions.md`: rewrite the Regenerate Posts section
+  to describe per-post targeting, the two-versions-side-by-side proposal state, and the
+  pick-one-delete-other resolution. Note the `posts` schema likely needs a way to represent "two
+  candidate drafts for the same post, pending a decision" — this needs its own design pass
+  when Phase 3 is actually scoped (not decided here: could be a `pending` flag + duplicate row,
+  or an ephemeral non-persisted proposal held only in server memory/session until picked).
+- `REVIEW-WORKSPACE--draft-review-ui.md`: correct the regenerate description to match (one
+  button per post, not one button for all 3).
+
+## Candidate retention — new STORAGE-HISTORY decision (locked 2026-07-17, addition, not a
+## reversal)
+
+New `settings.json` field: `candidateRetentionDays: number | null`, nullable, off by default
+(matches the nullable-off-by-default pattern of `budgetCapUsd`/`postsRetentionRuns`). When set,
+prunes every candidate older than that many days that was never chosen — a candidate that
+already became a post is exempt at any age, since `posts.candidateId` is a hard FK into
+`candidates` and deleting it would orphan the post. Checked at the start of every pipeline run
+(`pruneStaleCandidates()` in `lib/candidates/retention.ts`, called from `runPipeline()`) rather
+than needing a real scheduler, since SCHEDULER (Phase 4) isn't built yet. Run history
+(`pipeline_runs`, `llm_calls`) and post retention (`postsRetentionRuns`) are separate, untouched
+concerns — this only ever deletes rows from `candidates`.
+
+RIPPLE:
+- `STORAGE-HISTORY--architecture.md`: document the new `candidateRetentionDays` setting and the
+  prune-on-run-start mechanism, cross-reference the existing `postsRetentionRuns` entry to make
+  clear these are two independent retention knobs for two different tables.
+- `CONFIG-UI` sub-features (if they enumerate `settings.json` fields anywhere): add
+  `candidateRetentionDays` to that list when next touched — not urgent enough alone to dispatch
+  a CONFIG-UI-specific vault pass right now.
