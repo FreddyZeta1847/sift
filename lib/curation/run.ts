@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { candidatesTable } from "../db/schema";
 import { getSettings } from "../config/settings";
@@ -25,20 +25,19 @@ function extractJson(content: string): string {
   return (fenced ? fenced[1] : content).trim();
 }
 
-export async function runCuration(
-  runId: number,
-  poolFilter: "all" | "unchosen" = "all"
-): Promise<CuratedItem[]> {
+export async function runCuration(runId: number): Promise<CuratedItem[]> {
   const db = getDb();
 
+  // Not scoped to this run's own ingestion: a candidate ingested by an
+  // earlier run that never reached curation (aborted run, dedup meant this
+  // run found nothing new) must still be eligible — runId on a candidate
+  // records which run discovered it, not an expiry boundary. Oldest first
+  // so a backlog drains in order instead of newest-always-wins.
   const pool = await db
     .select()
     .from(candidatesTable)
-    .where(
-      poolFilter === "all"
-        ? eq(candidatesTable.runId, runId)
-        : and(eq(candidatesTable.runId, runId), eq(candidatesTable.chosen, false))
-    );
+    .where(eq(candidatesTable.chosen, false))
+    .orderBy(asc(candidatesTable.id));
 
   const guarded = pool.slice(0, INPUT_GUARD_LIMIT);
   if (guarded.length === 0) {

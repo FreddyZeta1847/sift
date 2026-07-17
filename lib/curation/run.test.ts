@@ -121,7 +121,7 @@ describe("runCuration", () => {
     expect(budgetSpy).not.toHaveBeenCalled();
   });
 
-  it("poolFilter='unchosen' scopes to WHERE chosen = false", async () => {
+  it("excludes already-chosen candidates from the pool", async () => {
     const db = getDb();
     const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
     await db.update(candidatesTable).set({ chosen: true }).where(eq(candidatesTable.id, rows[0].id));
@@ -132,6 +132,29 @@ describe("runCuration", () => {
       return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
     });
 
-    await runCuration(runId, "unchosen");
+    await runCuration(runId);
+  });
+
+  it("includes unchosen candidates ingested by an earlier run, not just this run's own", async () => {
+    const db = getDb();
+    const [earlierRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date(), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+    await db.insert(candidatesTable).values({
+      runId: earlierRun.id,
+      url: "https://orphan.test/1",
+      sourceRecap: "Orphaned Item",
+      chosen: false,
+      createdAt: new Date(),
+    });
+
+    vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
+      const prompt = messages.map((m) => m.content).join(" ");
+      expect(prompt).toContain("Orphaned Item");
+      return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
+    });
+
+    await runCuration(runId);
   });
 });
