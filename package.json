@@ -15,10 +15,12 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.1",
     "better-sqlite3": "^11.8.1",
+    "cheerio": "^1.2.0",
     "drizzle-orm": "^0.38.4",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
