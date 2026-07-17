@@ -9,7 +9,8 @@ export const SEED_SOURCES: Source[] = [
   { name: "Krebs on Security", url: "https://krebsonsecurity.com/feed/", category: "cybersecurity", enabled: true },
   { name: "BleepingComputer", url: "https://www.bleepingcomputer.com/feed/", category: "cybersecurity", enabled: true },
   { name: "IEEE Spectrum Robotics", url: "https://spectrum.ieee.org/feeds/topic/robotics.rss", category: "robotics", enabled: true },
-  // TLDR is intentionally deferred to Phase 2 — its URLs require date-based construction
-  // (e.g., tldr.tech/ai/2026-07-17) rather than static feeds, which belongs in INGESTION's
-  // Phase 2 implementation when fetch logic can handle dynamic URL patterns.
+  // TLDR is intentionally dropped from v1 (not deferred): its URLs require date-based
+  // construction (e.g. tldr.tech/ai/2026-07-17) rather than static feeds, and the fetch
+  // path built for it during Phase 2 was never fully wired up. Revisit with a fresh
+  // design pass if TLDR support is wanted post-v1.
 ];
