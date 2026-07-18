@@ -9,20 +9,31 @@
  * messages. Per-stage "Test this model" probes use `useTransition` (mirroring
  * DraftCard's Regenerate button) so each button can show a pending label
  * independently while its `probeModelAction` Server Action call is in flight.
+ * "Save model assignment" reuses this same provider-selected-but-blank-model
+ * guard: it's disabled whenever either stage has a provider chosen with no
+ * model name, preventing a silent blank-model save that would only surface
+ * as a failure on the next real pipeline run.
  *
  * The provider list and the two model-assignment dropdowns are rendered
  * directly from the `providers`/`settings` props rather than copied into
- * local state, so a `router.refresh()` after add/delete immediately reflects
- * the new provider set everywhere it's used on this page. Only the
+ * local state, so a `router.refresh()` after add/delete/update immediately
+ * reflects the new provider set everywhere it's used on this page. Only the
  * add-provider mini-form and the assignment/probe fields are held in local
  * state, since those are user-in-progress input rather than a mirror of
  * server data.
+ *
+ * Editing an existing provider reuses this same add-provider field shape:
+ * clicking "Edit" on a row sets `editingId` to that provider's id and swaps
+ * the row's static text for the identical set of inputs, pre-filled from the
+ * provider's current values and held in `editProvider` state. "Save" calls
+ * `updateProvider` and, on success, clears `editingId` and refreshes; "Cancel"
+ * just clears `editingId` without persisting anything.
  */
 "use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
+import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
 import type { Provider, Settings } from "../../../lib/config/types";
 import type { ProbeResult } from "../../../lib/config/test-model-probe";
 
@@ -40,6 +51,10 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   const [newProvider, setNewProvider] = useState(EMPTY_NEW_PROVIDER);
   const [addStatus, setAddStatus] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editProvider, setEditProvider] = useState(EMPTY_NEW_PROVIDER);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   const [curationProviderId, setCurationProviderId] = useState(settings.curationProviderId ?? "");
   const [curationModel, setCurationModel] = useState(settings.curationModel ?? "");
@@ -77,6 +92,30 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
     router.refresh();
   };
 
+  const handleStartEdit = (p: Provider) => {
+    setEditingId(p.id);
+    setEditProvider(p);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditProvider(EMPTY_NEW_PROVIDER);
+  };
+
+  const handleSaveEdit = async () => {
+    const result = await updateProvider(editProvider);
+    if (!result.ok) {
+      setEditErrors((prev) => ({ ...prev, [editProvider.id]: result.error ?? "Update failed" }));
+      return;
+    }
+    setEditErrors((prev) => {
+      const { [editProvider.id]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setEditingId(null);
+    router.refresh();
+  };
+
   const handleSaveAssignment = async () => {
     const result = await assignModels({ curationProviderId, curationModel, draftingProviderId, draftingModel });
     if (!result.ok) {
@@ -104,13 +143,54 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
       <section>
         <h2>Providers</h2>
         <ul>
-          {providers.map((p) => (
-            <li key={p.id}>
-              {p.label} — {p.baseUrl} ({p.kind})
-              <button onClick={() => handleDelete(p.id)}>Delete</button>
-              {deleteErrors[p.id] && <p role="alert">{deleteErrors[p.id]}</p>}
-            </li>
-          ))}
+          {providers.map((p) =>
+            editingId === p.id ? (
+              <li key={p.id}>
+                <input
+                  placeholder="id"
+                  value={editProvider.id}
+                  onChange={(e) => setEditProvider({ ...editProvider, id: e.target.value })}
+                  required
+                />
+                <input
+                  placeholder="label"
+                  value={editProvider.label}
+                  onChange={(e) => setEditProvider({ ...editProvider, label: e.target.value })}
+                  required
+                />
+                <input
+                  placeholder="baseUrl"
+                  value={editProvider.baseUrl}
+                  onChange={(e) => setEditProvider({ ...editProvider, baseUrl: e.target.value })}
+                  required
+                />
+                <input
+                  placeholder="apiKey"
+                  type="password"
+                  value={editProvider.apiKey}
+                  onChange={(e) => setEditProvider({ ...editProvider, apiKey: e.target.value })}
+                  required
+                />
+                <select
+                  value={editProvider.kind}
+                  onChange={(e) => setEditProvider({ ...editProvider, kind: e.target.value as Provider["kind"] })}
+                >
+                  <option value="openai-compatible">openai-compatible</option>
+                  <option value="anthropic">anthropic</option>
+                </select>
+                <button onClick={handleSaveEdit}>Save</button>
+                <button onClick={handleCancelEdit}>Cancel</button>
+                {editErrors[p.id] && <p role="alert">{editErrors[p.id]}</p>}
+              </li>
+            ) : (
+              <li key={p.id}>
+                {p.label} — {p.baseUrl} ({p.kind})
+                <button onClick={() => handleStartEdit(p)}>Edit</button>
+                <button onClick={() => handleDelete(p.id)}>Delete</button>
+                {deleteErrors[p.id] && <p role="alert">{deleteErrors[p.id]}</p>}
+              </li>
+            )
+          )}
         </ul>
 
         <form onSubmit={handleAddProvider}>
@@ -118,22 +198,26 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             placeholder="id"
             value={newProvider.id}
             onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
+            required
           />
           <input
             placeholder="label"
             value={newProvider.label}
             onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
+            required
           />
           <input
             placeholder="baseUrl"
             value={newProvider.baseUrl}
             onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
+            required
           />
           <input
             placeholder="apiKey"
             type="password"
             value={newProvider.apiKey}
             onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+            required
           />
           <select
             value={newProvider.kind}
@@ -192,7 +276,12 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
           {draftingProbeResult && <span>{draftingProbeResult}</span>}
         </div>
 
-        <button onClick={handleSaveAssignment}>Save model assignment</button>
+        <button
+          onClick={handleSaveAssignment}
+          disabled={(!!curationProviderId && !curationModel) || (!!draftingProviderId && !draftingModel)}
+        >
+          Save model assignment
+        </button>
         {assignStatus && <p role="alert">{assignStatus}</p>}
       </section>
     </div>
