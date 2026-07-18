@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
-import { readConfig } from "./read-config";
+import { existsSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { readConfig, writeConfig } from "./read-config";
 
 const testDir = "config-test";
 
@@ -35,5 +35,21 @@ describe("readConfig", () => {
     await expect(readConfig(`${testDir}/corrupt.json`, {})).rejects.toThrow(
       /corrupt\.json/
     );
+  });
+});
+
+describe("writeConfig", () => {
+  afterEach(() => {
+    if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it("writeConfig overwrites the file with the given data", async () => {
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(`${testDir}/existing.json`, JSON.stringify({ foo: "old" }));
+
+    await writeConfig(`${testDir}/existing.json`, { foo: "new" });
+
+    const raw = readFileSync(`${testDir}/existing.json`, "utf-8");
+    expect(JSON.parse(raw)).toEqual({ foo: "new" });
   });
 });

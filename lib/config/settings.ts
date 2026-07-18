@@ -1,4 +1,4 @@
-import { readConfig, configPath } from "./read-config";
+import { readConfig, writeConfig, configPath } from "./read-config";
 import type { Settings } from "./types";
 
 const DEFAULT_SETTINGS: Settings = {
@@ -15,4 +15,8 @@ const DEFAULT_SETTINGS: Settings = {
 
 export async function getSettings(): Promise<Settings> {
   return readConfig<Settings>(configPath("settings.json"), DEFAULT_SETTINGS);
+}
+
+export async function saveSettings(settings: Settings): Promise<void> {
+  return writeConfig(configPath("settings.json"), settings);
 }

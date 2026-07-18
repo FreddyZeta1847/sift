@@ -29,3 +29,11 @@ export async function readConfig<T>(filePath: string, defaults: T): Promise<T> {
     );
   }
 }
+
+export async function writeConfig<T>(filePath: string, data: T): Promise<void> {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(filePath, JSON.stringify(data, null, 2));
+}
