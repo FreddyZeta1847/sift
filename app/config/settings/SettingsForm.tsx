@@ -37,10 +37,19 @@
  * the two retention settings; checking "unlimited" passes `null` to
  * `saveRetention` instead of the number. Both fields are saved together
  * whenever either changes, since `saveRetention` takes both values at once.
+ *
+ * Schedule, voice profile, and retention all apply their local state change
+ * optimistically and only persist afterward; each capture the pre-update
+ * value and revert local state back to it if the Server Action reports
+ * `!result.ok`, so a failed save never leaves the UI showing an unpersisted
+ * value with only the status line as a clue. The tone-notes textarea is the
+ * one case where "the value before this optimistic update" isn't the
+ * previous render's state (it mutates on every keystroke before the save on
+ * blur), so it's captured on focus into a ref instead.
  */
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   toggleSource,
@@ -81,6 +90,11 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   const [newExamplePost, setNewExamplePost] = useState("");
   const [newInterest, setNewInterest] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  // Snapshot of the voice profile as of the last focus on the tone-notes
+  // textarea, used to revert the optimistic update on save failure — the
+  // textarea mutates state on every keystroke, so the "previous" value for
+  // rollback purposes has to be captured before typing starts, not at blur.
+  const voiceProfileBeforeEditRef = useRef<VoiceProfile>(voiceProfile);
 
   const [postsRetentionRuns, setPostsRetentionRuns] = useState<number | null>(settings.postsRetentionRuns);
   const [candidateRetentionDays, setCandidateRetentionDays] = useState<number | null>(
@@ -114,12 +128,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   };
 
   const handleToggleDay = async (day: string) => {
+    const previous = scheduleDays;
     const next = scheduleDays.includes(day)
       ? scheduleDays.filter((d) => d !== day)
       : [...scheduleDays, day];
     setScheduleDays(next);
     const result = await saveSchedule(next);
     if (!result.ok) {
+      setScheduleDays(previous);
       setScheduleStatus(`Save failed: ${result.error}`);
       return;
     }
@@ -139,50 +155,66 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     });
   };
 
-  const persistVoiceProfile = async (profile: VoiceProfile) => {
+  const persistVoiceProfile = async (profile: VoiceProfile, previous: VoiceProfile) => {
     const result = await saveVoiceProfile(profile);
     if (!result.ok) {
+      setVoiceProfile(previous);
       setVoiceStatus(`Save failed: ${result.error}`);
       return;
     }
     setVoiceStatus("Voice profile saved.");
   };
 
+  const handleToneNotesFocus = () => {
+    voiceProfileBeforeEditRef.current = voiceProfile;
+  };
+
   const handleToneNotesBlur = () => {
-    persistVoiceProfile(voiceProfile);
+    persistVoiceProfile(voiceProfile, voiceProfileBeforeEditRef.current);
   };
 
   const handleAddExamplePost = () => {
     if (!newExamplePost.trim()) return;
+    const previous = voiceProfile;
     const next = { ...voiceProfile, examplePosts: [...voiceProfile.examplePosts, newExamplePost] };
     setVoiceProfile(next);
     setNewExamplePost("");
-    persistVoiceProfile(next);
+    persistVoiceProfile(next, previous);
   };
 
   const handleRemoveExamplePost = (index: number) => {
+    const previous = voiceProfile;
     const next = { ...voiceProfile, examplePosts: voiceProfile.examplePosts.filter((_, i) => i !== index) };
     setVoiceProfile(next);
-    persistVoiceProfile(next);
+    persistVoiceProfile(next, previous);
   };
 
   const handleAddInterest = () => {
     if (!newInterest.trim()) return;
+    const previous = voiceProfile;
     const next = { ...voiceProfile, interests: [...voiceProfile.interests, newInterest] };
     setVoiceProfile(next);
     setNewInterest("");
-    persistVoiceProfile(next);
+    persistVoiceProfile(next, previous);
   };
 
   const handleRemoveInterest = (index: number) => {
+    const previous = voiceProfile;
     const next = { ...voiceProfile, interests: voiceProfile.interests.filter((_, i) => i !== index) };
     setVoiceProfile(next);
-    persistVoiceProfile(next);
+    persistVoiceProfile(next, previous);
   };
 
-  const persistRetention = async (posts: number | null, candidates: number | null) => {
+  const persistRetention = async (
+    posts: number | null,
+    candidates: number | null,
+    previousPosts: number | null,
+    previousCandidates: number | null
+  ) => {
     const result = await saveRetention(posts, candidates);
     if (!result.ok) {
+      setPostsRetentionRuns(previousPosts);
+      setCandidateRetentionDays(previousCandidates);
       setRetentionStatus(`Save failed: ${result.error}`);
       return;
     }
@@ -190,13 +222,15 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   };
 
   const handlePostsRetentionChange = (value: number | null) => {
+    const previousPosts = postsRetentionRuns;
     setPostsRetentionRuns(value);
-    persistRetention(value, candidateRetentionDays);
+    persistRetention(value, candidateRetentionDays, previousPosts, candidateRetentionDays);
   };
 
   const handleCandidateRetentionChange = (value: number | null) => {
+    const previousCandidates = candidateRetentionDays;
     setCandidateRetentionDays(value);
-    persistRetention(postsRetentionRuns, value);
+    persistRetention(postsRetentionRuns, value, postsRetentionRuns, previousCandidates);
   };
 
   return (
@@ -277,6 +311,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           <textarea
             value={voiceProfile.toneNotes}
             onChange={(e) => setVoiceProfile({ ...voiceProfile, toneNotes: e.target.value })}
+            onFocus={handleToneNotesFocus}
             onBlur={handleToneNotesBlur}
           />
         </label>
@@ -285,7 +320,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           <h3>Example posts</h3>
           <ul>
             {voiceProfile.examplePosts.map((post, i) => (
-              <li key={i}>
+              <li key={`${post}-${i}`}>
                 {post}
                 <button onClick={() => handleRemoveExamplePost(i)}>Remove</button>
               </li>
@@ -303,7 +338,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           <h3>Interests</h3>
           <ul>
             {voiceProfile.interests.map((interest, i) => (
-              <li key={i}>
+              <li key={`${interest}-${i}`}>
                 {interest}
                 <button onClick={() => handleRemoveInterest(i)}>Remove</button>
               </li>
@@ -331,14 +366,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             disabled={postsRetentionRuns === null}
             onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
           />
-          <label>
-            <input
-              type="checkbox"
-              checked={postsRetentionRuns === null}
-              onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
-            />
-            Unlimited
-          </label>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={postsRetentionRuns === null}
+            onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
+          />
+          Unlimited
         </label>
 
         <label>
@@ -352,14 +387,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
               handleCandidateRetentionChange(e.target.value === "" ? null : Number(e.target.value))
             }
           />
-          <label>
-            <input
-              type="checkbox"
-              checked={candidateRetentionDays === null}
-              onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
-            />
-            Unlimited
-          </label>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={candidateRetentionDays === null}
+            onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
+          />
+          Unlimited
         </label>
 
         {retentionStatus && <p role="alert">{retentionStatus}</p>}
