@@ -25,9 +25,17 @@
  * Editing an existing provider reuses this same add-provider field shape:
  * clicking "Edit" on a row sets `editingId` to that provider's id and swaps
  * the row's static text for the identical set of inputs, pre-filled from the
- * provider's current values and held in `editProvider` state. "Save" calls
- * `updateProvider` and, on success, clears `editingId` and refreshes; "Cancel"
- * just clears `editingId` without persisting anything.
+ * provider's current values and held in `editProvider` state. The `id` input
+ * is disabled in edit mode: `updateProvider` matches the row to replace by
+ * the submitted id, so letting a user retype it risks a silent no-op or
+ * overwriting an unrelated provider — ids are only ever chosen in the
+ * add-provider form. Since these inputs live in the `<ul>` rather than a
+ * `<form>`, their `required` attributes don't enforce anything on their own,
+ * so "Save" is additionally disabled whenever `label`/`baseUrl`/`apiKey` is
+ * blank (mirroring the "Save model assignment" guard below). "Save" calls
+ * `updateProvider` and, on success, shows "Provider updated." via
+ * `editStatus`, clears `editingId`, and refreshes; "Cancel" just clears
+ * `editingId` without persisting anything.
  */
 "use client";
 
@@ -55,6 +63,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editProvider, setEditProvider] = useState(EMPTY_NEW_PROVIDER);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [editStatus, setEditStatus] = useState<string | null>(null);
 
   const [curationProviderId, setCurationProviderId] = useState(settings.curationProviderId ?? "");
   const [curationModel, setCurationModel] = useState(settings.curationModel ?? "");
@@ -112,6 +121,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
       const { [editProvider.id]: _removed, ...rest } = prev;
       return rest;
     });
+    setEditStatus("Provider updated.");
     setEditingId(null);
     router.refresh();
   };
@@ -150,6 +160,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                   placeholder="id"
                   value={editProvider.id}
                   onChange={(e) => setEditProvider({ ...editProvider, id: e.target.value })}
+                  disabled
                   required
                 />
                 <input
@@ -178,7 +189,12 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                   <option value="openai-compatible">openai-compatible</option>
                   <option value="anthropic">anthropic</option>
                 </select>
-                <button onClick={handleSaveEdit}>Save</button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={!editProvider.label || !editProvider.baseUrl || !editProvider.apiKey}
+                >
+                  Save
+                </button>
                 <button onClick={handleCancelEdit}>Cancel</button>
                 {editErrors[p.id] && <p role="alert">{editErrors[p.id]}</p>}
               </li>
@@ -192,6 +208,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             )
           )}
         </ul>
+        {editStatus && <p role="alert">{editStatus}</p>}
 
         <form onSubmit={handleAddProvider}>
           <input
