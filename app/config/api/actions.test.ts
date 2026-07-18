@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
 import { getProviders, saveProviders } from "../../../lib/config/providers";
+import * as providersModule from "../../../lib/config/providers";
 import { getSettings } from "../../../lib/config/settings";
 import * as probeModule from "../../../lib/config/test-model-probe";
 
@@ -28,6 +29,15 @@ describe("api config actions", () => {
     await addProvider({ id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" });
     const result = await addProvider({ id: "p1", label: "Dup", baseUrl: "http://y", apiKey: "k2", kind: "openai-compatible" });
     expect(result.ok).toBe(false);
+  });
+
+  it("addProvider returns {ok: false, error} instead of throwing when the write fails", async () => {
+    vi.spyOn(providersModule, "saveProviders").mockRejectedValue(new Error("disk full"));
+
+    const result = await addProvider({ id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("disk full");
   });
 
   it("updateProvider replaces the matching entry", async () => {

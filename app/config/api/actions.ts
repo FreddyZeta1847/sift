@@ -17,6 +17,11 @@
  * together as one `saveSettings` call, preserving the rest of the settings
  * object.
  *
+ * Every action's actual `saveProviders`/`saveSettings` write is routed
+ * through `lib/config/safe-write.ts`'s `safeWrite` so a genuine I/O failure
+ * surfaces as `{ok: false, error}` instead of throwing and rejecting the
+ * Server Action unhandled.
+ *
  * `probeModelAction` is a thin "use server" wrapper around
  * `probeModel` (lib/config/test-model-probe.ts): the probe itself does a
  * live network call and can't be imported directly into a Client Component,
@@ -35,6 +40,7 @@
 import { getProviders, saveProviders } from "../../../lib/config/providers";
 import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { probeModel, type ProbeResult } from "../../../lib/config/test-model-probe";
+import { safeWrite } from "../../../lib/config/safe-write";
 import type { Provider } from "../../../lib/config/types";
 
 interface ActionResult {
@@ -47,15 +53,13 @@ export async function addProvider(provider: Provider): Promise<ActionResult> {
   if (providers.some((p) => p.id === provider.id)) {
     return { ok: false, error: `Provider id "${provider.id}" already exists` };
   }
-  await saveProviders([...providers, provider]);
-  return { ok: true };
+  return safeWrite(() => saveProviders([...providers, provider]));
 }
 
 export async function updateProvider(provider: Provider): Promise<ActionResult> {
   const providers = await getProviders();
   const next = providers.map((p) => (p.id === provider.id ? provider : p));
-  await saveProviders(next);
-  return { ok: true };
+  return safeWrite(() => saveProviders(next));
 }
 
 export async function deleteProvider(id: string): Promise<ActionResult> {
@@ -64,8 +68,7 @@ export async function deleteProvider(id: string): Promise<ActionResult> {
     return { ok: false, error: `Provider "${id}" is assigned to a pipeline stage — reassign it first` };
   }
   const providers = await getProviders();
-  await saveProviders(providers.filter((p) => p.id !== id));
-  return { ok: true };
+  return safeWrite(() => saveProviders(providers.filter((p) => p.id !== id)));
 }
 
 export async function assignModels(assignment: {
@@ -75,8 +78,7 @@ export async function assignModels(assignment: {
   draftingModel: string;
 }): Promise<ActionResult> {
   const settings = await getSettings();
-  await saveSettings({ ...settings, ...assignment });
-  return { ok: true };
+  return safeWrite(() => saveSettings({ ...settings, ...assignment }));
 }
 
 export async function probeModelAction(providerId: string, model: string): Promise<ProbeResult> {

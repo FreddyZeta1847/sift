@@ -12,6 +12,7 @@ import { existsSync, rmSync } from "node:fs";
 import { toggleSource, addSource, saveSchedule, runNow, saveVoiceProfile, saveRetention } from "./actions";
 import { getSources } from "../../../lib/config/sources";
 import { getSettings } from "../../../lib/config/settings";
+import * as settingsModule from "../../../lib/config/settings";
 import * as runPipelineModule from "../../../scripts/run-pipeline";
 import * as runGuardModule from "../../../lib/pipeline/run-guard";
 
@@ -49,6 +50,15 @@ describe("settings page actions", () => {
     expect(result.ok).toBe(true);
     const settings = await getSettings();
     expect(settings.scheduleDays).toEqual(["mon", "wed"]);
+  });
+
+  it("saveSchedule returns {ok: false, error} instead of throwing when the write fails", async () => {
+    vi.spyOn(settingsModule, "saveSettings").mockRejectedValue(new Error("disk full"));
+
+    const result = await saveSchedule(["mon", "wed"]);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("disk full");
   });
 
   it("runNow invokes runPipeline with type manual", async () => {

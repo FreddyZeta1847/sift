@@ -24,6 +24,11 @@
  * the caller always sends the whole current in-memory object rather than a
  * diff.
  *
+ * Every action's actual `saveSources`/`saveSettings` write is routed through
+ * `lib/config/safe-write.ts`'s `safeWrite` so a genuine I/O failure (disk
+ * full, permissions) surfaces as `{ok: false, error}` instead of throwing
+ * and rejecting the Server Action unhandled.
+ *
  * Note: this project's `"use server"` files must export only
  * locally-declared async functions (bare re-exports fail Next.js's
  * compiler — discovered during a prior task), so this file is written
@@ -35,6 +40,7 @@ import { getSources, saveSources } from "../../../lib/config/sources";
 import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { checkAndSetRunning, clearRunning } from "../../../lib/pipeline/run-guard";
 import { runPipeline } from "../../../scripts/run-pipeline";
+import { safeWrite } from "../../../lib/config/safe-write";
 import type { VoiceProfile, Source } from "../../../lib/config/types";
 
 interface ActionResult {
@@ -45,21 +51,18 @@ interface ActionResult {
 export async function toggleSource(name: string): Promise<ActionResult> {
   const sources = await getSources();
   const next = sources.map((s) => (s.name === name ? { ...s, enabled: !s.enabled } : s));
-  await saveSources(next);
-  return { ok: true };
+  return safeWrite(() => saveSources(next));
 }
 
 export async function addSource(input: { name: string; url: string; category: string }): Promise<ActionResult> {
   const sources = await getSources();
   const newSource: Source = { ...input, enabled: true };
-  await saveSources([...sources, newSource]);
-  return { ok: true };
+  return safeWrite(() => saveSources([...sources, newSource]));
 }
 
 export async function saveSchedule(scheduleDays: string[]): Promise<ActionResult> {
   const settings = await getSettings();
-  await saveSettings({ ...settings, scheduleDays });
-  return { ok: true };
+  return safeWrite(() => saveSettings({ ...settings, scheduleDays }));
 }
 
 export async function runNow(): Promise<ActionResult> {
@@ -79,8 +82,7 @@ export async function runNow(): Promise<ActionResult> {
 
 export async function saveVoiceProfile(profile: VoiceProfile): Promise<ActionResult> {
   const settings = await getSettings();
-  await saveSettings({ ...settings, voiceProfile: profile });
-  return { ok: true };
+  return safeWrite(() => saveSettings({ ...settings, voiceProfile: profile }));
 }
 
 export async function saveRetention(
@@ -88,6 +90,5 @@ export async function saveRetention(
   candidateRetentionDays: number | null
 ): Promise<ActionResult> {
   const settings = await getSettings();
-  await saveSettings({ ...settings, postsRetentionRuns, candidateRetentionDays });
-  return { ok: true };
+  return safeWrite(() => saveSettings({ ...settings, postsRetentionRuns, candidateRetentionDays }));
 }
