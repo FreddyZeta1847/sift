@@ -8,6 +8,20 @@
  * API and cannot run inside a Server Action, so DraftCard performs the
  * clipboard write client-side first and only calls `markPosted` here once
  * that write has succeeded (see DraftCard.tsx for the clipboard-gating).
+ *
+ * `discarded` and `posted` are mutually exclusive terminal states for a
+ * post — a discarded post was never sent, so it cannot also be posted, and
+ * vice versa. `discardPost` and `markPosted` each read the current row and
+ * refuse to write if the row is already in the *other* terminal state. This
+ * is the authoritative guard: the DraftCard UI also disables both buttons
+ * once either state is set, but that's only a same-page-load convenience
+ * (see DraftCard.tsx's `muted` derivation) — this server-side check is what
+ * actually prevents the invalid `discarded: true, posted: true` combination
+ * from ever being written, regardless of what the client's stale props show.
+ *
+ * Per REVIEW-WORKSPACE--resilience.md, a write that fails because SQLite
+ * can't be acquired (e.g. a transient lock) must not be silently dropped:
+ * `safeUpdate` retries once after a brief delay before surfacing an error.
  */
 "use server";
 
@@ -20,13 +34,28 @@ interface ActionResult {
   error?: string;
 }
 
+const RETRY_DELAY_MS = 100;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function safeUpdate(postId: number, values: Partial<typeof postsTable.$inferInsert>): Promise<ActionResult> {
   try {
     const db = getDb();
     await db.update(postsTable).set(values).where(eq(postsTable.id, postId));
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (err as Error).message };
+    // Transient failures (e.g. SQLite momentarily locked by another writer) must not
+    // silently drop the change — retry once before giving up and surfacing an error.
+    await delay(RETRY_DELAY_MS);
+    try {
+      const db = getDb();
+      await db.update(postsTable).set(values).where(eq(postsTable.id, postId));
+      return { ok: true };
+    } catch (retryErr) {
+      return { ok: false, error: (retryErr as Error).message };
+    }
   }
 }
 
@@ -35,9 +64,19 @@ export async function saveEdit(postId: number, text: string): Promise<ActionResu
 }
 
 export async function discardPost(postId: number): Promise<ActionResult> {
+  const db = getDb();
+  const [row] = await db.select().from(postsTable).where(eq(postsTable.id, postId));
+  if (row?.posted) {
+    return { ok: false, error: "Cannot discard a post that's already marked posted" };
+  }
   return safeUpdate(postId, { discarded: true });
 }
 
 export async function markPosted(postId: number): Promise<ActionResult> {
+  const db = getDb();
+  const [row] = await db.select().from(postsTable).where(eq(postsTable.id, postId));
+  if (row?.discarded) {
+    return { ok: false, error: "Cannot mark a discarded post as posted" };
+  }
   return safeUpdate(postId, { posted: true, postedAt: new Date() });
 }
