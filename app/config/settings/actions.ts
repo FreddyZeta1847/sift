@@ -8,8 +8,8 @@
  * task's scope — disabling a source via `toggleSource` is the only way to
  * remove it from active use.
  *
- * `saveSchedule` is persist-only: it writes `scheduleDays` to
- * `config/settings.json` and nothing else. There is no live cron job to
+ * `saveSchedule` is persist-only: it writes `scheduleDays` and `scheduleTime`
+ * to `config/settings.json` and nothing else. There is no live cron job to
  * re-register yet — that's SCHEDULER, a later, not-yet-built phase — so this
  * action must never be extended to touch any scheduling runtime.
  *
@@ -60,9 +60,9 @@ export async function addSource(input: { name: string; url: string; category: st
   return safeWrite(() => saveSources([...sources, newSource]));
 }
 
-export async function saveSchedule(scheduleDays: string[]): Promise<ActionResult> {
+export async function saveSchedule(scheduleDays: string[], scheduleTime: string): Promise<ActionResult> {
   const settings = await getSettings();
-  return safeWrite(() => saveSettings({ ...settings, scheduleDays }));
+  return safeWrite(() => saveSettings({ ...settings, scheduleDays, scheduleTime }));
 }
 
 export async function runNow(): Promise<ActionResult> {

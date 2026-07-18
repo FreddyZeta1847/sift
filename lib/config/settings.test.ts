@@ -20,6 +20,7 @@ describe("getSettings", () => {
     expect(result.postsRetentionRuns).toBeNull();
     expect(result.candidateRetentionDays).toBeNull();
     expect(result.scheduleDays).toEqual([]);
+    expect(result.scheduleTime).toBe("09:00");
     expect(result.voiceProfile).toEqual({ toneNotes: "", examplePosts: [], interests: [] });
     expect(result.curationProviderId).toBeNull();
     expect(result.draftingProviderId).toBeNull();
@@ -39,6 +40,7 @@ describe("saveSettings", () => {
   it("saveSettings writes the given settings", async () => {
     const custom = {
       budgetCapUsd: 10, postsRetentionRuns: 5, candidateRetentionDays: 7, scheduleDays: ["mon"],
+      scheduleTime: "14:30",
       voiceProfile: { toneNotes: "casual", examplePosts: [], interests: ["ai"] },
       curationProviderId: "p1", curationModel: "m1", draftingProviderId: "p1", draftingModel: "m1",
     };

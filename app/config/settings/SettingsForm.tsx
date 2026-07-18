@@ -15,11 +15,15 @@
  * scope — disabling via the toggle is the only way to remove a source from
  * active use.
  *
- * The schedule checkboxes are local state seeded from `settings.scheduleDays`
- * and call `saveSchedule` with the full updated array on every toggle. This
- * is a **persist-only** control: there is no live cron job yet (SCHEDULER is
- * a later, not-yet-built phase), so the note under this section deliberately
- * says the change "takes effect once the scheduler is running" rather than
+ * The schedule checkboxes are local state seeded from `settings.scheduleDays`,
+ * and the `<input type="time">` is local state seeded from
+ * `settings.scheduleTime` ("HH:MM", 24h UTC). Both call `saveSchedule` with
+ * the full current `(scheduleDays, scheduleTime)` pair on every change — the
+ * day-toggle handler passes along the current time value and vice versa,
+ * since the action always persists both together. This is a **persist-only**
+ * control: there is no live cron job yet (a later task in this same phase
+ * wires up live re-registration), so the note under this section deliberately
+ * says the change "applies the next time the scheduler checks in" rather than
  * claiming any immediate rescheduling effect.
  *
  * Run Now uses `useTransition` (mirroring DraftCard's Regenerate button) so
@@ -81,6 +85,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   const [toggleErrors, setToggleErrors] = useState<Record<string, string>>({});
 
   const [scheduleDays, setScheduleDays] = useState<string[]>(settings.scheduleDays);
+  const [scheduleTime, setScheduleTime] = useState<string>(settings.scheduleTime);
   const [scheduleStatus, setScheduleStatus] = useState<string | null>(null);
 
   const [runStatus, setRunStatus] = useState<string | null>(null);
@@ -133,9 +138,22 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
       ? scheduleDays.filter((d) => d !== day)
       : [...scheduleDays, day];
     setScheduleDays(next);
-    const result = await saveSchedule(next);
+    const result = await saveSchedule(next, scheduleTime);
     if (!result.ok) {
       setScheduleDays(previous);
+      setScheduleStatus(`Save failed: ${result.error}`);
+      return;
+    }
+    setScheduleStatus("Schedule saved.");
+    router.refresh();
+  };
+
+  const handleScheduleTimeChange = async (time: string) => {
+    const previous = scheduleTime;
+    setScheduleTime(time);
+    const result = await saveSchedule(scheduleDays, time);
+    if (!result.ok) {
+      setScheduleTime(previous);
       setScheduleStatus(`Save failed: ${result.error}`);
       return;
     }
@@ -279,10 +297,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
 
       <section>
         <h2>Schedule</h2>
-        <p>
-          Schedule changes take effect once the scheduler is running — this only saves the days for
-          later use, it does not reschedule anything right now.
-        </p>
+        <p>Schedule changes apply the next time the scheduler checks in.</p>
         {DAYS.map(({ key, label }) => (
           <label key={key}>
             <input
@@ -293,6 +308,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             {label}
           </label>
         ))}
+        <label>
+          Time (UTC)
+          <input
+            type="time"
+            value={scheduleTime}
+            onChange={(e) => handleScheduleTimeChange(e.target.value)}
+          />
+        </label>
         {scheduleStatus && <p role="alert">{scheduleStatus}</p>}
       </section>
 

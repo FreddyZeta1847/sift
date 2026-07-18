@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS: Settings = {
   postsRetentionRuns: null,
   candidateRetentionDays: null,
   scheduleDays: [],
+  scheduleTime: "09:00",
   voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
   curationProviderId: null,
   curationModel: null,

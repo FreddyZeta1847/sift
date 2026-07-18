@@ -17,6 +17,7 @@ function settingsWithRetention(candidateRetentionDays: number | null) {
     postsRetentionRuns: null,
     candidateRetentionDays,
     scheduleDays: [],
+    scheduleTime: "09:00",
     voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
     curationProviderId: null,
     curationModel: null,

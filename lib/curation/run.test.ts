@@ -28,7 +28,7 @@ describe("runCuration", () => {
     ]);
 
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
+      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([

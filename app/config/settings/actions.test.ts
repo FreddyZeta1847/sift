@@ -45,17 +45,18 @@ describe("settings page actions", () => {
     expect(sources.some((s) => s.name === "New Source" && s.enabled)).toBe(true);
   });
 
-  it("saveSchedule persists scheduleDays only", async () => {
-    const result = await saveSchedule(["mon", "wed"]);
+  it("saveSchedule persists scheduleDays and scheduleTime", async () => {
+    const result = await saveSchedule(["mon", "wed"], "14:30");
     expect(result.ok).toBe(true);
     const settings = await getSettings();
     expect(settings.scheduleDays).toEqual(["mon", "wed"]);
+    expect(settings.scheduleTime).toBe("14:30");
   });
 
   it("saveSchedule returns {ok: false, error} instead of throwing when the write fails", async () => {
     vi.spyOn(settingsModule, "saveSettings").mockRejectedValue(new Error("disk full"));
 
-    const result = await saveSchedule(["mon", "wed"]);
+    const result = await saveSchedule(["mon", "wed"], "14:30");
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("disk full");

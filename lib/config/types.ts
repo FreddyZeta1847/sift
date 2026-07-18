@@ -24,6 +24,7 @@ export interface Settings {
   postsRetentionRuns: number | null;
   candidateRetentionDays: number | null;
   scheduleDays: string[];
+  scheduleTime: string;
   voiceProfile: VoiceProfile;
   curationProviderId: string | null;
   curationModel: string | null;
