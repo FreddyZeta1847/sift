@@ -14,3 +14,6 @@ textarea { width: 100%; min-height: 120px; font: inherit; }
 .badge { display: inline-block; background: #f5c542; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .pending-compare { border-top: 1px dashed #999; margin-top: 12px; padding-top: 12px; }
 .empty-state { color: #666; }
+.site-nav { display: flex; gap: 16px; padding: 12px 24px; border-bottom: 1px solid #ccc; margin-bottom: 12px; }
+.site-nav a { color: #333; text-decoration: none; font-weight: 500; }
+.site-nav a:hover { text-decoration: underline; }
