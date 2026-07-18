@@ -122,4 +122,10 @@ describe("review actions", () => {
       updateSpy.mockRestore();
     }
   });
+
+  it("re-exports regeneratePost and keepVersion", async () => {
+    const mod = await import("./actions");
+    expect(typeof mod.regeneratePost).toBe("function");
+    expect(typeof mod.keepVersion).toBe("function");
+  });
 });

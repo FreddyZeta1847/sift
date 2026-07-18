@@ -22,12 +22,23 @@
  * Per REVIEW-WORKSPACE--resilience.md, a write that fails because SQLite
  * can't be acquired (e.g. a transient lock) must not be silently dropped:
  * `safeUpdate` retries once after a brief delay before surfacing an error.
+ *
+ * `regeneratePost`/`keepVersion` (Task 6) live in lib/draft/regenerate.ts so
+ * the batch pipeline and the per-post Regenerate UI share one implementation
+ * (see that file's header). They are wrapped here as local async function
+ * declarations rather than re-exported directly (`export { x } from "..."`)
+ * because Next's "use server" compiler statically requires every top-level
+ * export of a "use server" file to be an async function declaration — a
+ * bare re-export trips "Only async functions are allowed to be exported in
+ * a 'use server' file" at dev/build time even though the re-exported values
+ * are themselves async functions.
  */
 "use server";
 
 import { eq } from "drizzle-orm";
 import { getDb } from "../../lib/db/client";
 import { postsTable } from "../../lib/db/schema";
+import { regeneratePost as regeneratePostImpl, keepVersion as keepVersionImpl } from "../../lib/draft/regenerate";
 
 interface ActionResult {
   ok: boolean;
@@ -79,4 +90,12 @@ export async function markPosted(postId: number): Promise<ActionResult> {
     return { ok: false, error: "Cannot mark a discarded post as posted" };
   }
   return safeUpdate(postId, { posted: true, postedAt: new Date() });
+}
+
+export async function regeneratePost(postId: number): Promise<ActionResult> {
+  return regeneratePostImpl(postId);
+}
+
+export async function keepVersion(keptPostId: number, deletedPostId: number): Promise<ActionResult> {
+  return keepVersionImpl(keptPostId, deletedPostId);
 }

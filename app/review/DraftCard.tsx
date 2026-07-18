@@ -21,12 +21,23 @@
  * would otherwise leave both buttons enabled until a manual reload), both
  * handlers call `router.refresh()` on success so the page re-fetches fresh
  * post state and the card re-renders muted immediately.
+ *
+ * Regenerate (Task 6) reuses this same "mutate then router.refresh()"
+ * pattern via `useTransition` so the button can show a "Regenerating…"
+ * label while the Server Action is in flight. It is disabled while muted,
+ * while a regenerate for this card is already pending, or while this card
+ * already has a `pendingVersion` awaiting resolution — this card's own
+ * pending compare must be resolved (via "Keep this one"/"Keep original",
+ * which call `keepVersion`) before another regenerate can be triggered for
+ * it. Other cards remain fully interactive in the meantime: the run-guard
+ * lock in `regeneratePost` only prevents two regenerate/pipeline runs from
+ * overlapping, it doesn't block edits/discard/copy on other cards.
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveEdit, discardPost, markPosted } from "./actions";
+import { saveEdit, discardPost, markPosted, regeneratePost, keepVersion } from "./actions";
 import { isFlagged } from "../../lib/safety/leakage-linter";
 import type { PostWithPending } from "../../lib/review/queries";
 
@@ -34,6 +45,7 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   const router = useRouter();
   const [text, setText] = useState(post.editedText ?? post.originalText);
   const [status, setStatus] = useState<string | null>(null);
+  const [isRegenerating, startTransition] = useTransition();
 
   const handleBlur = async () => {
     const result = await saveEdit(post.id, text);
@@ -74,6 +86,28 @@ export function DraftCard({ post }: { post: PostWithPending }) {
     }
   };
 
+  const handleRegenerate = () => {
+    startTransition(async () => {
+      const result = await regeneratePost(post.id);
+      if (!result.ok) {
+        setStatus(`Regenerate failed: ${result.error}`);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  const handleKeep = (keptId: number, deletedId: number) => {
+    startTransition(async () => {
+      const result = await keepVersion(keptId, deletedId);
+      if (!result.ok) {
+        setStatus(`Could not resolve regenerate: ${result.error}`);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
   const muted = post.posted || post.discarded;
 
   return (
@@ -85,6 +119,16 @@ export function DraftCard({ post }: { post: PostWithPending }) {
       <button onClick={handleCopyPrompt}>Copy prompt</button>
       <button onClick={handleCopyAndPost} disabled={muted}>Copy &amp; Mark Posted</button>
       <button onClick={handleDiscard} disabled={muted}>Discard</button>
+      <button onClick={handleRegenerate} disabled={muted || isRegenerating || !!post.pendingVersion}>
+        {isRegenerating ? "Regenerating…" : "Regenerate"}
+      </button>
+      {post.pendingVersion && (
+        <div className="pending-compare">
+          <p>New version: {post.pendingVersion.originalText}</p>
+          <button onClick={() => handleKeep(post.pendingVersion!.id, post.id)}>Keep this one</button>
+          <button onClick={() => handleKeep(post.id, post.pendingVersion!.id)}>Keep original</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,8 +3,8 @@
  *
  * Resolves the pipeline run for the given date (default today) via
  * lib/review/queries and renders its posts as interactive DraftCards
- * (edit-with-autosave, discard, copy-and-mark-posted). Regenerate is not
- * built here — it lands in a later task once its Server Action exists.
+ * (edit-with-autosave, discard, copy-and-mark-posted, and per-post
+ * Regenerate with propose/keep/discard — see DraftCard.tsx).
  */
 import { resolveRunIdForDate, getPostsForRun } from "../../lib/review/queries";
 import { DraftCard } from "./DraftCard";
