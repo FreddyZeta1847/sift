@@ -1,6 +1,7 @@
 .
 ├── .impeccable/
 │   ├── config.json
+│   ├── design.json
 │   └── hook.cache.json
 ├── app/
 │   ├── config/
@@ -137,6 +138,7 @@
 ├── .env.example
 ├── .gitignore
 ├── CONTRIBUTING.md
+├── DESIGN.md
 ├── docker-compose.yml
 ├── Dockerfile
 ├── drizzle.config.ts
@@ -146,6 +148,7 @@
 ├── next.config.ts
 ├── package-lock.json
 ├── package.json
+├── PRODUCT.md
 ├── PROGRESS.md
 ├── README.md
 ├── SECURITY.md
