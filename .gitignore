@@ -1,6 +1,7 @@
 vault-sift/
 .env
 .env.*
+!.env.example
 node_modules/
 .next/
 __pycache__/

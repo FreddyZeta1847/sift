@@ -1,0 +1,29 @@
+# One-command front door: `docker compose up -d`. Builds locally from the
+# Dockerfile for now — GHCR publishing (vault-sift/features/DISTRIBUTION-TRUST/
+# DISTRIBUTION-TRUST--oss-packaging.md) is optional and not yet set up; once it
+# is, replace `build: .` with a pinned `image: ghcr.io/<org>/sift:<version>`
+# (never `:latest`, so upgrades are a deliberate `pull && up -d`, not something
+# that happens silently on a container restart).
+services:
+  sift:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    # Kept as two separate mounts, not one merged directory: data/ is
+    # generated history, config/ is user-authored configuration, and a
+    # self-hoster may want to back up or reset one without touching the
+    # other.
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    environment:
+      - SIFT_DB_PATH=/app/data/sift.db
+      - SIFT_CONFIG_DIR=/app/config
+    # Optional and normally unnecessary: no API key is required to boot —
+    # keys are entered through the running app's Config UI, and there is no
+    # env-var path for them. .env only matters if you want to override
+    # SIFT_DB_PATH/SIFT_CONFIG_DIR above without editing this file directly.
+    env_file:
+      - path: .env
+        required: false

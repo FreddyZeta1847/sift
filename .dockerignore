@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.git/
+data/
+config/
+vault-sift/
+.claude/
+.impeccable/
+docs/
+.env
+.env.*
+*.tsbuildinfo
+next-env.d.ts
