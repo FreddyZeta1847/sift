@@ -22,10 +22,12 @@
  * if a run is already in progress, and always calls `clearRunning()` in a
  * `finally` so the guard can't get stuck set after a thrown error.
  *
- * `saveVoiceProfile`/`saveRetention` are thin read-modify-write wrappers
- * over `config/settings.json`, matching this project's low-ceremony style:
- * the caller always sends the whole current in-memory object rather than a
- * diff.
+ * `saveVoiceProfile`/`saveRetention`/`saveCurationTopN` are thin
+ * read-modify-write wrappers over `config/settings.json`, matching this
+ * project's low-ceremony style: the caller always sends the whole current
+ * in-memory object rather than a diff. `curationTopN` is Curation Engine's
+ * "default 3, configurable" ceiling (see CURATION-ENGINE--ranking-logic in
+ * the vault) — previously hardcoded to 3 directly in the ranking prompt.
  *
  * Every action's actual `saveSources`/`saveSettings` write is routed through
  * `lib/config/safe-write.ts`'s `safeWrite` so a genuine I/O failure (disk
@@ -104,4 +106,9 @@ export async function saveRetention(
 ): Promise<ActionResult> {
   const settings = await getSettings();
   return safeWrite(() => saveSettings({ ...settings, postsRetentionRuns, candidateRetentionDays }));
+}
+
+export async function saveCurationTopN(curationTopN: number): Promise<ActionResult> {
+  const settings = await getSettings();
+  return safeWrite(() => saveSettings({ ...settings, curationTopN }));
 }

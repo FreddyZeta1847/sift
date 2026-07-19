@@ -51,7 +51,7 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     throw new Error("No curation provider/model configured");
   }
 
-  const promptText = buildRankingPrompt(guarded, settings.voiceProfile);
+  const promptText = buildRankingPrompt(guarded, settings.voiceProfile, settings.curationTopN);
   const promptTokens = Math.ceil(promptText.length / 4); // rough estimate, refined by real usage post-call
 
   await assertBudgetAvailable(settings.curationModel, promptTokens, MAX_OUTPUT_TOKENS);
@@ -96,12 +96,14 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
 
 function buildRankingPrompt(
   pool: { id: number; sourceRecap: string }[],
-  profile: { toneNotes: string; interests: string[] }
+  profile: { toneNotes: string; interests: string[] },
+  topN: number
 ): string {
   const itemLines = pool.map((item) => `- id ${item.id}: ${item.sourceRecap}`).join("\n");
   return [
     "You are ranking news items for a user with these interests: " + profile.interests.join(", ") + ".",
-    "Pick the top 3 most important/relevant items from the list below, personalized to those interests.",
+    `Pick up to ${topN} of the most important/relevant items from the list below, personalized to those interests.`,
+    `Only include items that are genuinely worth posting about — picking fewer than ${topN} is fine if that's all that qualifies, never pad the list with weak picks just to hit the number.`,
     "Respond with ONLY valid JSON matching this shape: {\"selected\": [{\"id\": string, \"whyPicked\": string}]}.",
     "Return only the ids from the list below — never invent an id.",
     "",

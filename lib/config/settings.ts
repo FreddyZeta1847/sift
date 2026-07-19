@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   curationModel: null,
   draftingProviderId: null,
   draftingModel: null,
+  curationTopN: 3,
 };
 
 export async function getSettings(): Promise<Settings> {

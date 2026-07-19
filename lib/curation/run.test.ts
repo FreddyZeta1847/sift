@@ -30,6 +30,7 @@ describe("runCuration", () => {
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
       budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
+      curationTopN: 3,
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([
       { id: "p1", label: "Test", baseUrl: "https://x.test", apiKey: "k", kind: "openai-compatible" },
@@ -129,6 +130,21 @@ describe("runCuration", () => {
     vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
       const prompt = messages.map((m) => m.content).join(" ");
       expect(prompt).not.toContain(rows[0].sourceRecap);
+      return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
+    });
+
+    await runCuration(runId);
+  });
+
+  it("uses settings.curationTopN as the pick ceiling instead of a hardcoded number", async () => {
+    vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
+      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
+      curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
+      curationTopN: 7,
+    });
+    vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
+      const prompt = messages.map((m) => m.content).join(" ");
+      expect(prompt).toContain("up to 7");
       return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
     });
 

@@ -257,6 +257,19 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
     box-shadow var(--duration-fast) var(--ease-standard);
 }
 
+/* A drafted post's internal title (RunPicker-adjacent identifier, not
+   LinkedIn-facing copy) — bolder than body but deliberately short of the
+   Headline scale, so it reads as this card's label without competing with
+   the draft text itself for "the one lit thing." Absent on posts written
+   before this field existed (nullable column, no backfill) — the `{post.title
+   && ...}` guard in DraftCard.tsx means those just render with no gap. */
+.draft-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-sm);
+}
+
 /* The AI image-generation prompt attached to a draft — visually a distinct
    sub-block (one tonal step up, per the system's flat/tonal-layering
    language) with its own labeled icon so it reads unambiguously as "the
@@ -283,6 +296,18 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
   font-size: 0.875rem;
   font-style: italic;
   margin: 0;
+}
+
+/* The Review Workspace's run picker (RunPicker.tsx) — inherits the shared
+   `select` styling but sits compact and inline where the old static "Run
+   #N — X post(s)" status line used to be, not stretched to the page's
+   full 70ch reading measure. */
+.run-picker {
+  width: auto;
+  display: inline-block;
+  font-size: 0.8125rem;
+  padding: 6px 10px;
+  margin-bottom: var(--space-lg);
 }
 
 .pending-compare {

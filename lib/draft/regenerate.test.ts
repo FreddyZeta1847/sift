@@ -38,7 +38,7 @@ describe("regeneratePost", () => {
 
   it("inserts a pending sibling row without touching the original", async () => {
     vi.spyOn(generateModule, "generateDrafts").mockResolvedValue([
-      { candidateId, url: "https://a.test", text: "new draft", imagePrompt: "new prompt" },
+      { candidateId, url: "https://a.test", title: "new title", text: "new draft", imagePrompt: "new prompt" },
     ]);
 
     const result = await regeneratePost(postId);
@@ -55,7 +55,7 @@ describe("regeneratePost", () => {
 
   it("creates a new pipeline_runs row tagged regenerate-posts", async () => {
     vi.spyOn(generateModule, "generateDrafts").mockResolvedValue([
-      { candidateId, url: "https://a.test", text: "new draft", imagePrompt: "new prompt" },
+      { candidateId, url: "https://a.test", title: "new title", text: "new draft", imagePrompt: "new prompt" },
     ]);
 
     await regeneratePost(postId);

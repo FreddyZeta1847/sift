@@ -15,7 +15,7 @@ describe("initializeScheduler", () => {
       budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
       scheduleDays: ["mon"], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
     });
     const registerSpy = vi.spyOn(cronModule, "registerCronJob").mockImplementation(() => {});
     const catchupSpy = vi.spyOn(catchupModule, "checkMissedRun").mockResolvedValue(undefined);
@@ -31,7 +31,7 @@ describe("initializeScheduler", () => {
       budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
       scheduleDays: [], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
     });
     const catchupSpy = vi.spyOn(catchupModule, "checkMissedRun").mockResolvedValue(undefined);
 

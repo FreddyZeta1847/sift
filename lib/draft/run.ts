@@ -25,6 +25,7 @@ export async function runDraftGenerator(
         candidateId: r.candidateId,
         runId,
         url: r.url,
+        title: r.title,
         originalText: r.text,
         imagePrompt: r.imagePrompt,
       }))

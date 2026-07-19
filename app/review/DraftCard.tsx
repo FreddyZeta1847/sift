@@ -166,6 +166,8 @@ export function DraftCard({ post }: { post: PostWithPending }) {
 
   return (
     <article className={muted ? "card muted" : "card"}>
+      {post.title && <p className="draft-title">{post.title}</p>}
+
       {status && (
         <p role="alert" style={{ marginTop: 0, marginBottom: "var(--space-sm)", fontWeight: 500 }}>
           {status}
@@ -230,6 +232,7 @@ export function DraftCard({ post }: { post: PostWithPending }) {
       {post.pendingVersion && (
         <div className="pending-compare">
           <p className="status-line" style={{ marginTop: 0 }}>New version:</p>
+          {post.pendingVersion.title && <p className="draft-title">{post.pendingVersion.title}</p>}
           <p style={{ maxWidth: "70ch" }}>{post.pendingVersion.originalText}</p>
           <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
             <button onClick={() => handleKeep(post.pendingVersion!.id, post.id)}>Keep this one</button>

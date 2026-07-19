@@ -29,6 +29,7 @@ describe("postsTable", () => {
         "candidateId",
         "runId",
         "url",
+        "title",
         "originalText",
         "editedText",
         "imagePrompt",

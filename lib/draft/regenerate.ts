@@ -65,6 +65,7 @@ export async function regeneratePost(postId: number): Promise<ActionResult> {
         candidateId: post.candidateId,
         runId: run.id,
         url: draft.url,
+        title: draft.title,
         originalText: draft.text,
         imagePrompt: draft.imagePrompt,
         pending: true,

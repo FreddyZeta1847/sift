@@ -40,6 +40,11 @@
  * `saveRetention` instead of the number. Both fields are saved together
  * whenever either changes, since `saveRetention` takes both values at once.
  *
+ * Curation's "posts per run" is a single positive-integer field (no
+ * unlimited option — Curation Engine's input guard caps the candidate pool
+ * at 40 regardless, see CURATION-ENGINE--ranking-logic) seeded from
+ * `settings.curationTopN` and saved via `saveCurationTopN` on change.
+ *
  * Schedule, voice profile, and retention all apply their local state change
  * optimistically and only persist afterward; each capture the pre-update
  * value and revert local state back to it if the Server Action reports
@@ -59,6 +64,7 @@ import {
   saveSchedule,
   saveVoiceProfile,
   saveRetention,
+  saveCurationTopN,
 } from "./actions";
 import type { Source, Settings, VoiceProfile } from "../../../lib/config/types";
 
@@ -125,6 +131,9 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     settings.candidateRetentionDays
   );
   const [retentionStatus, setRetentionStatus] = useState<string | null>(null);
+
+  const [curationTopN, setCurationTopN] = useState<number>(settings.curationTopN);
+  const [curationTopNStatus, setCurationTopNStatus] = useState<string | null>(null);
 
   const handleToggleSource = async (name: string) => {
     const result = await toggleSource(name);
@@ -258,11 +267,24 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     persistRetention(postsRetentionRuns, value, postsRetentionRuns, previousCandidates);
   };
 
+  const handleCurationTopNChange = async (value: number) => {
+    const previous = curationTopN;
+    setCurationTopN(value);
+    const result = await saveCurationTopN(value);
+    if (!result.ok) {
+      setCurationTopN(previous);
+      setCurationTopNStatus(`Save failed: ${result.error}`);
+      return;
+    }
+    setCurationTopNStatus("Curation setting saved.");
+  };
+
   return (
     <div className="config-page config-page--with-nav">
       <nav className="config-nav" aria-label="Settings sections">
         <a href="#sources">Sources</a>
         <a href="#schedule">Schedule</a>
+        <a href="#curation">Curation</a>
         <a href="#voice-profile">Voice profile</a>
         <a href="#retention">Retention</a>
       </nav>
@@ -349,6 +371,31 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         {scheduleStatus && (
           <p className={statusTone(scheduleStatus)} role="alert">
             {scheduleStatus}
+          </p>
+        )}
+      </section>
+
+      <section id="curation">
+        <h2>Curation</h2>
+        <label>
+          Posts per run
+          <input
+            type="number"
+            min={1}
+            max={40}
+            value={curationTopN}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (value >= 1) handleCurationTopNChange(value);
+            }}
+          />
+        </label>
+        <p className="status-line">
+          The upper bound — curation only picks fewer if fewer items are genuinely worth posting.
+        </p>
+        {curationTopNStatus && (
+          <p className={statusTone(curationTopNStatus)} role="alert">
+            {curationTopNStatus}
           </p>
         )}
       </section>

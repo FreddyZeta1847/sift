@@ -23,6 +23,7 @@ function settingsWithRetention(candidateRetentionDays: number | null) {
     curationModel: null,
     draftingProviderId: null,
     draftingModel: null,
+    curationTopN: 3,
   };
 }
 

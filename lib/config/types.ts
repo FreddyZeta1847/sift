@@ -30,4 +30,5 @@ export interface Settings {
   curationModel: string | null;
   draftingProviderId: string | null;
   draftingModel: string | null;
+  curationTopN: number;
 }

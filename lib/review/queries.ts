@@ -8,13 +8,42 @@
  * returned once, with the pending row attached as `pendingVersion`, so the
  * review page can render "current vs proposed" without duplicate cards.
  */
-import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { pipelineRunsTable, postsTable } from "../db/schema";
 
 export type PostRow = typeof postsTable.$inferSelect;
 export interface PostWithPending extends PostRow {
   pendingVersion?: PostRow;
+}
+
+export type RunRow = typeof pipelineRunsTable.$inferSelect;
+export interface RunSummary extends RunRow {
+  postCount: number;
+}
+
+// Backs the Review page's run picker — every run in reverse-chronological
+// order (not scoped to "today"), including ones that never finished
+// (status null) or aborted, so a crashed/stuck run is something the user
+// can actually see and inspect rather than a silent gap. Nothing in this
+// app currently deletes a pipeline_runs row or its posts once written (see
+// lib/candidates/retention.ts's docstring — post/run retention by count is
+// a stored setting with no enforcement code yet), so every run that ever
+// ran real ingestion/curation/drafting work stays browsable here.
+export async function getRecentRuns(limit = 50): Promise<RunSummary[]> {
+  const db = getDb();
+  const runs = await db.select().from(pipelineRunsTable).orderBy(desc(pipelineRunsTable.id)).limit(limit);
+  if (runs.length === 0) return [];
+
+  const runIds = runs.map((r) => r.id);
+  const counts = await db
+    .select({ runId: postsTable.runId, postCount: count(postsTable.id) })
+    .from(postsTable)
+    .where(inArray(postsTable.runId, runIds))
+    .groupBy(postsTable.runId);
+  const countByRunId = new Map(counts.map((c) => [c.runId, Number(c.postCount)]));
+
+  return runs.map((r) => ({ ...r, postCount: countByRunId.get(r.id) ?? 0 }));
 }
 
 export async function resolveRunIdForDate(date: string): Promise<number | null> {

@@ -28,6 +28,26 @@ describe("readConfig", () => {
     expect(result).toEqual({ foo: "baz" });
   });
 
+  it("fills in a default for a key missing from an existing file (added after that file was written)", async () => {
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(`${testDir}/existing.json`, JSON.stringify({ foo: "baz" }));
+
+    const result = await readConfig(`${testDir}/existing.json`, { foo: "bar", newField: 3 });
+
+    expect(result).toEqual({ foo: "baz", newField: 3 });
+  });
+
+  it("does not merge array-shaped config (providers.json/sources.json) — returns the array as-is", async () => {
+    mkdirSync(testDir, { recursive: true });
+    const stored = [{ id: "p1" }, { id: "p2" }];
+    writeFileSync(`${testDir}/list.json`, JSON.stringify(stored));
+
+    const result = await readConfig(`${testDir}/list.json`, []);
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(stored);
+  });
+
   it("throws a clear error on malformed JSON, naming the file", async () => {
     mkdirSync(testDir, { recursive: true });
     writeFileSync(`${testDir}/corrupt.json`, "{ not valid json");

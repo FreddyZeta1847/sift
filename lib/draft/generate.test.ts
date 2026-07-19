@@ -31,6 +31,7 @@ describe("generateDrafts", () => {
       scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "m", draftingProviderId: "p1", draftingModel: "m",
+      curationTopN: 3,
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([
       { id: "p1", label: "Test", baseUrl: "https://x.test", apiKey: "k", kind: "openai-compatible" },
@@ -38,13 +39,15 @@ describe("generateDrafts", () => {
     vi.spyOn(costSafetyModule, "assertBudgetAvailable").mockResolvedValue(undefined);
     vi.spyOn(costSafetyModule, "logLlmCall").mockResolvedValue(undefined);
     vi.spyOn(providerModule, "callLLM").mockResolvedValue({
-      content: JSON.stringify([{ id: "1", text: "draft text", imagePrompt: "a prompt" }]),
+      content: JSON.stringify([{ id: "1", title: "a title", text: "draft text", imagePrompt: "a prompt" }]),
       inputTokens: 10,
       outputTokens: 5,
     });
 
     const result = await generateDrafts(items, 99);
 
-    expect(result).toEqual([{ candidateId: 1, url: "https://a.test", text: "draft text", imagePrompt: "a prompt" }]);
+    expect(result).toEqual([
+      { candidateId: 1, url: "https://a.test", title: "a title", text: "draft text", imagePrompt: "a prompt" },
+    ]);
   });
 });

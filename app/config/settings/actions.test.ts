@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
-import { toggleSource, addSource, saveSchedule, runNow, saveVoiceProfile, saveRetention } from "./actions";
+import { toggleSource, addSource, saveSchedule, runNow, saveVoiceProfile, saveRetention, saveCurationTopN } from "./actions";
 import { getSources } from "../../../lib/config/sources";
 import { getSettings } from "../../../lib/config/settings";
 import * as settingsModule from "../../../lib/config/settings";
@@ -90,6 +90,12 @@ describe("settings page actions", () => {
     const settings = await getSettings();
     expect(settings.postsRetentionRuns).toBe(10);
     expect(settings.candidateRetentionDays).toBe(7);
+  });
+
+  it("saveCurationTopN writes curationTopN", async () => {
+    await saveCurationTopN(7);
+    const settings = await getSettings();
+    expect(settings.curationTopN).toBe(7);
   });
 
   it("saveSchedule re-registers the cron job live after a successful save", async () => {

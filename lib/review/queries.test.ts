@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
-import { resolveRunIdForDate, getPostsForRun } from "./queries";
+import { resolveRunIdForDate, getPostsForRun, getRecentRuns } from "./queries";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
 import { pipelineRunsTable, candidatesTable, postsTable } from "../db/schema";
@@ -132,5 +132,34 @@ describe("review queries", () => {
     const resolved = await resolveRunIdForDate("2026-07-18");
 
     expect(resolved).toBe(lateRun.id);
+  });
+
+  it("getRecentRuns returns runs newest-first with post counts, including runs with zero posts", async () => {
+    const db = getDb();
+    const [oldRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-17T10:00:00.000Z"), type: "manual", status: "success", finishedAt: new Date() })
+      .returning({ id: pipelineRunsTable.id });
+    const [candidate] = await db
+      .insert(candidatesTable)
+      .values({ runId: oldRun.id, url: "https://a.test", sourceRecap: "r", chosen: true, createdAt: new Date() })
+      .returning({ id: candidatesTable.id });
+    await db.insert(postsTable).values({ candidateId: candidate.id, runId: oldRun.id, url: "https://a.test", originalText: "x", imagePrompt: "p" });
+    // A run that never finished — must still appear, with postCount 0.
+    const [stuckRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-18T10:00:00.000Z"), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+
+    const runs = await getRecentRuns();
+
+    expect(runs.map((r) => r.id)).toEqual([stuckRun.id, oldRun.id]);
+    expect(runs[0].postCount).toBe(0);
+    expect(runs[0].status).toBeNull();
+    expect(runs[1].postCount).toBe(1);
+  });
+
+  it("getRecentRuns returns an empty array when there are no runs", async () => {
+    expect(await getRecentRuns()).toEqual([]);
   });
 });

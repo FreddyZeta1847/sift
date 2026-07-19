@@ -32,6 +32,7 @@ export const postsTable = sqliteTable("posts", {
     .notNull()
     .references(() => pipelineRunsTable.id),
   url: text("url").notNull(),
+  title: text("title"),
   originalText: text("original_text").notNull(),
   editedText: text("edited_text"),
   imagePrompt: text("image_prompt").notNull(),
