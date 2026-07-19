@@ -33,7 +33,8 @@
 │       └── plans/
 │           ├── 2026-07-16-phase-1-data-foundation.md
 │           ├── 2026-07-17-phase-2-core-pipeline.md
-│           └── 2026-07-18-phase-3-human-interface.md
+│           ├── 2026-07-18-phase-3-human-interface.md
+│           └── 2026-07-19-phase-4-automation.md
 ├── drizzle/
 │   ├── meta/
 │   │   ├── 0000_snapshot.json
@@ -107,9 +108,18 @@
 │   ├── review/
 │   │   ├── queries.test.ts
 │   │   └── queries.ts
-│   └── safety/
-│       ├── leakage-linter.test.ts
-│       └── leakage-linter.ts
+│   ├── safety/
+│   │   ├── leakage-linter.test.ts
+│   │   └── leakage-linter.ts
+│   └── scheduler/
+│       ├── catchup.test.ts
+│       ├── catchup.ts
+│       ├── cron.test.ts
+│       ├── cron.ts
+│       ├── init.test.ts
+│       ├── init.ts
+│       ├── trigger.test.ts
+│       └── trigger.ts
 ├── scripts/
 │   ├── regenerate-posts.test.ts
 │   ├── regenerate-posts.ts
@@ -123,6 +133,7 @@
 │   └── view-runs.ts
 ├── .gitignore
 ├── drizzle.config.ts
+├── instrumentation.ts
 ├── next.config.ts
 ├── package-lock.json
 ├── package.json
