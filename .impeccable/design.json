@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-19T00:00:00Z",
+  "title": "Design System: sift",
+  "extensions": {
+    "colorMeta": {
+      "bg": { "role": "neutral", "displayName": "Deep Room", "canonical": "oklch(0.09 0 0)", "tonalRamp": ["oklch(0.04 0 0)", "oklch(0.09 0 0)", "oklch(0.14 0 0)", "oklch(0.22 0 0)", "oklch(0.34 0 0)", "oklch(0.50 0 0)", "oklch(0.70 0 0)", "oklch(0.90 0 0)"] },
+      "surface": { "role": "neutral", "displayName": "Lamp Surface", "canonical": "oklch(0.14 0.006 75)", "tonalRamp": ["oklch(0.09 0.004 75)", "oklch(0.14 0.006 75)", "oklch(0.18 0.007 75)", "oklch(0.24 0.007 75)", "oklch(0.34 0.007 75)", "oklch(0.50 0.006 75)", "oklch(0.70 0.005 75)", "oklch(0.90 0.003 75)"] },
+      "surface-raised": { "role": "neutral", "displayName": "Lamp Surface Raised", "canonical": "oklch(0.18 0.007 75)", "tonalRamp": ["oklch(0.12 0.005 75)", "oklch(0.18 0.007 75)", "oklch(0.22 0.007 75)", "oklch(0.28 0.007 75)", "oklch(0.38 0.007 75)", "oklch(0.54 0.006 75)", "oklch(0.72 0.005 75)", "oklch(0.91 0.003 75)"] },
+      "border": { "role": "neutral", "displayName": "Border", "canonical": "oklch(0.27 0.006 75)", "tonalRamp": ["oklch(0.15 0.005 75)", "oklch(0.20 0.006 75)", "oklch(0.27 0.006 75)", "oklch(0.34 0.006 75)", "oklch(0.44 0.006 75)", "oklch(0.58 0.005 75)", "oklch(0.75 0.004 75)", "oklch(0.92 0.003 75)"] },
+      "ink": { "role": "neutral", "displayName": "Warm Paper", "canonical": "oklch(0.93 0.012 80)", "tonalRamp": ["oklch(0.20 0.010 80)", "oklch(0.34 0.011 80)", "oklch(0.48 0.011 80)", "oklch(0.60 0.010 80)", "oklch(0.72 0.010 80)", "oklch(0.82 0.011 80)", "oklch(0.93 0.012 80)", "oklch(0.98 0.008 80)"] },
+      "muted": { "role": "neutral", "displayName": "Ash", "canonical": "oklch(0.60 0.008 78)", "tonalRamp": ["oklch(0.24 0.007 78)", "oklch(0.36 0.008 78)", "oklch(0.48 0.008 78)", "oklch(0.60 0.008 78)", "oklch(0.70 0.008 78)", "oklch(0.80 0.007 78)", "oklch(0.90 0.006 78)", "oklch(0.96 0.005 78)"] },
+      "primary": { "role": "primary", "displayName": "Harbor Cobalt", "canonical": "oklch(0.58 0.10 228)", "tonalRamp": ["oklch(0.20 0.06 228)", "oklch(0.30 0.08 228)", "oklch(0.40 0.09 228)", "oklch(0.48 0.09 228)", "oklch(0.58 0.10 228)", "oklch(0.68 0.09 228)", "oklch(0.79 0.07 228)", "oklch(0.90 0.04 228)"] },
+      "primary-deep": { "role": "primary", "displayName": "Harbor Cobalt Deep", "canonical": "oklch(0.48 0.09 228)" },
+      "accent": { "role": "secondary", "displayName": "Ember", "canonical": "oklch(0.68 0.15 45)", "tonalRamp": ["oklch(0.24 0.09 45)", "oklch(0.35 0.12 45)", "oklch(0.46 0.14 45)", "oklch(0.58 0.14 45)", "oklch(0.68 0.15 45)", "oklch(0.77 0.13 45)", "oklch(0.86 0.09 45)", "oklch(0.93 0.05 45)"] },
+      "accent-deep": { "role": "secondary", "displayName": "Ember Deep", "canonical": "oklch(0.58 0.14 45)" },
+      "success": { "role": "status", "displayName": "Moss", "canonical": "oklch(0.62 0.12 145)" },
+      "danger": { "role": "status", "displayName": "Rust", "canonical": "oklch(0.62 0.16 25)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles only, one per page." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings within a page." },
+      "body": { "displayName": "Body", "purpose": "Draft text, labels, reading content. Cap at 70ch measure." },
+      "label": { "displayName": "Label", "purpose": "Form labels, button text, nav items." },
+      "data": { "displayName": "Data", "purpose": "Costs, timestamps, run IDs, model names — tabular/numeric only." }
+    },
+    "shadows": [
+      { "name": "float", "value": "0 8px 24px oklch(0 0 0 / 0.45)", "purpose": "Toasts and popovers only — anything floating above document flow via position: fixed." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Default ease-out-quart for hover/focus state transitions, 150ms." },
+      { "name": "duration-fast", "value": "150ms", "purpose": "Hover, focus, button state changes." },
+      { "name": "duration-base", "value": "220ms", "purpose": "Toast/popover enter-exit, form validation reveals." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "960px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action on a view (Save, Run Now, Copy & Mark Posted).",
+      "html": "<button class=\"ds-btn-primary\">Run Now</button>",
+      "css": ".ds-btn-primary { background: oklch(0.58 0.10 228); color: oklch(0.97 0.01 80); padding: 10px 20px; border-radius: 6px; border: none; font-family: Figtree, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-primary:hover { background: oklch(0.48 0.09 228); } .ds-btn-primary:focus-visible { outline: 2px solid oklch(0.58 0.10 228); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action — edit, regenerate, cancel. The default button everywhere that isn't the one primary action.",
+      "html": "<button class=\"ds-btn-ghost\">Regenerate</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: oklch(0.93 0.012 80); padding: 10px 20px; border-radius: 6px; border: 1px solid transparent; font-family: Figtree, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1), border-color 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-ghost:hover { background: oklch(0.18 0.007 75); border-color: oklch(0.27 0.006 75); } .ds-btn-ghost:focus-visible { outline: 2px solid oklch(0.58 0.10 228); outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Discard, only. Never filled — a filled red button reads as an alarm this product doesn't need to sound.",
+      "html": "<button class=\"ds-btn-danger\">Discard</button>",
+      "css": ".ds-btn-danger { background: transparent; color: oklch(0.62 0.16 25); padding: 10px 20px; border-radius: 6px; border: 1px solid transparent; font-family: Figtree, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-danger:hover { background: oklch(0.62 0.16 25 / 0.12); } .ds-btn-danger:focus-visible { outline: 2px solid oklch(0.62 0.16 25); outline-offset: 2px; }"
+    },
+    {
+      "name": "Draft Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The one legitimate card in the system — a single drafted post in the Review Workspace.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-meta\">Draft 1 of 3</p><p class=\"ds-card-body\">Sample drafted post text goes here, wrapping naturally across a few lines to show the reading measure.</p></div>",
+      "css": ".ds-card { background: oklch(0.14 0.006 75); border-radius: 10px; padding: 20px; max-width: 70ch; } .ds-card-meta { font-family: Figtree, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; color: oklch(0.60 0.008 78); margin: 0 0 8px; } .ds-card-body { font-family: Figtree, system-ui, sans-serif; font-size: 1rem; line-height: 1.6; color: oklch(0.93 0.012 80); margin: 0; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard form field — API keys, source URLs, settings values.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"https://example.com/feed.xml\" />",
+      "css": ".ds-input { background: oklch(0.14 0.006 75); color: oklch(0.93 0.012 80); border: 1px solid oklch(0.27 0.006 75); border-radius: 6px; padding: 10px 14px; font-family: Figtree, system-ui, sans-serif; font-size: 1rem; width: 100%; transition: border-color 150ms cubic-bezier(0.25, 1, 0.5, 1), box-shadow 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-input::placeholder { color: oklch(0.60 0.008 78); } .ds-input:focus { outline: none; border-color: oklch(0.58 0.10 228); box-shadow: 0 0 0 3px oklch(0.58 0.10 228 / 0.20); }"
+    },
+    {
+      "name": "New-Draft Badge",
+      "kind": "chip",
+      "refersTo": "badge-accent",
+      "description": "The 'new/unreviewed' marker on a draft, and the content-safety linter's warning flag. Ember is reserved for exactly these personal/attention moments.",
+      "html": "<span class=\"ds-badge-accent\">New</span>",
+      "css": ".ds-badge-accent { display: inline-block; background: oklch(0.68 0.15 45); color: oklch(0.98 0.01 70); padding: 2px 10px; border-radius: 6px; font-family: Figtree, system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; }"
+    },
+    {
+      "name": "Top Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Single-row nav, active route underlined in primary. No sidebar, no pill background.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\" class=\"ds-nav-link ds-nav-link-active\">Review</a><a href=\"#\" class=\"ds-nav-link\">API Config</a><a href=\"#\" class=\"ds-nav-link\">Settings</a><a href=\"#\" class=\"ds-nav-link\">Costs</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 24px; align-items: center; padding: 14px 24px; background: oklch(0.14 0.006 75); border-bottom: 1px solid oklch(0.27 0.006 75); } .ds-nav-link { font-family: Figtree, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; color: oklch(0.60 0.008 78); text-decoration: none; padding-bottom: 4px; border-bottom: 2px solid transparent; transition: color 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-nav-link:hover { color: oklch(0.93 0.012 80); } .ds-nav-link-active { color: oklch(0.58 0.10 228); border-bottom-color: oklch(0.58 0.10 228); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Study Lamp",
+    "overview": "A single warm reading lamp on in an otherwise dark, quiet room — that's the whole system in one image. sift is checked by exactly one person, most likely at the end of a day, to read a handful of drafted posts, glance at what they cost, and either send them or let them go. The room (the interface) stays out of the way — near-black, unlit, structurally quiet — so the one lit thing (the draft text, the number that matters, the action you're actually here to take) is what the eye lands on. This explicitly rejects the cold ops-dashboard look and the generic SaaS-product look. Warmth comes from a genuinely warm off-white ink color, a warm ember accent reserved for personal moments, and a rounded humanist typeface — never from a beige/cream surface.",
+    "keyCharacteristics": [
+      "Near-black, zero-chroma background — the room is dark, not navy, not charcoal-blue.",
+      "One structural color (a deep, muted cobalt) used sparingly for navigation and primary actions.",
+      "One warm color (a terracotta ember) reserved for moments genuinely personal to the user.",
+      "Cards used only where content is genuinely discrete and comparable (draft posts in Review).",
+      "Flat by default; depth comes from tonal layering, not shadows."
+    ],
+    "rules": [
+      { "name": "The One Lit Thing Rule", "body": "Any given screen gets exactly one accent-colored element competing for attention, never several.", "section": "colors" },
+      { "name": "The No Warm Surface Rule", "body": "Warmth lives in ink and accent, never in bg. If a background starts reading as brown or cream, its chroma is too high.", "section": "colors" },
+      { "name": "The One Voice Rule", "body": "Every weight and size on screen comes from the Figtree family. A second sans-serif appearing means the system has drifted.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "A card sits at rest with zero shadow. Shadows appear only on elements that float above document flow.", "section": "elevation" },
+      { "name": "The Card-Is-Not-Default Rule", "body": "A card is earned by content that is a standalone, comparable unit. Settings sections and cost summaries are a headline and spacing, not a card.", "section": "components" }
+    ],
+    "dos": [
+      "Do keep bg at exactly oklch(0.09 0 0) — zero chroma, no navy or brown tint.",
+      "Do spend accent (Ember) only on genuinely personal moments.",
+      "Do use tonal layering for depth, never a shadow on ordinary at-rest content.",
+      "Do cap draft/body text at ~70ch measure.",
+      "Do respect prefers-reduced-motion on every transition."
+    ],
+    "donts": [
+      "Don't tint the background warm for coziness — that's the cream/sand AI cliché.",
+      "Don't wrap Settings, API Config, or Costs sections in cards.",
+      "Don't use a filled red button for Discard.",
+      "Don't add a gradient anywhere.",
+      "Don't add glassmorphism or a second typeface alongside Figtree.",
+      "Don't put a colored border stripe on any card or list item.",
+      "Don't add an uppercase tracked eyebrow label above section headings."
+    ]
+  }
+}
