@@ -28,6 +28,8 @@
 │   ├── layout.tsx
 │   ├── Nav.tsx
 │   └── page.tsx
+├── bin/
+│   └── sift-server.js
 ├── docs/
 │   └── superpowers/
 │       └── plans/
