@@ -32,6 +32,19 @@
  * it. Other cards remain fully interactive in the meantime: the run-guard
  * lock in `regeneratePost` only prevents two regenerate/pipeline runs from
  * overlapping, it doesn't block edits/discard/copy on other cards.
+ *
+ * Visual pass only (see DESIGN.md): the draft text is this card's "one lit
+ * thing" — read at body typography, capped to a ~70ch measure, everything
+ * else (badge, prompt, buttons) recedes around it. "Copy & Mark Posted" is
+ * the card's one primary action; "Discard" stays a ghost/danger button
+ * (never filled, per the Flat-By-Default / danger-button rules — a filled
+ * red Discard would read as a false alarm); "Regenerate" and "Copy prompt"
+ * are plain ghost buttons. The content-safety badge sits at the top of the
+ * card, on its own line, so it can't be missed. The pending-version compare
+ * is visually separated by `.pending-compare`'s top border and stacked
+ * clearly under the current draft so "keep new" vs. "keep original" reads
+ * unambiguously. None of this touches the handlers, state, props, or the
+ * conditions that gate them below.
  */
 "use client";
 
@@ -109,26 +122,65 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   };
 
   const muted = post.posted || post.discarded;
+  const flagged = isFlagged(text);
 
   return (
-    <div className={muted ? "card muted" : "card"}>
-      {status && <p role="alert">{status}</p>}
-      {isFlagged(text) && <span className="badge">content-safety flag</span>}
-      <textarea defaultValue={text} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} />
-      <p className="prompt">{post.imagePrompt}</p>
-      <button onClick={handleCopyPrompt}>Copy prompt</button>
-      <button onClick={handleCopyAndPost} disabled={muted}>Copy &amp; Mark Posted</button>
-      <button onClick={handleDiscard} disabled={muted}>Discard</button>
-      <button onClick={handleRegenerate} disabled={muted || isRegenerating || !!post.pendingVersion}>
-        {isRegenerating ? "Regenerating…" : "Regenerate"}
-      </button>
-      {post.pendingVersion && (
-        <div className="pending-compare">
-          <p>New version: {post.pendingVersion.originalText}</p>
-          <button onClick={() => handleKeep(post.pendingVersion!.id, post.id)}>Keep this one</button>
-          <button onClick={() => handleKeep(post.id, post.pendingVersion!.id)}>Keep original</button>
+    <article className={muted ? "card muted" : "card"}>
+      {status && (
+        <p role="alert" style={{ marginTop: 0, marginBottom: "var(--space-sm)", fontWeight: 500 }}>
+          {status}
+        </p>
+      )}
+
+      {muted && (
+        <p className="status-line" style={{ marginTop: 0 }}>
+          {post.discarded ? "Discarded" : "Posted"}
+        </p>
+      )}
+
+      {flagged && (
+        <div style={{ marginBottom: "var(--space-sm)" }}>
+          <span className="badge">content-safety flag</span>
         </div>
       )}
-    </div>
+
+      <div style={{ maxWidth: "70ch" }}>
+        <textarea defaultValue={text} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} />
+      </div>
+
+      <p className="prompt">{post.imagePrompt}</p>
+
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          gap: "var(--space-sm)",
+          marginTop: "var(--space-md)",
+        }}
+      >
+        <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+          <button onClick={handleCopyPrompt}>Copy prompt</button>
+          <button onClick={handleRegenerate} disabled={muted || isRegenerating || !!post.pendingVersion}>
+            {isRegenerating ? "Regenerating…" : "Regenerate"}
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+          <button className="danger" onClick={handleDiscard} disabled={muted}>Discard</button>
+          <button className="primary" onClick={handleCopyAndPost} disabled={muted}>Copy &amp; Mark Posted</button>
+        </div>
+      </div>
+
+      {post.pendingVersion && (
+        <div className="pending-compare">
+          <p className="status-line" style={{ marginTop: 0 }}>New version:</p>
+          <p style={{ maxWidth: "70ch" }}>{post.pendingVersion.originalText}</p>
+          <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+            <button onClick={() => handleKeep(post.pendingVersion!.id, post.id)}>Keep this one</button>
+            <button onClick={() => handleKeep(post.id, post.pendingVersion!.id)}>Keep original</button>
+          </div>
+        </div>
+      )}
+    </article>
   );
 }
