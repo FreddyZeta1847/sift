@@ -20,11 +20,11 @@
  * `settings.scheduleTime` ("HH:MM", 24h UTC). Both call `saveSchedule` with
  * the full current `(scheduleDays, scheduleTime)` pair on every change — the
  * day-toggle handler passes along the current time value and vice versa,
- * since the action always persists both together. This is a **persist-only**
- * control: there is no live cron job yet (a later task in this same phase
- * wires up live re-registration), so the note under this section deliberately
- * says the change "applies the next time the scheduler checks in" rather than
- * claiming any immediate rescheduling effect.
+ * since the action always persists both together. `saveSchedule` persists the
+ * change to `config/settings.json` and re-registers the live cron job (see
+ * `lib/scheduler/cron.ts`) in the same request, so the note under this
+ * section says the change takes effect immediately rather than on some future
+ * scheduler check-in.
  *
  * Run Now uses `useTransition` (mirroring DraftCard's Regenerate button) so
  * the button can show a pending label while `runNow` is in flight, and
@@ -297,7 +297,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
 
       <section>
         <h2>Schedule</h2>
-        <p>Schedule changes apply the next time the scheduler checks in.</p>
+        <p>Schedule changes take effect immediately.</p>
         {DAYS.map(({ key, label }) => (
           <label key={key}>
             <input
