@@ -43,12 +43,21 @@
  * card, on its own line, so it can't be missed. The pending-version compare
  * is visually separated by `.pending-compare`'s top border and stacked
  * clearly under the current draft so "keep new" vs. "keep original" reads
- * unambiguously. None of this touches the handlers, state, props, or the
- * conditions that gate them below.
+ * unambiguously.
+ *
+ * The draft textarea auto-grows to its content's `scrollHeight` (see the
+ * `resizeTextarea` effect below) instead of sitting at a fixed height with
+ * an inner scrollbar — a typical post-length draft is this tool's single
+ * most important reading surface, so it should read in full at a glance.
+ * The image prompt below it is wrapped in `.image-prompt` with an explicit
+ * icon + label, since an unlabeled italic line was easy to mistake for a
+ * caption or secondary draft text rather than what it actually is: the
+ * prompt for the post's AI-generated photo. None of this touches the
+ * handlers, state, props, or the conditions that gate them below.
  */
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveEdit, discardPost, markPosted, regeneratePost, keepVersion } from "./actions";
 import { isFlagged } from "../../lib/safety/leakage-linter";
@@ -59,6 +68,37 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   const [text, setText] = useState(post.editedText ?? post.originalText);
   const [status, setStatus] = useState<string | null>(null);
   const [isRegenerating, startTransition] = useTransition();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  // next/font loads Figtree with `display: "swap"` — the fallback system
+  // font renders first, so the height computed on mount can be too short
+  // once Figtree swaps in and reflows the text (different metrics can wrap
+  // it onto more lines). Re-measure once fonts finish loading; harmless if
+  // they were already ready by then. Without this, `overflow: hidden` on
+  // `.draft-textarea` silently clips the bottom of the draft instead of
+  // scrolling, which is worse than the original fixed-height textarea.
+  useEffect(() => {
+    const resize = () => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    if (typeof document !== "undefined" && "fonts" in document) {
+      document.fonts.ready.then(resize);
+    }
+    // A window resize can also change how many lines the text wraps to at
+    // the card's fixed max-width, so the frozen height needs recomputing.
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
 
   const handleBlur = async () => {
     const result = await saveEdit(post.id, text);
@@ -145,10 +185,26 @@ export function DraftCard({ post }: { post: PostWithPending }) {
       )}
 
       <div style={{ maxWidth: "70ch" }}>
-        <textarea defaultValue={text} onChange={(e) => setText(e.target.value)} onBlur={handleBlur} />
+        <textarea
+          ref={textareaRef}
+          className="draft-textarea"
+          defaultValue={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={handleBlur}
+        />
       </div>
 
-      <p className="prompt">{post.imagePrompt}</p>
+      <div className="image-prompt" style={{ maxWidth: "70ch" }}>
+        <span className="image-prompt-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="m21 15-5-5L5 21" />
+          </svg>
+          Image prompt
+        </span>
+        <p className="image-prompt-text">{post.imagePrompt}</p>
+      </div>
 
       <div
         style={{

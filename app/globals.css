@@ -58,12 +58,24 @@ body {
   font-family: var(--font-body, "Figtree"), system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.6;
+  /* Guards against exactly the kind of leak the daily-spend chart's edge
+     tooltips can cause (an absolutely-positioned tooltip centered on the
+     last bar extends past the container) — the page itself must never
+     gain a horizontal scrollbar over a hover-only element. */
+  overflow-x: hidden;
 }
 
 main {
   max-width: 70ch;
   margin: 0 auto;
   padding: var(--space-xl) var(--space-lg);
+}
+
+/* Config surfaces (Settings/API Config/Costs) are dense forms, not reading
+   prose — the 70ch measure above exists for Review's draft text and starves
+   these pages of the width their field grids/tables actually want. */
+main:has(.config-page) {
+  max-width: 1000px;
 }
 
 h1 {
@@ -98,11 +110,7 @@ label {
   margin-bottom: var(--space-xs);
 }
 
-input[type="text"],
-input[type="number"],
-input[type="time"],
-input[type="password"],
-input[type="url"],
+input:not([type="checkbox"]),
 select,
 textarea {
   background: var(--surface);
@@ -132,6 +140,17 @@ textarea:focus {
 input[type="checkbox"] {
   width: auto;
   accent-color: var(--primary);
+}
+
+/* A number never needs a 700px-wide box to sit in — without this, wide
+   config-page containers stretch retention counts/budget caps absurdly. */
+input[type="number"] { max-width: 160px; }
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 textarea { min-height: 120px; font-family: inherit; }
@@ -192,6 +211,8 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
   border-radius: var(--radius-md);
   padding: var(--space-md) var(--space-lg);
   margin-bottom: var(--space-md);
+  transition: opacity var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
 }
 .card.muted { border: 1px solid var(--border); opacity: 0.6; }
 
@@ -203,20 +224,72 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
   border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
+  animation: fade-scale-in var(--duration-base) var(--ease-standard);
+}
+
+/* Neutral categorization chip — a source's category, a provider's kind.
+   Deliberately not `.badge`: that fill is reserved for the accent color
+   per DESIGN.md's One Lit Thing Rule, and a tag on every list row would
+   blow that budget instantly. */
+.tag {
+  display: inline-block;
+  background: var(--surface-raised);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .empty-state { color: var(--muted); }
 
-.prompt {
+/* Draft text — the card's "one lit thing" (DESIGN.md). Auto-grows in
+   DraftCard.tsx (height set from scrollHeight) so a typical post reads in
+   full without an inner scrollbar. */
+.draft-textarea {
+  /* Height is set imperatively from scrollHeight in DraftCard.tsx and left
+     untransitioned on purpose — animating a text-reflowing element's height
+     is layout-thrash-prone and would visibly lag behind fast typing, so it
+     resizes instantly like Notion/Linear's auto-grow fields do. */
+  resize: none;
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+/* The AI image-generation prompt attached to a draft — visually a distinct
+   sub-block (one tonal step up, per the system's flat/tonal-layering
+   language) with its own labeled icon so it reads unambiguously as "the
+   photo prompt", never mistaken for a caption or secondary draft text. */
+.image-prompt {
+  background: var(--surface-raised);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  margin-top: var(--space-sm);
+}
+.image-prompt-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin-bottom: 2px;
+}
+.image-prompt-label svg { flex-shrink: 0; }
+.image-prompt-text {
   color: var(--muted);
   font-size: 0.875rem;
   font-style: italic;
+  margin: 0;
 }
 
 .pending-compare {
   border-top: 1px solid var(--border);
   margin-top: var(--space-md);
   padding-top: var(--space-md);
+  animation: fade-slide-in var(--duration-base) var(--ease-standard);
 }
 
 .status-line {
@@ -232,11 +305,20 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
 
 .site-nav {
   display: flex;
-  gap: var(--space-lg);
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
   padding: 14px var(--space-lg);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.site-nav-links {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
 }
 .site-nav a {
   font-size: 0.8125rem;
@@ -246,13 +328,33 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
   text-decoration: none;
   padding-bottom: 4px;
   border-bottom: 2px solid transparent;
-  transition: color var(--duration-fast) var(--ease-standard);
+  transition: color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
 .site-nav a:hover { color: var(--ink); }
 .site-nav a.active {
   color: var(--primary);
   border-bottom-color: var(--primary);
 }
+.site-nav-run { padding: 8px 18px; flex-shrink: 0; }
+
+/* Global Run Now feedback — the one place a shadow earns its keep per
+   DESIGN.md's Elevation section, since it floats above the whole app
+   regardless of which page is open. */
+.toast {
+  position: fixed;
+  top: 68px;
+  right: var(--space-lg);
+  z-index: 20;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-float);
+  animation: toast-in var(--duration-base) var(--ease-standard);
+}
+.toast--danger { color: var(--danger); }
 
 /* ---------------------------------------------------------------------
  * Config surface (Settings / API Config / Costs) — per DESIGN.md's
@@ -265,11 +367,63 @@ button.danger:hover:not(:disabled) { background: oklch(0.62 0.16 25 / 0.12); bor
 
 /* h2 already resets its own top margin when it's a section's first child,
    so the rhythm *between* sections has to come from the section wrapper
-   itself, not from the heading. */
-.config-page > section + section {
+   itself, not from the heading. Targets both a bare `.config-page` (Costs,
+   two short sections, no side nav needed) and `.config-content` (the
+   sectioned column inside `.config-page--with-nav`, see below). */
+.config-page > section + section,
+.config-content > section + section {
   margin-top: var(--space-xl);
   padding-top: var(--space-lg);
   border-top: 1px solid var(--border);
+}
+
+/* Settings/API Config: a page long enough to have several sections earns a
+   sticky section nav instead of forcing a blind scroll to find one. Not a
+   sidebar in the generic-admin sense (DESIGN.md's Navigation stays a single
+   top row) — this is page-local wayfinding for one long form, scoped to
+   just the pages that need it. */
+.config-page--with-nav {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  gap: var(--space-xl);
+  align-items: start;
+}
+.config-nav {
+  position: sticky;
+  top: calc(65px + var(--space-lg));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.config-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.config-nav a:hover { color: var(--ink); background: var(--surface-raised); }
+.config-nav a:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.config-content { min-width: 0; }
+/* Without this, the sticky .site-nav (65px) covers the top of whichever
+   section a .config-nav anchor jumps to. */
+.config-content > section[id] { scroll-margin-top: calc(65px + var(--space-lg)); }
+
+@media (max-width: 760px) {
+  .config-page--with-nav { grid-template-columns: 1fr; }
+  .config-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-md);
+  }
 }
 
 /* Third-level heading for a labeled sub-group within a section (e.g.
@@ -287,6 +441,17 @@ h3:first-child { margin-top: 0; }
 /* A labeled sub-group inside a section (model-assignment stage, voice
    profile's example-posts/interests clusters). */
 .stage-block + .stage-block { margin-top: var(--space-lg); }
+
+/* Model assignment's two stages (Curation/Drafting) are directly
+   comparable, so on a wide config page they sit side by side instead of
+   stacked — the wider `.config-page` container (see `main:has(...)` above)
+   is what makes this worth doing at all. */
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-xl);
+}
+.stage-grid > .stage-block + .stage-block { margin-top: 0; }
 
 /* Row-based lists (providers, sources) — a divider between rows, never a
    card and never a colored side-stripe. */
@@ -320,6 +485,45 @@ h3:first-child { margin-top: 0; }
   align-items: stretch;
   gap: var(--space-sm);
   padding: var(--space-md) 0;
+}
+
+/* API Config's provider list, as an actual scannable table (label, base
+   URL, kind, actions) rather than one flex row per provider with its
+   meta packed into a single wrapping line. */
+.provider-table { display: flex; flex-direction: column; }
+.provider-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(180px, 2fr) auto auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+.provider-row:last-child { border-bottom: none; }
+.provider-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-row > .tag { overflow: visible; white-space: nowrap; justify-self: start; }
+.provider-row--head {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding-bottom: var(--space-xs);
+}
+/* The edit-mode row swaps to the full-width stacked field form — spans
+   every column instead of trying to fit inside the table grid. */
+.provider-row--edit {
+  grid-template-columns: 1fr;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+}
+
+@media (max-width: 640px) {
+  .provider-row:not(.provider-row--head):not(.provider-row--edit) {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .provider-row--head { display: none; }
 }
 
 /* Field clusters — an add/edit mini-form's inputs, laid out as a
@@ -454,3 +658,112 @@ h3:first-child { margin-top: 0; }
 
 .status-line--danger { color: var(--danger); }
 .status-line--success { color: var(--success); }
+
+/* Standard clip-not-hide utility for content meant for assistive tech only
+   (the Costs daily-spend chart's data-table alternative). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Costs' daily-spend chart — a single-series bar chart, so per the dataviz
+   skill's accessibility pass it needs no legend (the section title already
+   names the series); Harbor Cobalt carries magnitude since this is a
+   structural data readout, not a personal/voice moment (Ember stays
+   reserved for those per DESIGN.md's One Lit Thing Rule). Bars use
+   `transform: scaleY()` off a fixed-height track rather than animating
+   `height` — same layout-thrash reasoning as `.budget-bar-fill`. */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  padding-top: var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+.bar-chart-col {
+  flex: 1;
+  min-width: 3px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  position: relative;
+}
+.bar-chart-col:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.bar-chart-bar {
+  width: 100%;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px 3px 0 0;
+  transform-origin: bottom;
+  transition: transform var(--duration-base) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.bar-chart-col:hover .bar-chart-bar { background: var(--primary-deep); }
+.bar-chart-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+  z-index: 5;
+}
+.bar-chart-col:hover .bar-chart-tooltip,
+.bar-chart-col:focus-visible .bar-chart-tooltip { opacity: 1; }
+
+/* A save/failure line conveys a state change as it appears — this small
+   entrance is what makes that legible as "something just happened" rather
+   than text popping into a static page. */
+[role="alert"] { animation: fade-slide-in var(--duration-base) var(--ease-standard); }
+
+/* Spend vs. budget cap, read at a glance (PRODUCT.md's "trust through
+   transparency") — the fill's width is set inline from the cap ratio in
+   CostsForm.tsx and transitions in on load/change. */
+.budget-bar {
+  height: 6px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: var(--space-sm);
+}
+.budget-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--success);
+  border-radius: var(--radius-sm);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+.budget-bar-fill[data-tone="danger"] { background: var(--danger); }
+
+@keyframes fade-slide-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

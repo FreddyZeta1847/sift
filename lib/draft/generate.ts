@@ -98,6 +98,19 @@ export async function generateDrafts(items: CuratedItem[], runId: number): Promi
   return resolved;
 }
 
+// Platform instruction, always present ahead of the user's own voice
+// profile — establishes the LinkedIn formatting conventions (emoji,
+// bullet-point cascades, hashtags) regardless of what toneNotes says, so a
+// voice profile that doesn't mention formatting still produces a
+// platform-appropriate post rather than a plain paragraph of prose.
+const LINKEDIN_PLATFORM_PROMPT = [
+  "You are writing a post for LinkedIn, not a blog, email, or generic article. Follow LinkedIn's own conventions:",
+  "- Use emoji sparingly and purposefully (as line-leading bullets, or to punctuate a key point) — never decorative clutter, and never more than a small handful per post.",
+  "- Prefer short paragraphs and a point-cascade structure (a punchy hook line, then a scannable cascade of short lines or emoji/bullet points) over dense blocks of prose.",
+  "- End with 2-5 relevant hashtags on their own line.",
+  "- Keep sentences short and skimmable — this is read on a phone, in a feed, between other posts.",
+].join("\n");
+
 function buildDraftingPrompt(
   items: EnrichedItem[],
   profile: { toneNotes: string; examplePosts: string[]; interests: string[] }
@@ -109,6 +122,7 @@ function buildDraftingPrompt(
     )
     .join("\n\n");
   return [
+    LINKEDIN_PLATFORM_PROMPT,
     `Write LinkedIn posts in this voice: ${profile.toneNotes}`,
     profile.examplePosts.length > 0
       ? `Example posts for style reference:\n${profile.examplePosts.join("\n---\n")}`

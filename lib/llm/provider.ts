@@ -1,6 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Provider } from "../config/types";
 
+// Without a timeout, a slow/unresponsive provider hangs `fetch` forever —
+// the request never resolves or rejects, so the caller (Curation/Draft
+// Generator) never reaches its own catch block, the pipeline_runs row is
+// never marked success/aborted, and the in-memory run-guard (see
+// lib/pipeline/run-guard.ts) never clears, permanently blocking every
+// future Run Now/Regenerate. Matches DRAFT-GENERATOR--resilience.md's
+// already-documented "API error/timeout" hard-failure path, which assumed
+// this existed. 90s is generous for a real completion (curation/drafting
+// calls are typically single-digit seconds to low tens of seconds) while
+// still bounding the worst case, mirroring the AbortController pattern
+// already used for article fetches in lib/draft/safe-fetch.ts.
+const LLM_TIMEOUT_MS = 90_000;
+
 export interface LlmMessage {
   role: "system" | "user";
   content: string;
@@ -29,18 +42,31 @@ async function callOpenAICompatible(
   messages: LlmMessage[],
   options: LlmCallOptions
 ): Promise<LlmCallResult> {
-  const res = await fetch(`${provider.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${provider.apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: options.maxOutputTokens,
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${provider.baseUrl}/chat/completions`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: options.maxOutputTokens,
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`LLM call failed: ${provider.baseUrl} timed out after ${LLM_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const body = await res.text();
@@ -73,7 +99,7 @@ async function callAnthropic(
   messages: LlmMessage[],
   options: LlmCallOptions
 ): Promise<LlmCallResult> {
-  const client = new Anthropic({ apiKey: provider.apiKey });
+  const client = new Anthropic({ apiKey: provider.apiKey, timeout: LLM_TIMEOUT_MS });
   const system = messages.find((m) => m.role === "system")?.content;
   const userMessages = messages
     .filter((m) => m.role === "user")

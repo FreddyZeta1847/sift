@@ -165,13 +165,24 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   };
 
   return (
-    <div className="config-page">
-      <section>
+    <div className="config-page config-page--with-nav">
+      <nav className="config-nav" aria-label="API Config sections">
+        <a href="#providers">Providers</a>
+        <a href="#model-assignment">Model assignment</a>
+      </nav>
+      <div className="config-content">
+      <section id="providers">
         <h2>Providers</h2>
-        <ul className="list">
+        <div className="provider-table">
+          <div className="provider-row provider-row--head">
+            <span>Label</span>
+            <span>Base URL</span>
+            <span>Kind</span>
+            <span />
+          </div>
           {providers.map((p) =>
             editingId === p.id ? (
-              <li key={p.id} className="list-row list-row--edit">
+              <div key={p.id} className="provider-row provider-row--edit">
                 <div className="row-fields">
                   <label>
                     ID
@@ -233,15 +244,12 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                     {editErrors[p.id]}
                   </p>
                 )}
-              </li>
+              </div>
             ) : (
-              <li key={p.id} className="list-row">
-                <div className="list-row-main">
-                  <span className="list-row-title">{p.label}</span>
-                  <span className="list-row-meta data">
-                    {p.baseUrl} · {p.kind}
-                  </span>
-                </div>
+              <div key={p.id} className="provider-row">
+                <span className="list-row-title">{p.label}</span>
+                <span className="list-row-meta data">{p.baseUrl}</span>
+                <span className="tag">{p.kind}</span>
                 <div className="row-actions">
                   <button onClick={() => handleStartEdit(p)}>Edit</button>
                   <button className="danger" onClick={() => handleDelete(p.id)}>
@@ -253,10 +261,10 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                     {deleteErrors[p.id]}
                   </p>
                 )}
-              </li>
+              </div>
             )
           )}
-        </ul>
+        </div>
         {editStatus && (
           <p className={statusTone(editStatus)} role="alert">
             {editStatus}
@@ -318,9 +326,10 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
         )}
       </section>
 
-      <section>
+      <section id="model-assignment">
         <h2>Model assignment</h2>
 
+        <div className="stage-grid">
         <div className="stage-block">
           <h3>Curation model</h3>
           <div className="row-fields">
@@ -374,6 +383,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             {draftingProbeResult && <span className={probeTone(draftingProbeResult)}>{draftingProbeResult}</span>}
           </div>
         </div>
+        </div>
 
         <div className="section-actions row-actions">
           <button
@@ -390,6 +400,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
           </p>
         )}
       </section>
+      </div>
     </div>
   );
 }

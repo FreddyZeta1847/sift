@@ -98,4 +98,39 @@ describe("review queries", () => {
 
     expect(resolved).toBe(lateRun.id);
   });
+
+  it("resolveRunIdForDate prefers a successful run over a later stuck/aborted one on the same date", async () => {
+    const db = getDb();
+    const [successRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-18T08:00:00.000Z"), type: "manual", status: "success", finishedAt: new Date("2026-07-18T08:05:00.000Z") })
+      .returning({ id: pipelineRunsTable.id });
+    // A later run that never finished (status/finishedAt both null) — e.g. a
+    // hung LLM call — must not mask the earlier successful run's posts just
+    // because it has a higher id.
+    await db.insert(pipelineRunsTable).values({ startedAt: new Date("2026-07-18T16:00:00.000Z"), type: "manual" });
+
+    const resolved = await resolveRunIdForDate("2026-07-18");
+
+    expect(resolved).toBe(successRun.id);
+  });
+
+  it("resolveRunIdForDate falls back to the latest run when none succeeded", async () => {
+    const db = getDb();
+    await db.insert(pipelineRunsTable).values({
+      startedAt: new Date("2026-07-18T08:00:00.000Z"),
+      type: "manual",
+      status: "aborted",
+      abortReason: "api_error",
+      finishedAt: new Date("2026-07-18T08:01:00.000Z"),
+    });
+    const [lateRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-18T16:00:00.000Z"), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+
+    const resolved = await resolveRunIdForDate("2026-07-18");
+
+    expect(resolved).toBe(lateRun.id);
+  });
 });

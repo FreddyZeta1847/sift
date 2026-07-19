@@ -26,11 +26,9 @@
  * section says the change takes effect immediately rather than on some future
  * scheduler check-in.
  *
- * Run Now uses `useTransition` (mirroring DraftCard's Regenerate button) so
- * the button can show a pending label while `runNow` is in flight, and
- * surfaces either the specific abort reason, "Already running", or success
- * in a status line, refreshing on success so the user can go check the
- * review page.
+ * Run Now itself now lives in the global top nav (see app/Nav.tsx) rather
+ * than here — kicking off a pipeline run isn't a settings-configuration
+ * action, and it needs to be reachable regardless of which page is open.
  *
  * The voice profile is local state seeded from `settings.voiceProfile`.
  * Per this project's low-ceremony style, every field change (tone notes on
@@ -53,13 +51,12 @@
  */
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   toggleSource,
   addSource,
   saveSchedule,
-  runNow,
   saveVoiceProfile,
   saveRetention,
 } from "./actions";
@@ -86,8 +83,24 @@ const DAYS: { key: string; label: string }[] = [
   { key: "sun", label: "Sun" },
 ];
 
+// Visual-only grouping: sources are stored as a flat list, but scanning 8+
+// of them for the one you want is much easier grouped by category than as
+// one undifferentiated column. Preserves each category's first-seen order
+// rather than alphabetizing, so a deliberately-ordered sources.json isn't
+// visually reshuffled.
+function groupByCategory(sources: Source[]): [string, Source[]][] {
+  const groups = new Map<string, Source[]>();
+  for (const s of sources) {
+    const bucket = groups.get(s.category);
+    if (bucket) bucket.push(s);
+    else groups.set(s.category, [s]);
+  }
+  return Array.from(groups.entries());
+}
+
 export function SettingsForm({ sources, settings }: { sources: Source[]; settings: Settings }) {
   const router = useRouter();
+  const sourceGroups = groupByCategory(sources);
 
   const [newSource, setNewSource] = useState(EMPTY_NEW_SOURCE);
   const [addSourceStatus, setAddSourceStatus] = useState<string | null>(null);
@@ -96,9 +109,6 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   const [scheduleDays, setScheduleDays] = useState<string[]>(settings.scheduleDays);
   const [scheduleTime, setScheduleTime] = useState<string>(settings.scheduleTime);
   const [scheduleStatus, setScheduleStatus] = useState<string | null>(null);
-
-  const [runStatus, setRunStatus] = useState<string | null>(null);
-  const [isRunning, startRun] = useTransition();
 
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>(settings.voiceProfile);
   const [newExamplePost, setNewExamplePost] = useState("");
@@ -168,18 +178,6 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     }
     setScheduleStatus("Schedule saved.");
     router.refresh();
-  };
-
-  const handleRunNow = () => {
-    startRun(async () => {
-      const result = await runNow();
-      if (!result.ok) {
-        setRunStatus(result.error ?? "Run failed");
-        return;
-      }
-      setRunStatus("Run completed.");
-      router.refresh();
-    });
   };
 
   const persistVoiceProfile = async (profile: VoiceProfile, previous: VoiceProfile) => {
@@ -261,29 +259,41 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   };
 
   return (
-    <div className="config-page">
-      <section>
+    <div className="config-page config-page--with-nav">
+      <nav className="config-nav" aria-label="Settings sections">
+        <a href="#sources">Sources</a>
+        <a href="#schedule">Schedule</a>
+        <a href="#voice-profile">Voice profile</a>
+        <a href="#retention">Retention</a>
+      </nav>
+      <div className="config-content">
+      <section id="sources">
         <h2>Sources</h2>
-        <ul className="list">
-          {sources.map((s) => (
-            <li key={s.name} className="list-row">
-              <label className="checkbox-label">
-                <input type="checkbox" checked={s.enabled} onChange={() => handleToggleSource(s.name)} />
-                <span className="list-row-main">
-                  <span className="list-row-title">{s.name}</span>
-                  <span className="list-row-meta data">
-                    {s.url} · {s.category}
-                  </span>
-                </span>
-              </label>
-              {toggleErrors[s.name] && (
-                <p className="status-line status-line--danger" role="alert">
-                  {toggleErrors[s.name]}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
+        {sourceGroups.map(([category, group]) => (
+          <div className="stage-block" key={category}>
+            <h3>
+              {category} <span className="status-line" style={{ display: "inline" }}>({group.length})</span>
+            </h3>
+            <ul className="list">
+              {group.map((s) => (
+                <li key={s.name} className="list-row">
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={s.enabled} onChange={() => handleToggleSource(s.name)} />
+                    <span className="list-row-main">
+                      <span className="list-row-title">{s.name}</span>
+                      <span className="list-row-meta data">{s.url}</span>
+                    </span>
+                  </label>
+                  {toggleErrors[s.name] && (
+                    <p className="status-line status-line--danger" role="alert">
+                      {toggleErrors[s.name]}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
 
         <form className="add-form row-fields" onSubmit={handleAddSource}>
           <label>
@@ -321,7 +331,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section>
+      <section id="schedule">
         <h2>Schedule</h2>
         <p className="status-line">Schedule changes take effect immediately.</p>
         <div className="day-toggle-group">
@@ -343,21 +353,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section>
-        <h2>Run Now</h2>
-        <div className="row-actions">
-          <button className="primary" onClick={handleRunNow} disabled={isRunning}>
-            {isRunning ? "Running…" : "Run Now"}
-          </button>
-        </div>
-        {runStatus && (
-          <p className={statusTone(runStatus)} role="alert">
-            {runStatus}
-          </p>
-        )}
-      </section>
-
-      <section>
+      <section id="voice-profile">
         <h2>Voice profile</h2>
         <label>
           Tone notes
@@ -412,7 +408,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section>
+      <section id="retention">
         <h2>Retention</h2>
         <div className="field-row">
           <label>
@@ -464,6 +460,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           </p>
         )}
       </section>
+      </div>
     </div>
   );
 }
