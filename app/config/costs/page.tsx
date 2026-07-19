@@ -10,6 +10,11 @@ import { getSettings } from "../../../lib/config/settings";
 import { getMonthlySpend } from "../../../lib/config/cost-history";
 import { CostsForm } from "./CostsForm";
 
+// Reads live DB state that doesn't exist yet at build time (a fresh clone's
+// database has no llm_calls table until migrations run at server startup) —
+// must never be statically prerendered.
+export const dynamic = "force-dynamic";
+
 export default async function CostsPage() {
   const settings = await getSettings();
   const currentMonth = new Date().toISOString().slice(0, 7);

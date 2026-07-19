@@ -12,6 +12,10 @@ import { getSources } from "../../../lib/config/sources";
 import { getSettings } from "../../../lib/config/settings";
 import { SettingsForm } from "./SettingsForm";
 
+// Renders live, mutable server state (sources/settings) — never valid to
+// prerender as a static snapshot at build time.
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   const sources = await getSources();
   const settings = await getSettings();

@@ -12,6 +12,10 @@ import { getProviders } from "../../../lib/config/providers";
 import { getSettings } from "../../../lib/config/settings";
 import { ApiConfigForm } from "./ApiConfigForm";
 
+// Renders live, mutable server state (providers/settings) — never valid to
+// prerender as a static snapshot at build time.
+export const dynamic = "force-dynamic";
+
 export default async function ApiConfigPage() {
   const providers = await getProviders();
   const settings = await getSettings();
