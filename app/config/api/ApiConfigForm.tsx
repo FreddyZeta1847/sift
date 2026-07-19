@@ -53,6 +53,22 @@ const EMPTY_NEW_PROVIDER = {
   kind: "openai-compatible" as Provider["kind"],
 };
 
+// Visual-only helper: every failure message produced in this file follows
+// an "X failed: ..." shape (see the handlers below), so matching that
+// substring is enough to apply the danger tint without adding any new
+// state — a plain success sentence falls through to the default, quieter
+// `.status-line` tone.
+function statusTone(message: string): string {
+  return /failed/i.test(message) ? "status-line status-line--danger" : "status-line";
+}
+
+// Visual-only helper: colors a "test this model" probe result — "pass" is
+// the only outcome that means "safe to assign", every other ProbeResult
+// value is a problem worth flagging in `--danger`.
+function probeTone(result: ProbeResult): string {
+  return result === "pass" ? "data status-line--success" : "data status-line--danger";
+}
+
 export function ApiConfigForm({ providers, settings }: { providers: Provider[]; settings: Settings }) {
   const router = useRouter();
 
@@ -149,157 +165,230 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   };
 
   return (
-    <div>
+    <div className="config-page">
       <section>
         <h2>Providers</h2>
-        <ul>
+        <ul className="list">
           {providers.map((p) =>
             editingId === p.id ? (
-              <li key={p.id}>
-                <input
-                  placeholder="id"
-                  value={editProvider.id}
-                  onChange={(e) => setEditProvider({ ...editProvider, id: e.target.value })}
-                  disabled
-                  required
-                />
-                <input
-                  placeholder="label"
-                  value={editProvider.label}
-                  onChange={(e) => setEditProvider({ ...editProvider, label: e.target.value })}
-                  required
-                />
-                <input
-                  placeholder="baseUrl"
-                  value={editProvider.baseUrl}
-                  onChange={(e) => setEditProvider({ ...editProvider, baseUrl: e.target.value })}
-                  required
-                />
-                <input
-                  placeholder="apiKey"
-                  type="password"
-                  value={editProvider.apiKey}
-                  onChange={(e) => setEditProvider({ ...editProvider, apiKey: e.target.value })}
-                  required
-                />
-                <select
-                  value={editProvider.kind}
-                  onChange={(e) => setEditProvider({ ...editProvider, kind: e.target.value as Provider["kind"] })}
-                >
-                  <option value="openai-compatible">openai-compatible</option>
-                  <option value="anthropic">anthropic</option>
-                </select>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={!editProvider.label || !editProvider.baseUrl || !editProvider.apiKey}
-                >
-                  Save
-                </button>
-                <button onClick={handleCancelEdit}>Cancel</button>
-                {editErrors[p.id] && <p role="alert">{editErrors[p.id]}</p>}
+              <li key={p.id} className="list-row list-row--edit">
+                <div className="row-fields">
+                  <label>
+                    ID
+                    <input
+                      value={editProvider.id}
+                      onChange={(e) => setEditProvider({ ...editProvider, id: e.target.value })}
+                      disabled
+                      required
+                    />
+                  </label>
+                  <label>
+                    Label
+                    <input
+                      value={editProvider.label}
+                      onChange={(e) => setEditProvider({ ...editProvider, label: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Base URL
+                    <input
+                      value={editProvider.baseUrl}
+                      onChange={(e) => setEditProvider({ ...editProvider, baseUrl: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label>
+                    API key
+                    <input
+                      type="password"
+                      value={editProvider.apiKey}
+                      onChange={(e) => setEditProvider({ ...editProvider, apiKey: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Kind
+                    <select
+                      value={editProvider.kind}
+                      onChange={(e) => setEditProvider({ ...editProvider, kind: e.target.value as Provider["kind"] })}
+                    >
+                      <option value="openai-compatible">openai-compatible</option>
+                      <option value="anthropic">anthropic</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="row-actions">
+                  <button
+                    className="primary"
+                    onClick={handleSaveEdit}
+                    disabled={!editProvider.label || !editProvider.baseUrl || !editProvider.apiKey}
+                  >
+                    Save
+                  </button>
+                  <button onClick={handleCancelEdit}>Cancel</button>
+                </div>
+                {editErrors[p.id] && (
+                  <p className="status-line status-line--danger" role="alert">
+                    {editErrors[p.id]}
+                  </p>
+                )}
               </li>
             ) : (
-              <li key={p.id}>
-                {p.label} — {p.baseUrl} ({p.kind})
-                <button onClick={() => handleStartEdit(p)}>Edit</button>
-                <button onClick={() => handleDelete(p.id)}>Delete</button>
-                {deleteErrors[p.id] && <p role="alert">{deleteErrors[p.id]}</p>}
+              <li key={p.id} className="list-row">
+                <div className="list-row-main">
+                  <span className="list-row-title">{p.label}</span>
+                  <span className="list-row-meta data">
+                    {p.baseUrl} · {p.kind}
+                  </span>
+                </div>
+                <div className="row-actions">
+                  <button onClick={() => handleStartEdit(p)}>Edit</button>
+                  <button className="danger" onClick={() => handleDelete(p.id)}>
+                    Delete
+                  </button>
+                </div>
+                {deleteErrors[p.id] && (
+                  <p className="status-line status-line--danger" role="alert">
+                    {deleteErrors[p.id]}
+                  </p>
+                )}
               </li>
             )
           )}
         </ul>
-        {editStatus && <p role="alert">{editStatus}</p>}
+        {editStatus && (
+          <p className={statusTone(editStatus)} role="alert">
+            {editStatus}
+          </p>
+        )}
 
-        <form onSubmit={handleAddProvider}>
-          <input
-            placeholder="id"
-            value={newProvider.id}
-            onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
-            required
-          />
-          <input
-            placeholder="label"
-            value={newProvider.label}
-            onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
-            required
-          />
-          <input
-            placeholder="baseUrl"
-            value={newProvider.baseUrl}
-            onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
-            required
-          />
-          <input
-            placeholder="apiKey"
-            type="password"
-            value={newProvider.apiKey}
-            onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
-            required
-          />
-          <select
-            value={newProvider.kind}
-            onChange={(e) => setNewProvider({ ...newProvider, kind: e.target.value as Provider["kind"] })}
-          >
-            <option value="openai-compatible">openai-compatible</option>
-            <option value="anthropic">anthropic</option>
-          </select>
-          <button type="submit">Add provider</button>
+        <form className="add-form row-fields" onSubmit={handleAddProvider}>
+          <label>
+            ID
+            <input
+              value={newProvider.id}
+              onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Label
+            <input
+              value={newProvider.label}
+              onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Base URL
+            <input
+              value={newProvider.baseUrl}
+              onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            API key
+            <input
+              type="password"
+              value={newProvider.apiKey}
+              onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Kind
+            <select
+              value={newProvider.kind}
+              onChange={(e) => setNewProvider({ ...newProvider, kind: e.target.value as Provider["kind"] })}
+            >
+              <option value="openai-compatible">openai-compatible</option>
+              <option value="anthropic">anthropic</option>
+            </select>
+          </label>
+          <div className="row-actions">
+            <button type="submit">Add provider</button>
+          </div>
         </form>
-        {addStatus && <p role="alert">{addStatus}</p>}
+        {addStatus && (
+          <p className={statusTone(addStatus)} role="alert">
+            {addStatus}
+          </p>
+        )}
       </section>
 
       <section>
         <h2>Model assignment</h2>
 
-        <div>
+        <div className="stage-block">
           <h3>Curation model</h3>
-          <select value={curationProviderId} onChange={(e) => setCurationProviderId(e.target.value)}>
-            <option value="">— select provider —</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <input
-            placeholder="model name"
-            value={curationModel}
-            onChange={(e) => setCurationModel(e.target.value)}
-          />
-          <button onClick={handleTestCuration} disabled={isCurationProbing || !curationProviderId || !curationModel}>
-            {isCurationProbing ? "Testing…" : "Test this model"}
-          </button>
-          {curationProbeResult && <span>{curationProbeResult}</span>}
+          <div className="row-fields">
+            <label>
+              Provider
+              <select value={curationProviderId} onChange={(e) => setCurationProviderId(e.target.value)}>
+                <option value="">— select provider —</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Model name
+              <input value={curationModel} onChange={(e) => setCurationModel(e.target.value)} />
+            </label>
+          </div>
+          <div className="row-actions">
+            <button onClick={handleTestCuration} disabled={isCurationProbing || !curationProviderId || !curationModel}>
+              {isCurationProbing ? "Testing…" : "Test this model"}
+            </button>
+            {curationProbeResult && <span className={probeTone(curationProbeResult)}>{curationProbeResult}</span>}
+          </div>
         </div>
 
-        <div>
+        <div className="stage-block">
           <h3>Drafting model</h3>
-          <select value={draftingProviderId} onChange={(e) => setDraftingProviderId(e.target.value)}>
-            <option value="">— select provider —</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <input
-            placeholder="model name"
-            value={draftingModel}
-            onChange={(e) => setDraftingModel(e.target.value)}
-          />
-          <button onClick={handleTestDrafting} disabled={isDraftingProbing || !draftingProviderId || !draftingModel}>
-            {isDraftingProbing ? "Testing…" : "Test this model"}
-          </button>
-          {draftingProbeResult && <span>{draftingProbeResult}</span>}
+          <div className="row-fields">
+            <label>
+              Provider
+              <select value={draftingProviderId} onChange={(e) => setDraftingProviderId(e.target.value)}>
+                <option value="">— select provider —</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Model name
+              <input value={draftingModel} onChange={(e) => setDraftingModel(e.target.value)} />
+            </label>
+          </div>
+          <div className="row-actions">
+            <button onClick={handleTestDrafting} disabled={isDraftingProbing || !draftingProviderId || !draftingModel}>
+              {isDraftingProbing ? "Testing…" : "Test this model"}
+            </button>
+            {draftingProbeResult && <span className={probeTone(draftingProbeResult)}>{draftingProbeResult}</span>}
+          </div>
         </div>
 
-        <button
-          onClick={handleSaveAssignment}
-          disabled={(!!curationProviderId && !curationModel) || (!!draftingProviderId && !draftingModel)}
-        >
-          Save model assignment
-        </button>
-        {assignStatus && <p role="alert">{assignStatus}</p>}
+        <div className="section-actions row-actions">
+          <button
+            className="primary"
+            onClick={handleSaveAssignment}
+            disabled={(!!curationProviderId && !curationModel) || (!!draftingProviderId && !draftingModel)}
+          >
+            Save model assignment
+          </button>
+        </div>
+        {assignStatus && (
+          <p className={statusTone(assignStatus)} role="alert">
+            {assignStatus}
+          </p>
+        )}
       </section>
     </div>
   );

@@ -67,6 +67,15 @@ import type { Source, Settings, VoiceProfile } from "../../../lib/config/types";
 
 const EMPTY_NEW_SOURCE = { name: "", url: "", category: "" };
 
+// Visual-only helper: every failure message produced in this file follows
+// an "X failed: ..." shape (see the handlers below), so matching that
+// substring is enough to apply the danger tint without adding any new
+// state — a plain success sentence falls through to the default, quieter
+// `.status-line` tone.
+function statusTone(message: string): string {
+  return /failed/i.test(message) ? "status-line status-line--danger" : "status-line";
+}
+
 const DAYS: { key: string; label: string }[] = [
   { key: "mon", label: "Mon" },
   { key: "tue", label: "Tue" },
@@ -252,79 +261,100 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   };
 
   return (
-    <div>
+    <div className="config-page">
       <section>
         <h2>Sources</h2>
-        <ul>
+        <ul className="list">
           {sources.map((s) => (
-            <li key={s.name}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={s.enabled}
-                  onChange={() => handleToggleSource(s.name)}
-                />
-                {s.name} — {s.url} ({s.category})
+            <li key={s.name} className="list-row">
+              <label className="checkbox-label">
+                <input type="checkbox" checked={s.enabled} onChange={() => handleToggleSource(s.name)} />
+                <span className="list-row-main">
+                  <span className="list-row-title">{s.name}</span>
+                  <span className="list-row-meta data">
+                    {s.url} · {s.category}
+                  </span>
+                </span>
               </label>
-              {toggleErrors[s.name] && <p role="alert">{toggleErrors[s.name]}</p>}
+              {toggleErrors[s.name] && (
+                <p className="status-line status-line--danger" role="alert">
+                  {toggleErrors[s.name]}
+                </p>
+              )}
             </li>
           ))}
         </ul>
 
-        <form onSubmit={handleAddSource}>
-          <input
-            placeholder="name"
-            value={newSource.name}
-            onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
-            required
-          />
-          <input
-            placeholder="url"
-            value={newSource.url}
-            onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
-            required
-          />
-          <input
-            placeholder="category"
-            value={newSource.category}
-            onChange={(e) => setNewSource({ ...newSource, category: e.target.value })}
-            required
-          />
-          <button type="submit">Add source</button>
+        <form className="add-form row-fields" onSubmit={handleAddSource}>
+          <label>
+            Name
+            <input
+              value={newSource.name}
+              onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            URL
+            <input
+              value={newSource.url}
+              onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
+              required
+            />
+          </label>
+          <label>
+            Category
+            <input
+              value={newSource.category}
+              onChange={(e) => setNewSource({ ...newSource, category: e.target.value })}
+              required
+            />
+          </label>
+          <div className="row-actions">
+            <button type="submit">Add source</button>
+          </div>
         </form>
-        {addSourceStatus && <p role="alert">{addSourceStatus}</p>}
+        {addSourceStatus && (
+          <p className={statusTone(addSourceStatus)} role="alert">
+            {addSourceStatus}
+          </p>
+        )}
       </section>
 
       <section>
         <h2>Schedule</h2>
-        <p>Schedule changes take effect immediately.</p>
-        {DAYS.map(({ key, label }) => (
-          <label key={key}>
-            <input
-              type="checkbox"
-              checked={scheduleDays.includes(key)}
-              onChange={() => handleToggleDay(key)}
-            />
-            {label}
-          </label>
-        ))}
+        <p className="status-line">Schedule changes take effect immediately.</p>
+        <div className="day-toggle-group">
+          {DAYS.map(({ key, label }) => (
+            <label key={key} className="day-toggle">
+              <input type="checkbox" checked={scheduleDays.includes(key)} onChange={() => handleToggleDay(key)} />
+              {label}
+            </label>
+          ))}
+        </div>
         <label>
           Time (UTC)
-          <input
-            type="time"
-            value={scheduleTime}
-            onChange={(e) => handleScheduleTimeChange(e.target.value)}
-          />
+          <input type="time" value={scheduleTime} onChange={(e) => handleScheduleTimeChange(e.target.value)} />
         </label>
-        {scheduleStatus && <p role="alert">{scheduleStatus}</p>}
+        {scheduleStatus && (
+          <p className={statusTone(scheduleStatus)} role="alert">
+            {scheduleStatus}
+          </p>
+        )}
       </section>
 
       <section>
         <h2>Run Now</h2>
-        <button onClick={handleRunNow} disabled={isRunning}>
-          {isRunning ? "Running…" : "Run Now"}
-        </button>
-        {runStatus && <p role="alert">{runStatus}</p>}
+        <div className="row-actions">
+          <button className="primary" onClick={handleRunNow} disabled={isRunning}>
+            {isRunning ? "Running…" : "Run Now"}
+          </button>
+        </div>
+        {runStatus && (
+          <p className={statusTone(runStatus)} role="alert">
+            {runStatus}
+          </p>
+        )}
       </section>
 
       <section>
@@ -339,88 +369,100 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           />
         </label>
 
-        <div>
+        <div className="stage-block">
           <h3>Example posts</h3>
-          <ul>
+          <ul className="chip-list">
             {voiceProfile.examplePosts.map((post, i) => (
-              <li key={`${post}-${i}`}>
-                {post}
+              <li key={`${post}-${i}`} className="chip-row">
+                <span>{post}</span>
                 <button onClick={() => handleRemoveExamplePost(i)}>Remove</button>
               </li>
             ))}
           </ul>
-          <input
-            placeholder="new example post"
-            value={newExamplePost}
-            onChange={(e) => setNewExamplePost(e.target.value)}
-          />
-          <button onClick={handleAddExamplePost}>Add example post</button>
+          <div className="field-row">
+            <input
+              placeholder="new example post"
+              value={newExamplePost}
+              onChange={(e) => setNewExamplePost(e.target.value)}
+            />
+            <button onClick={handleAddExamplePost}>Add example post</button>
+          </div>
         </div>
 
-        <div>
+        <div className="stage-block">
           <h3>Interests</h3>
-          <ul>
+          <ul className="chip-list">
             {voiceProfile.interests.map((interest, i) => (
-              <li key={`${interest}-${i}`}>
-                {interest}
+              <li key={`${interest}-${i}`} className="chip-row">
+                <span>{interest}</span>
                 <button onClick={() => handleRemoveInterest(i)}>Remove</button>
               </li>
             ))}
           </ul>
-          <input
-            placeholder="new interest"
-            value={newInterest}
-            onChange={(e) => setNewInterest(e.target.value)}
-          />
-          <button onClick={handleAddInterest}>Add interest</button>
+          <div className="field-row">
+            <input placeholder="new interest" value={newInterest} onChange={(e) => setNewInterest(e.target.value)} />
+            <button onClick={handleAddInterest}>Add interest</button>
+          </div>
         </div>
 
-        {voiceStatus && <p role="alert">{voiceStatus}</p>}
+        {voiceStatus && (
+          <p className={statusTone(voiceStatus)} role="alert">
+            {voiceStatus}
+          </p>
+        )}
       </section>
 
       <section>
         <h2>Retention</h2>
-        <label>
-          Posts retention (runs)
-          <input
-            type="number"
-            min={0}
-            value={postsRetentionRuns ?? ""}
-            disabled={postsRetentionRuns === null}
-            onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={postsRetentionRuns === null}
-            onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
-          />
-          Unlimited
-        </label>
+        <div className="field-row">
+          <label>
+            Posts retention (runs)
+            <input
+              type="number"
+              min={0}
+              value={postsRetentionRuns ?? ""}
+              disabled={postsRetentionRuns === null}
+              onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
+            />
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={postsRetentionRuns === null}
+              onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
+            />
+            Unlimited
+          </label>
+        </div>
 
-        <label>
-          Candidate retention (days)
-          <input
-            type="number"
-            min={0}
-            value={candidateRetentionDays ?? ""}
-            disabled={candidateRetentionDays === null}
-            onChange={(e) =>
-              handleCandidateRetentionChange(e.target.value === "" ? null : Number(e.target.value))
-            }
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={candidateRetentionDays === null}
-            onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
-          />
-          Unlimited
-        </label>
+        <div className="field-row">
+          <label>
+            Candidate retention (days)
+            <input
+              type="number"
+              min={0}
+              value={candidateRetentionDays ?? ""}
+              disabled={candidateRetentionDays === null}
+              onChange={(e) =>
+                handleCandidateRetentionChange(e.target.value === "" ? null : Number(e.target.value))
+              }
+            />
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={candidateRetentionDays === null}
+              onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
+            />
+            Unlimited
+          </label>
+        </div>
 
-        {retentionStatus && <p role="alert">{retentionStatus}</p>}
+        {retentionStatus && (
+          <p className={statusTone(retentionStatus)} role="alert">
+            {retentionStatus}
+          </p>
+        )}
       </section>
     </div>
   );
