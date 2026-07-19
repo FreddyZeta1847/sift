@@ -8,10 +8,13 @@
  * task's scope — disabling a source via `toggleSource` is the only way to
  * remove it from active use.
  *
- * `saveSchedule` is persist-only: it writes `scheduleDays` and `scheduleTime`
- * to `config/settings.json` and nothing else. There is no live cron job to
- * re-register yet — that's SCHEDULER, a later, not-yet-built phase — so this
- * action must never be extended to touch any scheduling runtime.
+ * `saveSchedule` writes `scheduleDays` and `scheduleTime` to
+ * `config/settings.json`, then re-registers the live cron job (see
+ * `lib/scheduler/cron.ts`) so a schedule change takes effect immediately
+ * instead of only on next process restart. If the persisted save succeeds
+ * but re-registration throws (e.g. a bad cron expression), the save is
+ * NOT rolled back — the error is surfaced via `{ok: false, error}` so the
+ * UI can tell the user the schedule was saved but isn't yet live.
  *
  * `runNow` reuses the same `checkAndSetRunning`/`clearRunning` guard as
  * Regenerate (see `lib/pipeline/run-guard.ts`) so a manual run can't overlap
@@ -41,6 +44,8 @@ import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { checkAndSetRunning, clearRunning } from "../../../lib/pipeline/run-guard";
 import { runPipeline } from "../../../scripts/run-pipeline";
 import { safeWrite } from "../../../lib/config/safe-write";
+import { registerCronJob } from "../../../lib/scheduler/cron";
+import { triggerRun } from "../../../lib/scheduler/trigger";
 import type { VoiceProfile, Source } from "../../../lib/config/types";
 
 interface ActionResult {
@@ -62,7 +67,15 @@ export async function addSource(input: { name: string; url: string; category: st
 
 export async function saveSchedule(scheduleDays: string[], scheduleTime: string): Promise<ActionResult> {
   const settings = await getSettings();
-  return safeWrite(() => saveSettings({ ...settings, scheduleDays, scheduleTime }));
+  const result = await safeWrite(() => saveSettings({ ...settings, scheduleDays, scheduleTime }));
+  if (!result.ok) return result;
+
+  try {
+    registerCronJob(scheduleDays, scheduleTime, () => triggerRun("scheduled"));
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `Saved, but failed to re-register the schedule: ${(err as Error).message}` };
+  }
 }
 
 export async function runNow(): Promise<ActionResult> {

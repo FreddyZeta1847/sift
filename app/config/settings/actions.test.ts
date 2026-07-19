@@ -1,8 +1,8 @@
 /**
  * Tests for the Settings page (`/config/settings`) Server Actions.
  *
- * Covers source toggling/adding, schedule persistence (persist-only — no
- * live cron re-registration, see actions.ts header), Run Now (including the
+ * Covers source toggling/adding, schedule persistence and live cron
+ * re-registration (see actions.ts header), Run Now (including the
  * run-guard no-op path), voice profile persistence, and retention
  * persistence. Each test points `SIFT_CONFIG_DIR` at an isolated scratch
  * directory so it never touches the real `config/` files.
@@ -15,6 +15,7 @@ import { getSettings } from "../../../lib/config/settings";
 import * as settingsModule from "../../../lib/config/settings";
 import * as runPipelineModule from "../../../scripts/run-pipeline";
 import * as runGuardModule from "../../../lib/pipeline/run-guard";
+import * as cronModule from "../../../lib/scheduler/cron";
 
 const testConfigDir = "data/test-config-settings-actions";
 
@@ -89,5 +90,26 @@ describe("settings page actions", () => {
     const settings = await getSettings();
     expect(settings.postsRetentionRuns).toBe(10);
     expect(settings.candidateRetentionDays).toBe(7);
+  });
+
+  it("saveSchedule re-registers the cron job live after a successful save", async () => {
+    const registerSpy = vi.spyOn(cronModule, "registerCronJob").mockImplementation(() => {});
+
+    await saveSchedule(["tue"], "11:00");
+
+    expect(registerSpy).toHaveBeenCalledWith(["tue"], "11:00", expect.any(Function));
+  });
+
+  it("saveSchedule surfaces a re-registration failure without losing the persisted save", async () => {
+    vi.spyOn(cronModule, "registerCronJob").mockImplementation(() => {
+      throw new Error("bad expression");
+    });
+
+    const result = await saveSchedule(["wed"], "12:00");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("bad expression");
+    const settings = await getSettings();
+    expect(settings.scheduleDays).toEqual(["wed"]); // the save itself still happened
   });
 });
