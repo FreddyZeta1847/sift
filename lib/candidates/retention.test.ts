@@ -14,7 +14,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function settingsWithRetention(candidateRetentionDays: number | null) {
   return {
     budgetCapUsd: null,
-    postsRetentionRuns: null,
+    postsRetentionDays: null,
     candidateRetentionDays,
     scheduleDays: [],
     scheduleTime: "09:00",

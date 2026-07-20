@@ -27,7 +27,7 @@ describe("generateDrafts", () => {
       articleText: "full article text",
     });
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [],
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null, scheduleDays: [],
       scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "m", draftingProviderId: "p1", draftingModel: "m",

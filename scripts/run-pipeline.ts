@@ -9,6 +9,7 @@ import { runCuration } from "../lib/curation/run";
 import { runDraftGenerator } from "../lib/draft/run";
 import { BudgetCapAbort } from "../lib/llm/cost-safety";
 import { pruneStaleCandidates } from "../lib/candidates/retention";
+import { pruneStalePosts } from "../lib/posts/retention";
 
 export type PipelineOutcome =
   | { status: "success" }
@@ -75,6 +76,12 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
       .set({ status: "aborted", abortReason, errorMessage, finishedAt: new Date() })
       .where(eq(pipelineRunsTable.id, runId));
     return { status: "aborted", abortReason };
+  } finally {
+    // End-of-run housekeeping, unrelated to this run's own outcome — runs
+    // whether the pipeline above succeeded or aborted, unlike candidate
+    // pruning above (which runs at the *start*, for reasons specific to
+    // candidates' own dedup/backlog sweep).
+    await pruneStalePosts();
   }
 }
 

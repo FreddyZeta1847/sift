@@ -101,11 +101,11 @@ export async function saveVoiceProfile(profile: VoiceProfile): Promise<ActionRes
 }
 
 export async function saveRetention(
-  postsRetentionRuns: number | null,
+  postsRetentionDays: number | null,
   candidateRetentionDays: number | null
 ): Promise<ActionResult> {
   const settings = await getSettings();
-  return safeWrite(() => saveSettings({ ...settings, postsRetentionRuns, candidateRetentionDays }));
+  return safeWrite(() => saveSettings({ ...settings, postsRetentionDays, candidateRetentionDays }));
 }
 
 export async function saveCurationTopN(curationTopN: number): Promise<ActionResult> {

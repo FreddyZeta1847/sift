@@ -28,7 +28,7 @@ describe("runCuration", () => {
     ]);
 
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
       curationTopN: 3,
     });
@@ -138,7 +138,7 @@ describe("runCuration", () => {
 
   it("uses settings.curationTopN as the pick ceiling instead of a hardcoded number", async () => {
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
       curationTopN: 7,
     });

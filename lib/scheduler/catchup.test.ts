@@ -53,7 +53,7 @@ describe("checkMissedRun", () => {
 
   it("does nothing when no schedule is configured", async () => {
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
@@ -73,7 +73,7 @@ describe("checkMissedRun", () => {
     const mm = String(recentSlot.getUTCMinutes()).padStart(2, "0");
 
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
@@ -93,7 +93,7 @@ describe("checkMissedRun", () => {
     const mm = String(recentSlot.getUTCMinutes()).padStart(2, "0");
 
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
@@ -114,7 +114,7 @@ describe("checkMissedRun", () => {
     const mm = String(oldSlot.getUTCMinutes()).padStart(2, "0");
 
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,

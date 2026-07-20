@@ -167,6 +167,12 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   return (
     <article className={muted ? "card muted" : "card"}>
       {post.title && <p className="draft-title">{post.title}</p>}
+      <p className="status-line" style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0 }}>
+        <span className="data">#{post.id}</span>
+        <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
+          {post.url}
+        </a>
+      </p>
 
       {status && (
         <p role="alert" style={{ marginTop: 0, marginBottom: "var(--space-sm)", fontWeight: 500 }}>

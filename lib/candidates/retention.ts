@@ -5,8 +5,9 @@
  * candidate older than that many days that was never picked by curation —
  * a candidate that already became a post is exempt regardless of age,
  * since posts.candidateId is a hard foreign key into this table and
- * deleting it would orphan the post. Run history (pipeline_runs) and post
- * retention (settings.postsRetentionRuns) are separate, untouched concerns.
+ * deleting it would orphan the post. Run history (pipeline_runs) is
+ * untouched here; post retention (settings.postsRetentionDays, enforced by
+ * lib/posts/retention.ts) is a separate, sibling concern.
  *
  * Called at the start of every pipeline run rather than on a schedule,
  * since there's no persistent background process yet.

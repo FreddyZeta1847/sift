@@ -17,7 +17,7 @@ describe("getSettings", () => {
   it("returns blank defaults by default", async () => {
     const result = await getSettings();
     expect(result.budgetCapUsd).toBeNull();
-    expect(result.postsRetentionRuns).toBeNull();
+    expect(result.postsRetentionDays).toBeNull();
     expect(result.candidateRetentionDays).toBeNull();
     expect(result.scheduleDays).toEqual([]);
     expect(result.scheduleTime).toBe("09:00");
@@ -39,7 +39,7 @@ describe("saveSettings", () => {
 
   it("saveSettings writes the given settings", async () => {
     const custom = {
-      budgetCapUsd: 10, postsRetentionRuns: 5, candidateRetentionDays: 7, scheduleDays: ["mon"],
+      budgetCapUsd: 10, postsRetentionDays: 5, candidateRetentionDays: 7, scheduleDays: ["mon"],
       scheduleTime: "14:30",
       voiceProfile: { toneNotes: "casual", examplePosts: [], interests: ["ai"] },
       curationProviderId: "p1", curationModel: "m1", draftingProviderId: "p1", draftingModel: "m1",

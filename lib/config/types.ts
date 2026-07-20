@@ -21,7 +21,7 @@ export interface VoiceProfile {
 
 export interface Settings {
   budgetCapUsd: number | null;
-  postsRetentionRuns: number | null;
+  postsRetentionDays: number | null;
   candidateRetentionDays: number | null;
   scheduleDays: string[];
   scheduleTime: string;

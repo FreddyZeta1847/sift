@@ -33,6 +33,7 @@ const LINKS = [
   { href: "/config/api", label: "API Config" },
   { href: "/config/settings", label: "Settings" },
   { href: "/config/costs", label: "Costs" },
+  { href: "/admin", label: "Admin" },
 ];
 
 const TOAST_MS = 4000;
@@ -66,7 +67,11 @@ export function Nav() {
       <nav className="site-nav">
         <div className="site-nav-links">
           {LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className={pathname === link.href ? "active" : undefined}>
+            <Link
+              key={link.href}
+              href={link.href}
+              className={pathname === link.href || pathname.startsWith(`${link.href}/`) ? "active" : undefined}
+            >
               {link.label}
             </Link>
           ))}

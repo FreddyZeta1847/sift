@@ -12,7 +12,7 @@ describe("initializeScheduler", () => {
 
   it("registers the cron job from current settings and runs the missed-run check", async () => {
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: ["mon"], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
@@ -28,7 +28,7 @@ describe("initializeScheduler", () => {
 
   it("only initializes once even if called multiple times", async () => {
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
-      budgetCapUsd: null, postsRetentionRuns: null, candidateRetentionDays: null,
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,

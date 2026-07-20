@@ -25,11 +25,13 @@ export interface RunSummary extends RunRow {
 // Backs the Review page's run picker — every run in reverse-chronological
 // order (not scoped to "today"), including ones that never finished
 // (status null) or aborted, so a crashed/stuck run is something the user
-// can actually see and inspect rather than a silent gap. Nothing in this
-// app currently deletes a pipeline_runs row or its posts once written (see
-// lib/candidates/retention.ts's docstring — post/run retention by count is
-// a stored setting with no enforcement code yet), so every run that ever
-// ran real ingestion/curation/drafting work stays browsable here.
+// can actually see and inspect rather than a silent gap. A run can now be
+// removed two ways — the /admin page's manual delete, or automatically once
+// settings.postsRetentionDays (lib/posts/retention.ts) prunes its last post
+// away — so callers of resolveRunIdForDate/getPostsForRun must still handle
+// "no run found"/"this run produced no posts" gracefully (see
+// app/review/page.tsx's empty states) rather than assuming a bookmarked
+// runId always resolves.
 export async function getRecentRuns(limit = 50): Promise<RunSummary[]> {
   const db = getDb();
   const runs = await db.select().from(pipelineRunsTable).orderBy(desc(pipelineRunsTable.id)).limit(limit);

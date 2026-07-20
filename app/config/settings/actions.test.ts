@@ -85,10 +85,10 @@ describe("settings page actions", () => {
     expect(settings.voiceProfile).toEqual(profile);
   });
 
-  it("saveRetention writes postsRetentionRuns and candidateRetentionDays", async () => {
+  it("saveRetention writes postsRetentionDays and candidateRetentionDays", async () => {
     await saveRetention(10, 7);
     const settings = await getSettings();
-    expect(settings.postsRetentionRuns).toBe(10);
+    expect(settings.postsRetentionDays).toBe(10);
     expect(settings.candidateRetentionDays).toBe(7);
   });
 

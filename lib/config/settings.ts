@@ -3,7 +3,7 @@ import type { Settings } from "./types";
 
 const DEFAULT_SETTINGS: Settings = {
   budgetCapUsd: null,
-  postsRetentionRuns: null,
+  postsRetentionDays: null,
   candidateRetentionDays: null,
   scheduleDays: [],
   scheduleTime: "09:00",

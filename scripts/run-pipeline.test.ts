@@ -11,6 +11,7 @@ import * as curationModule from "../lib/curation/run";
 import * as draftModule from "../lib/draft/run";
 import * as sourcesModule from "../lib/config/sources";
 import * as retentionModule from "../lib/candidates/retention";
+import * as postsRetentionModule from "../lib/posts/retention";
 import { BudgetCapAbort } from "../lib/llm/cost-safety";
 
 const testDbPath = "data/test-run-pipeline.db";
@@ -33,6 +34,7 @@ describe("runPipeline", () => {
 
   it("creates a pipeline_runs row, prunes stale candidates, runs all three stages in order, marks success, and logs progress", async () => {
     const pruneSpy = vi.spyOn(retentionModule, "pruneStaleCandidates").mockResolvedValue({ deleted: 0 });
+    const prunePostsSpy = vi.spyOn(postsRetentionModule, "pruneStalePosts").mockResolvedValue({ deleted: 0 });
     const ingestionSpy = vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({
       fetched: 5,
       written: 5,
@@ -46,6 +48,7 @@ describe("runPipeline", () => {
     const result = await runPipeline("manual");
 
     expect(pruneSpy).toHaveBeenCalled();
+    expect(prunePostsSpy).toHaveBeenCalled();
     expect(ingestionSpy).toHaveBeenCalled();
     expect(curationSpy).toHaveBeenCalled();
     expect(draftSpy).toHaveBeenCalled();
@@ -67,10 +70,12 @@ describe("runPipeline", () => {
     vi.spyOn(ingestionModule, "runIngestion").mockResolvedValue({ fetched: 0, written: 0, skippedSources: [], perSource: [] });
     vi.spyOn(curationModule, "runCuration").mockRejectedValue(new BudgetCapAbort());
     const draftSpy = vi.spyOn(draftModule, "runDraftGenerator");
+    const prunePostsSpy = vi.spyOn(postsRetentionModule, "pruneStalePosts").mockResolvedValue({ deleted: 0 });
 
     const result = await runPipeline("manual");
 
     expect(draftSpy).not.toHaveBeenCalled();
+    expect(prunePostsSpy).toHaveBeenCalled();
     expect(result).toEqual({ status: "aborted", abortReason: "budget_cap" });
     const db = getDb();
     const [run] = await db.select().from(pipelineRunsTable);
@@ -81,9 +86,11 @@ describe("runPipeline", () => {
   it("marks the run aborted with reason api_error on any other stage failure, and logs the real error", async () => {
     vi.spyOn(ingestionModule, "runIngestion").mockRejectedValue(new Error("network down"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const prunePostsSpy = vi.spyOn(postsRetentionModule, "pruneStalePosts").mockResolvedValue({ deleted: 0 });
 
     const result = await runPipeline("manual");
 
+    expect(prunePostsSpy).toHaveBeenCalled();
     expect(result).toEqual({ status: "aborted", abortReason: "api_error" });
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("network down"));
     const db = getDb();

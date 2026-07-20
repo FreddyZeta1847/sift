@@ -126,7 +126,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   // rollback purposes has to be captured before typing starts, not at blur.
   const voiceProfileBeforeEditRef = useRef<VoiceProfile>(voiceProfile);
 
-  const [postsRetentionRuns, setPostsRetentionRuns] = useState<number | null>(settings.postsRetentionRuns);
+  const [postsRetentionDays, setPostsRetentionDays] = useState<number | null>(settings.postsRetentionDays);
   const [candidateRetentionDays, setCandidateRetentionDays] = useState<number | null>(
     settings.candidateRetentionDays
   );
@@ -247,7 +247,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   ) => {
     const result = await saveRetention(posts, candidates);
     if (!result.ok) {
-      setPostsRetentionRuns(previousPosts);
+      setPostsRetentionDays(previousPosts);
       setCandidateRetentionDays(previousCandidates);
       setRetentionStatus(`Save failed: ${result.error}`);
       return;
@@ -256,15 +256,15 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   };
 
   const handlePostsRetentionChange = (value: number | null) => {
-    const previousPosts = postsRetentionRuns;
-    setPostsRetentionRuns(value);
+    const previousPosts = postsRetentionDays;
+    setPostsRetentionDays(value);
     persistRetention(value, candidateRetentionDays, previousPosts, candidateRetentionDays);
   };
 
   const handleCandidateRetentionChange = (value: number | null) => {
     const previousCandidates = candidateRetentionDays;
     setCandidateRetentionDays(value);
-    persistRetention(postsRetentionRuns, value, postsRetentionRuns, previousCandidates);
+    persistRetention(postsRetentionDays, value, postsRetentionDays, previousCandidates);
   };
 
   const handleCurationTopNChange = async (value: number) => {
@@ -459,19 +459,19 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         <h2>Retention</h2>
         <div className="field-row">
           <label>
-            Posts retention (runs)
+            Posts retention (days)
             <input
               type="number"
               min={0}
-              value={postsRetentionRuns ?? ""}
-              disabled={postsRetentionRuns === null}
+              value={postsRetentionDays ?? ""}
+              disabled={postsRetentionDays === null}
               onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
             />
           </label>
           <label className="checkbox-label">
             <input
               type="checkbox"
-              checked={postsRetentionRuns === null}
+              checked={postsRetentionDays === null}
               onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
             />
             Unlimited
