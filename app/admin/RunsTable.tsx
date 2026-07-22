@@ -19,9 +19,13 @@ import type { RunRow } from "../../lib/review/queries";
 // only works once the column itself can actually shrink).
 const GRID = "56px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 64px";
 
+// Local time, not UTC — this renders in the browser, so the viewer's own
+// timezone is what they expect to see, not the UTC value the DB stores.
 function formatDate(d: Date | string | null): string {
   if (!d) return "—";
-  return new Date(d).toISOString().slice(0, 16).replace("T", " ");
+  return new Date(d).toLocaleString(undefined, {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export function RunsTable({

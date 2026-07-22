@@ -81,9 +81,40 @@ describe("runCuration", () => {
     expect(updated.filter((r) => r.chosen)).toHaveLength(2);
   });
 
-  it("silently drops an id that doesn't match any local item (soft failure)", async () => {
+  it("throws when every selected id is hallucinated (matches no real candidate) instead of silently returning nothing", async () => {
     vi.spyOn(providerModule, "callLLM").mockResolvedValue({
       content: JSON.stringify({ selected: [{ id: "999999", whyPicked: "hallucinated" }] }),
+      inputTokens: 500, outputTokens: 50,
+    });
+
+    await expect(runCuration(runId)).rejects.toThrow(/none matched a real candidate id/);
+    const db = getDb();
+    const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    expect(rows.every((r) => !r.chosen)).toBe(true);
+  });
+
+  it("drops a hallucinated id but still succeeds when at least one other selected id is real", async () => {
+    const db = getDb();
+    const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: JSON.stringify({
+        selected: [
+          { id: "999999", whyPicked: "hallucinated" },
+          { id: String(rows[0].id), whyPicked: "real pick" },
+        ],
+      }),
+      inputTokens: 500, outputTokens: 50,
+    });
+
+    const result = await runCuration(runId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].whyPicked).toBe("real pick");
+  });
+
+  it("returns an empty result without throwing when the model legitimately selects nothing", async () => {
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: JSON.stringify({ selected: [] }),
       inputTokens: 500, outputTokens: 50,
     });
 
@@ -115,15 +146,22 @@ describe("runCuration", () => {
     expect(result[0].whyPicked).toBe("relevant");
   });
 
-  it("soft-degrades to an empty result on unparseable content instead of throwing", async () => {
+  it("throws on unparseable content instead of silently returning an empty result", async () => {
     vi.spyOn(providerModule, "callLLM").mockResolvedValue({
       content: "not json at all",
       inputTokens: 500, outputTokens: 50,
     });
 
-    const result = await runCuration(runId);
+    await expect(runCuration(runId)).rejects.toThrow(/not valid JSON/);
+  });
 
-    expect(result).toEqual([]);
+  it("throws when the parsed response is missing a \"selected\" array", async () => {
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: JSON.stringify({ notSelected: [] }),
+      inputTokens: 500, outputTokens: 50,
+    });
+
+    await expect(runCuration(runId)).rejects.toThrow(/missing a "selected" array/);
   });
 
   it("skips the LLM call entirely when the candidate pool is empty", async () => {
@@ -137,6 +175,48 @@ describe("runCuration", () => {
     expect(result).toEqual([]);
     expect(callSpy).not.toHaveBeenCalled();
     expect(budgetSpy).not.toHaveBeenCalled();
+    const [row] = await db.select().from(pipelineRunsTable).where(eq(pipelineRunsTable.id, runId));
+    expect(row.currentStage).toBe("Curating 0 candidate(s)…");
+  });
+
+  it("writes currentStage with the whole eligible pool size, including backlog from an earlier run — not just candidates ingested by this run", async () => {
+    const db = getDb();
+    const [earlierRun] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date(), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+    await db.insert(candidatesTable).values({
+      runId: earlierRun.id,
+      url: "https://a.test/backlog",
+      sourceRecap: "Backlog item from an earlier run",
+      sourceId,
+      chosen: false,
+      createdAt: new Date(),
+    });
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: JSON.stringify({ selected: [] }),
+      inputTokens: 10,
+      outputTokens: 10,
+    });
+
+    await runCuration(runId);
+
+    // 3 candidates seeded in beforeEach (all under `runId`) + 1 backlog
+    // item under a different, earlier run = 4 total eligible for curation.
+    const [row] = await db.select().from(pipelineRunsTable).where(eq(pipelineRunsTable.id, runId));
+    expect(row.currentStage).toBe("Curating 4 candidate(s)…");
+  });
+
+  it("writes currentStage: 'Curating 0 candidate(s)…' when every source is disabled, without querying candidates", async () => {
+    vi.spyOn(configSourcesModule, "getSources").mockResolvedValue([
+      { name: "Test Source", url: "https://source.test/feed", category: "general-tech", enabled: false },
+    ]);
+
+    await runCuration(runId);
+
+    const db = getDb();
+    const [row] = await db.select().from(pipelineRunsTable).where(eq(pipelineRunsTable.id, runId));
+    expect(row.currentStage).toBe("Curating 0 candidate(s)…");
   });
 
   it("excludes already-chosen candidates from the pool", async () => {

@@ -1,3 +1,9 @@
+/**
+ * A single unified `callLLM` entry point for both provider kinds sift
+ * supports (Anthropic's own SDK, and any OpenAI-compatible endpoint) —
+ * Curation Engine and Draft Generator both call through here rather than
+ * touching either provider's client directly.
+ */
 import Anthropic from "@anthropic-ai/sdk";
 import type { Provider } from "../config/types";
 
@@ -8,11 +14,14 @@ import type { Provider } from "../config/types";
 // lib/pipeline/run-guard.ts) never clears, permanently blocking every
 // future Run Now/Regenerate. Matches DRAFT-GENERATOR--resilience.md's
 // already-documented "API error/timeout" hard-failure path, which assumed
-// this existed. 90s is generous for a real completion (curation/drafting
-// calls are typically single-digit seconds to low tens of seconds) while
-// still bounding the worst case, mirroring the AbortController pattern
-// already used for article fetches in lib/draft/safe-fetch.ts.
-const LLM_TIMEOUT_MS = 90_000;
+// this existed. Originally 90s, on the assumption that curation/drafting
+// calls are typically single-digit seconds to low tens of seconds — measured
+// against a real hosted 70B model, a normal-shaped drafting call (a realistic
+// prompt, a few hundred output tokens, nowhere near the 8000-token cap) took
+// 116s, comfortably over that assumption. 180s gives real headroom for a
+// heavier hosted model without meaningfully weakening the hung-request
+// safety net this timeout exists for.
+const LLM_TIMEOUT_MS = 180_000;
 
 export interface LlmMessage {
   role: "system" | "user";

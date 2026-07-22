@@ -370,9 +370,15 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
   min-height: 100vh;
 }
 
+/* Sticky, not part of the page's own scroll — only main's content should
+   scroll as the page grows (many draft cards, a long admin table); the
+   sidebar stays pinned to the viewport the whole time. */
 .app-sidebar {
   width: 272px;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -601,9 +607,11 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
 
 @media (max-width: 760px) {
   /* A fixed 272px sidebar would leave a narrow phone with no room for
-     content at all — stack it above the page instead of beside it. */
+     content at all — stack it above the page instead of beside it, and
+     drop the sticky/100vh behavior (stacked layout has no "beside the
+     content" position for it to stick to). */
   .app-shell { flex-direction: column; }
-  .app-sidebar { width: auto; padding: var(--space-sm); }
+  .app-sidebar { position: static; width: auto; height: auto; padding: var(--space-sm); }
   .app-sidebar-inner { flex: none; }
 
   .config-page--with-nav { grid-template-columns: 1fr; }
@@ -887,6 +895,53 @@ h3:first-child { margin-top: 0; }
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/* A green pill switch replacing a plain checkbox for on/off settings
+   (source enabled, unlimited retention/budget) — same "real checkbox,
+   visually hidden" technique as .day-toggle above, just styled as a
+   sliding track+knob instead of a button pill. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--chip-bg);
+  border-radius: var(--radius-pill);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+.switch-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.switch input:checked + .switch-track { background: var(--success); }
+.switch input:checked + .switch-track::before { transform: translateX(20px); }
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.switch input:disabled + .switch-track { opacity: 0.5; cursor: not-allowed; }
 
 /* A removable chip list (voice profile's example posts / interests). */
 .chip-list {

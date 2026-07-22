@@ -122,7 +122,10 @@ export function CostsForm({
             />
           </label>
           <label className="checkbox-label">
-            <input type="checkbox" checked={cap === null} onChange={(e) => handleCapChange(e.target.checked ? null : 0)} />
+            <span className="switch">
+              <input type="checkbox" checked={cap === null} onChange={(e) => handleCapChange(e.target.checked ? null : 0)} />
+              <span className="switch-track" />
+            </span>
             Unlimited
           </label>
         </div>

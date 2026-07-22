@@ -1,6 +1,12 @@
+/**
+ * Curation stage: ranks the entire eligible candidate backlog (not just
+ * this run's own fresh ingestion — see runCuration's pool query below)
+ * and asks the configured LLM to pick the top few worth drafting.
+ */
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { candidatesTable } from "../db/schema";
+import { candidatesTable, pipelineRunsTable } from "../db/schema";
+import { repairJsonControlChars } from "../llm/json-repair";
 import { getEnabledSourceIds } from "../db/sources";
 import { getSettings } from "../config/settings";
 import { getProviders } from "../config/providers";
@@ -34,6 +40,7 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
   // mirroring the empty-pool check just below.
   const enabledSourceIds = await getEnabledSourceIds();
   if (enabledSourceIds.length === 0) {
+    await db.update(pipelineRunsTable).set({ currentStage: "Curating 0 candidate(s)…" }).where(eq(pipelineRunsTable.id, runId));
     return [];
   }
 
@@ -53,6 +60,15 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     .orderBy(asc(candidatesTable.id));
 
   const guarded = pool.slice(0, INPUT_GUARD_LIMIT);
+  // Written here, not by the caller (executePipelineRun) — the pool size
+  // (the whole eligible backlog, capped at INPUT_GUARD_LIMIT) is only known
+  // once this query runs, and is very often much larger than "candidates
+  // ingested this run": a candidate from an earlier run that never got
+  // curated is still in this same pool.
+  await db
+    .update(pipelineRunsTable)
+    .set({ currentStage: `Curating ${guarded.length} candidate(s)…` })
+    .where(eq(pipelineRunsTable.id, runId));
   if (guarded.length === 0) {
     return [];
   }
@@ -84,18 +100,32 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     outputTokens: result.outputTokens,
   });
 
+  // A malformed/unparseable response is a real failure, not a legitimate
+  // "nothing worth posting" — it must surface as an aborted run with a
+  // visible error, not silently look like a normal empty-selection success.
   let parsed: RankingResponse;
   try {
-    parsed = JSON.parse(extractJson(result.content));
+    parsed = JSON.parse(repairJsonControlChars(extractJson(result.content)));
   } catch {
-    return [];
+    throw new Error(`Curation response was not valid JSON: ${result.content.slice(0, 300)}`);
   }
+  if (!Array.isArray(parsed.selected)) {
+    throw new Error(`Curation response was missing a "selected" array: ${result.content.slice(0, 300)}`);
+  }
+
   const resolved: CuratedItem[] = [];
   for (const sel of parsed.selected) {
     const match = guarded.find((row) => String(row.id) === sel.id);
     if (match) {
       resolved.push({ id: match.id, url: match.url, sourceRecap: match.sourceRecap, whyPicked: sel.whyPicked });
     }
+  }
+
+  // The model tried to select something, but every id it named was
+  // hallucinated (matched no real candidate) — also a real failure, not
+  // the same as the model legitimately returning `selected: []`.
+  if (parsed.selected.length > 0 && resolved.length === 0) {
+    throw new Error(`Curation selected ${parsed.selected.length} item(s) but none matched a real candidate id.`);
   }
 
   if (resolved.length > 0) {

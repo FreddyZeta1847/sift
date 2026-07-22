@@ -299,12 +299,13 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             <ul className="list">
               {group.map((s) => (
                 <li key={s.name} className="list-row">
-                  <label className="checkbox-label">
+                  <span className="list-row-main">
+                    <span className="list-row-title">{s.name}</span>
+                    <span className="list-row-meta data">{s.url}</span>
+                  </span>
+                  <label className="switch" aria-label={`Enable ${s.name}`}>
                     <input type="checkbox" checked={s.enabled} onChange={() => handleToggleSource(s.name)} />
-                    <span className="list-row-main">
-                      <span className="list-row-title">{s.name}</span>
-                      <span className="list-row-meta data">{s.url}</span>
-                    </span>
+                    <span className="switch-track" />
                   </label>
                   {toggleErrors[s.name] && (
                     <p className="status-line status-line--danger" role="alert">
@@ -390,11 +391,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             />
           </label>
           <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={postsRetentionDays === null}
-              onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
-            />
+            <span className="switch">
+              <input
+                type="checkbox"
+                checked={postsRetentionDays === null}
+                onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
+              />
+              <span className="switch-track" />
+            </span>
             Unlimited
           </label>
         </div>
@@ -413,11 +417,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             />
           </label>
           <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={candidateRetentionDays === null}
-              onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
-            />
+            <span className="switch">
+              <input
+                type="checkbox"
+                checked={candidateRetentionDays === null}
+                onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
+              />
+              <span className="switch-track" />
+            </span>
             Unlimited
           </label>
         </div>

@@ -70,10 +70,9 @@ export async function executePipelineRun(runId: number): Promise<PipelineOutcome
       console.log(`[sift] Skipped sources (fetch failed): ${ingested.skippedSources.join(", ")}`);
     }
 
-    await db
-      .update(pipelineRunsTable)
-      .set({ currentStage: `Curating ${ingested.written} candidate(s)…` })
-      .where(eq(pipelineRunsTable.id, runId));
+    // No "Curating…" write here — runCuration() writes its own currentStage
+    // once it knows the real pool size (the whole eligible backlog, not
+    // just candidates ingested this run — see lib/curation/run.ts).
     const curated = await runCuration(runId);
     if (curated.length > 0) {
       // eslint-disable-next-line no-console

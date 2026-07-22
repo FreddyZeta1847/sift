@@ -134,15 +134,13 @@ describe("runDraftGenerator", () => {
     expect(rows[0].originalText).toBe("Drafted post text");
   });
 
-  it("soft-degrades to written: 0 on unparseable content instead of throwing", async () => {
+  it("throws on unparseable content instead of silently writing nothing", async () => {
     vi.spyOn(providerModule, "callLLM").mockResolvedValue({
       content: "not json at all",
       inputTokens: 800, outputTokens: 200,
     });
 
-    const result = await runDraftGenerator(items, runId);
-
-    expect(result.written).toBe(0);
+    await expect(runDraftGenerator(items, runId)).rejects.toThrow(/not valid JSON/);
     const db = getDb();
     const rows = await db.select().from(postsTable).where(eq(postsTable.runId, runId));
     expect(rows).toHaveLength(0);

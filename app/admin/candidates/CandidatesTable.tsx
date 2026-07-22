@@ -18,8 +18,12 @@ import type { CandidateRowWithPost } from "../../../lib/admin/queries";
 // overflow:hidden ellipsis on .admin-row > span.
 const GRID = "56px 70px 70px 64px minmax(0,110px) minmax(0,140px) minmax(0,1fr) 64px";
 
+// Local time, not UTC — this renders in the browser, so the viewer's own
+// timezone is what they expect to see, not the UTC value the DB stores.
 function formatDate(d: Date | string): string {
-  return new Date(d).toISOString().slice(0, 16).replace("T", " ");
+  return new Date(d).toLocaleString(undefined, {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export function CandidatesTable({
