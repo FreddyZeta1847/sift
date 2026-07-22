@@ -106,7 +106,8 @@ export function CostsForm({
         <a href="#by-model">By model</a>
       </nav>
       <div className="config-content">
-      <section id="budget-cap">
+      <div className="stage-grid">
+      <section id="budget-cap" className="card">
         <h2>Budget cap</h2>
         <div className="field-row">
           <label>
@@ -132,7 +133,7 @@ export function CostsForm({
         )}
       </section>
 
-      <section id="this-month">
+      <section id="this-month" className="card">
         <h2>This month</h2>
         <p className={`figure-lg data ${spendTone}`}>${spend.toFixed(2)}</p>
         <p className="status-line">
@@ -152,8 +153,10 @@ export function CostsForm({
           </div>
         )}
       </section>
+      </div>
 
-      <section id="daily-spend">
+      <div className="stage-grid">
+      <section id="daily-spend" className="card">
         <h2>Daily spend</h2>
         {maxDayCost > 0 ? (
           <>
@@ -194,7 +197,7 @@ export function CostsForm({
         )}
       </section>
 
-      <section id="by-model">
+      <section id="by-model" className="card">
         <h2>By model</h2>
         {spendByModel.length > 0 ? (
           <ul className="list">
@@ -214,6 +217,7 @@ export function CostsForm({
           <p className="empty-state">No calls recorded yet this month.</p>
         )}
       </section>
+      </div>
       </div>
     </div>
   );

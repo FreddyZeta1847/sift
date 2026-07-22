@@ -9,27 +9,47 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
-import { toggleSource, addSource, saveSchedule, runNow, saveVoiceProfile, saveRetention, saveCurationTopN } from "./actions";
+import {
+  toggleSource,
+  addSource,
+  saveSchedule,
+  runNow,
+  startRun,
+  getRunStatus,
+  saveVoiceProfile,
+  saveRetention,
+  saveCurationTopN,
+} from "./actions";
 import { getSources } from "../../../lib/config/sources";
 import { getSettings } from "../../../lib/config/settings";
 import * as settingsModule from "../../../lib/config/settings";
 import * as runPipelineModule from "../../../scripts/run-pipeline";
 import * as runGuardModule from "../../../lib/pipeline/run-guard";
 import * as cronModule from "../../../lib/scheduler/cron";
+import { runMigrations } from "../../../lib/db/migrate";
+import { closeDb } from "../../../lib/db/client";
 
 const testConfigDir = "data/test-config-settings-actions";
+const testDbPath = "data/test-config-settings-actions.db";
 
 describe("settings page actions", () => {
   beforeEach(() => {
     process.env.SIFT_CONFIG_DIR = testConfigDir;
+    process.env.SIFT_DB_PATH = testDbPath;
+    runMigrations();
     runGuardModule.clearRunning();
   });
 
   afterEach(() => {
     delete process.env.SIFT_CONFIG_DIR;
+    closeDb();
+    delete process.env.SIFT_DB_PATH;
     vi.restoreAllMocks();
     runGuardModule.clearRunning();
     if (existsSync(testConfigDir)) rmSync(testConfigDir, { recursive: true, force: true });
+    for (const suffix of ["", "-wal", "-shm"]) {
+      if (existsSync(testDbPath + suffix)) rmSync(testDbPath + suffix);
+    }
   });
 
   it("toggleSource flips enabled for the named source", async () => {
@@ -76,6 +96,52 @@ describe("settings page actions", () => {
     const result = await runNow();
     expect(result.ok).toBe(false);
     expect(pipelineSpy).not.toHaveBeenCalled();
+  });
+
+  it("startRun returns a runId immediately without awaiting executePipelineRun", async () => {
+    vi.spyOn(runPipelineModule, "createPipelineRun").mockResolvedValue(42);
+    let resolveExecute!: () => void;
+    const executeSpy = vi
+      .spyOn(runPipelineModule, "executePipelineRun")
+      .mockReturnValue(new Promise((resolve) => (resolveExecute = () => resolve({ status: "success" }))));
+
+    const result = await startRun();
+
+    expect(result).toEqual({ ok: true, runId: 42 });
+    expect(executeSpy).toHaveBeenCalledWith(42);
+    // The pipeline hasn't finished yet — the guard must still read "running".
+    expect(runGuardModule.checkAndSetRunning()).toBe(false);
+
+    resolveExecute();
+    await new Promise((r) => setTimeout(r, 0)); // let the unawaited .finally() run
+    expect(runGuardModule.checkAndSetRunning()).toBe(true);
+  });
+
+  it("startRun is a silent no-op if a run is already in progress", async () => {
+    runGuardModule.checkAndSetRunning();
+    const createSpy = vi.spyOn(runPipelineModule, "createPipelineRun");
+    const result = await startRun();
+    expect(result).toEqual({ ok: false, error: "Already running" });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("getRunStatus returns the row's currentStage/status/abortReason for a given runId", async () => {
+    const { getDb } = await import("../../../lib/db/client");
+    const { pipelineRunsTable } = await import("../../../lib/db/schema");
+    const db = getDb();
+    const [run] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date(), type: "manual", currentStage: "Drafting 2 post(s)…" })
+      .returning({ id: pipelineRunsTable.id });
+
+    const result = await getRunStatus(run.id);
+
+    expect(result).toEqual({ currentStage: "Drafting 2 post(s)…", status: null, abortReason: null });
+  });
+
+  it("getRunStatus returns all-null fields for a runId that doesn't exist", async () => {
+    const result = await getRunStatus(999999);
+    expect(result).toEqual({ currentStage: null, status: null, abortReason: null });
   });
 
   it("saveVoiceProfile writes the given profile", async () => {

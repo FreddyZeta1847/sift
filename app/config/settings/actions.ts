@@ -22,6 +22,13 @@
  * if a run is already in progress, and always calls `clearRunning()` in a
  * `finally` so the guard can't get stuck set after a thrown error.
  *
+ * `startRun`/`getRunStatus` are the sidebar's live-progress counterpart to
+ * `runNow`: `startRun` creates the pipeline_runs row and fires
+ * `executePipelineRun` without awaiting it, returning the `runId`
+ * immediately so the client can poll `getRunStatus(runId)` for the row's
+ * `currentStage` while the run continues server-side. Same run-guard,
+ * cleared once the detached run actually finishes.
+ *
  * `saveVoiceProfile`/`saveRetention`/`saveCurationTopN` are thin
  * read-modify-write wrappers over `config/settings.json`, matching this
  * project's low-ceremony style: the caller always sends the whole current
@@ -41,13 +48,16 @@
  */
 "use server";
 
+import { eq } from "drizzle-orm";
 import { getSources, saveSources } from "../../../lib/config/sources";
 import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { checkAndSetRunning, clearRunning } from "../../../lib/pipeline/run-guard";
-import { runPipeline } from "../../../scripts/run-pipeline";
+import { runPipeline, createPipelineRun, executePipelineRun } from "../../../scripts/run-pipeline";
 import { safeWrite } from "../../../lib/config/safe-write";
 import { registerCronJob } from "../../../lib/scheduler/cron";
 import { triggerRun } from "../../../lib/scheduler/trigger";
+import { getDb } from "../../../lib/db/client";
+import { pipelineRunsTable } from "../../../lib/db/schema";
 import type { VoiceProfile, Source } from "../../../lib/config/types";
 
 interface ActionResult {
@@ -93,6 +103,33 @@ export async function runNow(): Promise<ActionResult> {
   } finally {
     clearRunning();
   }
+}
+
+// Fire-and-forget counterpart to runNow(), for the sidebar's live Run Now
+// progress display: hands the runId back the instant the row exists, then
+// lets executePipelineRun() continue on the server so getRunStatus(runId)
+// below can be polled while it's still in flight. runNow() stays as-is for
+// the CLI and any other blocking caller — this is additive, not a
+// replacement.
+export async function startRun(): Promise<ActionResult & { runId?: number }> {
+  if (!checkAndSetRunning()) {
+    return { ok: false, error: "Already running" };
+  }
+  const runId = await createPipelineRun("manual");
+  executePipelineRun(runId).finally(clearRunning);
+  return { ok: true, runId };
+}
+
+export async function getRunStatus(
+  runId: number
+): Promise<{ currentStage: string | null; status: "success" | "aborted" | null; abortReason: string | null }> {
+  const db = getDb();
+  const [run] = await db.select().from(pipelineRunsTable).where(eq(pipelineRunsTable.id, runId));
+  return {
+    currentStage: run?.currentStage ?? null,
+    status: run?.status ?? null,
+    abortReason: run?.abortReason ?? null,
+  };
 }
 
 export async function saveVoiceProfile(profile: VoiceProfile): Promise<ActionResult> {

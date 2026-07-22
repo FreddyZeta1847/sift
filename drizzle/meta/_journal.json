@@ -36,6 +36,13 @@
       "when": 1784713445582,
       "tag": "0004_add-sources-table",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784723110584,
+      "tag": "0005_add-current-stage",
+      "breakpoints": true
     }
   ]
 }

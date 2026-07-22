@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { runPipeline } from "./run-pipeline";
+import { runPipeline, abortOrphanedRuns } from "./run-pipeline";
 import { getDb, closeDb } from "../lib/db/client";
 import { runMigrations } from "../lib/db/migrate";
 import { pipelineRunsTable } from "../lib/db/schema";
@@ -64,6 +64,7 @@ describe("runPipeline", () => {
     expect(run.type).toBe("manual");
     expect(run.status).toBe("success");
     expect(run.finishedAt).not.toBeNull();
+    expect(run.currentStage).toBeNull();
   });
 
   it("marks the run aborted with reason budget_cap when a stage throws BudgetCapAbort", async () => {
@@ -81,6 +82,7 @@ describe("runPipeline", () => {
     const [run] = await db.select().from(pipelineRunsTable);
     expect(run.status).toBe("aborted");
     expect(run.abortReason).toBe("budget_cap");
+    expect(run.currentStage).toBeNull();
   });
 
   it("marks the run aborted with reason api_error on any other stage failure, and logs the real error", async () => {
@@ -141,5 +143,57 @@ describe("runPipeline — fresh, never-migrated database", () => {
     const db = getDb();
     const [run] = await db.select().from(pipelineRunsTable);
     expect(run.status).toBe("success");
+  });
+});
+
+describe("abortOrphanedRuns", () => {
+  beforeEach(() => {
+    process.env.SIFT_DB_PATH = testDbPath;
+    runMigrations();
+  });
+
+  afterEach(() => {
+    closeDb();
+    delete process.env.SIFT_DB_PATH;
+    for (const suffix of ["", "-wal", "-shm"]) {
+      if (existsSync(testDbPath + suffix)) rmSync(testDbPath + suffix);
+    }
+  });
+
+  it("marks a run with no finishedAt as aborted (server_restart), clearing currentStage", async () => {
+    const db = getDb();
+    const [orphaned] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date(), type: "manual", currentStage: "Curating 12 candidate(s)…" })
+      .returning({ id: pipelineRunsTable.id });
+
+    const result = await abortOrphanedRuns();
+
+    expect(result).toEqual({ aborted: 1 });
+    const [row] = await db.select().from(pipelineRunsTable).where(eq(pipelineRunsTable.id, orphaned.id));
+    expect(row.status).toBe("aborted");
+    expect(row.abortReason).toBe("server_restart");
+    expect(row.currentStage).toBeNull();
+    expect(row.finishedAt).not.toBeNull();
+  });
+
+  it("leaves already-finished runs untouched", async () => {
+    const db = getDb();
+    const finishedAt = new Date("2026-07-18T08:05:00.000Z");
+    const [finished] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date("2026-07-18T08:00:00.000Z"), type: "manual", status: "success", finishedAt })
+      .returning({ id: pipelineRunsTable.id });
+
+    const result = await abortOrphanedRuns();
+
+    expect(result).toEqual({ aborted: 0 });
+    const [row] = await db.select().from(pipelineRunsTable).where(eq(pipelineRunsTable.id, finished.id));
+    expect(row.status).toBe("success");
+    expect(row.finishedAt).toEqual(finishedAt);
+  });
+
+  it("returns {aborted: 0} when there are no runs at all", async () => {
+    expect(await abortOrphanedRuns()).toEqual({ aborted: 0 });
   });
 });

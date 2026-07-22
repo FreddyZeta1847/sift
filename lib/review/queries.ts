@@ -7,8 +7,12 @@
  * (see posts.pending, added in Task 1). A post with a pending sibling is
  * returned once, with the pending row attached as `pendingVersion`, so the
  * review page can render "current vs proposed" without duplicate cards.
+ *
+ * Also backs the sidebar's footer stat strip and its Run Now progress
+ * resume-on-load behavior (getMostRecentFinishedRun, getUndecidedPostCount,
+ * getInProgressRun) — read-only, so they live here rather than a new module.
  */
-import { and, count, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { pipelineRunsTable, postsTable } from "../db/schema";
 
@@ -69,6 +73,48 @@ export async function resolveRunIdForDate(date: string): Promise<number | null> 
   // from days ago).
   const latestSuccess = runs.find((r) => r.status === "success");
   return (latestSuccess ?? runs[0]).id;
+}
+
+// Sidebar footer stat: "Last run finished {X}h ago". Only a *successful*
+// run counts — an aborted/stuck run finishing doesn't tell the user
+// anything they'd want surfaced as "the last real run".
+export async function getMostRecentFinishedRun(): Promise<{ finishedAt: Date } | null> {
+  const db = getDb();
+  const [run] = await db
+    .select({ finishedAt: pipelineRunsTable.finishedAt })
+    .from(pipelineRunsTable)
+    .where(eq(pipelineRunsTable.status, "success"))
+    .orderBy(desc(pipelineRunsTable.id))
+    .limit(1);
+  return run?.finishedAt ? { finishedAt: run.finishedAt } : null;
+}
+
+// Sidebar footer stat: "{N} drafts awaiting review" — posts with no
+// decision yet (not discarded, not posted) and not a regenerate-pending
+// sibling row (those aren't independently reviewable, see PostWithPending
+// above).
+export async function getUndecidedPostCount(): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ value: count(postsTable.id) })
+    .from(postsTable)
+    .where(and(eq(postsTable.pending, false), eq(postsTable.discarded, false), eq(postsTable.posted, false)));
+  return Number(row?.value ?? 0);
+}
+
+// Lets the sidebar resume polling immediately on page load if a
+// scheduled/cron-triggered run is already in flight — otherwise "is a run
+// running" would only ever be known from the manual Run Now button's own
+// local component state.
+export async function getInProgressRun(): Promise<{ id: number; currentStage: string | null } | null> {
+  const db = getDb();
+  const [run] = await db
+    .select({ id: pipelineRunsTable.id, currentStage: pipelineRunsTable.currentStage })
+    .from(pipelineRunsTable)
+    .where(isNull(pipelineRunsTable.finishedAt))
+    .orderBy(desc(pipelineRunsTable.id))
+    .limit(1);
+  return run ?? null;
 }
 
 export async function getPostsForRun(runId: number): Promise<PostWithPending[]> {

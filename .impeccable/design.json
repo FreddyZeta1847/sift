@@ -1,31 +1,37 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-19T00:00:00Z",
+  "generatedAt": "2026-07-22T00:00:00Z",
   "title": "Design System: sift",
   "extensions": {
     "colorMeta": {
-      "bg": { "role": "neutral", "displayName": "Deep Room", "canonical": "oklch(0.09 0 0)", "tonalRamp": ["oklch(0.04 0 0)", "oklch(0.09 0 0)", "oklch(0.14 0 0)", "oklch(0.22 0 0)", "oklch(0.34 0 0)", "oklch(0.50 0 0)", "oklch(0.70 0 0)", "oklch(0.90 0 0)"] },
-      "surface": { "role": "neutral", "displayName": "Lamp Surface", "canonical": "oklch(0.14 0.006 75)", "tonalRamp": ["oklch(0.09 0.004 75)", "oklch(0.14 0.006 75)", "oklch(0.18 0.007 75)", "oklch(0.24 0.007 75)", "oklch(0.34 0.007 75)", "oklch(0.50 0.006 75)", "oklch(0.70 0.005 75)", "oklch(0.90 0.003 75)"] },
-      "surface-raised": { "role": "neutral", "displayName": "Lamp Surface Raised", "canonical": "oklch(0.18 0.007 75)", "tonalRamp": ["oklch(0.12 0.005 75)", "oklch(0.18 0.007 75)", "oklch(0.22 0.007 75)", "oklch(0.28 0.007 75)", "oklch(0.38 0.007 75)", "oklch(0.54 0.006 75)", "oklch(0.72 0.005 75)", "oklch(0.91 0.003 75)"] },
-      "border": { "role": "neutral", "displayName": "Border", "canonical": "oklch(0.27 0.006 75)", "tonalRamp": ["oklch(0.15 0.005 75)", "oklch(0.20 0.006 75)", "oklch(0.27 0.006 75)", "oklch(0.34 0.006 75)", "oklch(0.44 0.006 75)", "oklch(0.58 0.005 75)", "oklch(0.75 0.004 75)", "oklch(0.92 0.003 75)"] },
-      "ink": { "role": "neutral", "displayName": "Warm Paper", "canonical": "oklch(0.93 0.012 80)", "tonalRamp": ["oklch(0.20 0.010 80)", "oklch(0.34 0.011 80)", "oklch(0.48 0.011 80)", "oklch(0.60 0.010 80)", "oklch(0.72 0.010 80)", "oklch(0.82 0.011 80)", "oklch(0.93 0.012 80)", "oklch(0.98 0.008 80)"] },
-      "muted": { "role": "neutral", "displayName": "Ash", "canonical": "oklch(0.60 0.008 78)", "tonalRamp": ["oklch(0.24 0.007 78)", "oklch(0.36 0.008 78)", "oklch(0.48 0.008 78)", "oklch(0.60 0.008 78)", "oklch(0.70 0.008 78)", "oklch(0.80 0.007 78)", "oklch(0.90 0.006 78)", "oklch(0.96 0.005 78)"] },
-      "primary": { "role": "primary", "displayName": "Harbor Cobalt", "canonical": "oklch(0.58 0.10 228)", "tonalRamp": ["oklch(0.20 0.06 228)", "oklch(0.30 0.08 228)", "oklch(0.40 0.09 228)", "oklch(0.48 0.09 228)", "oklch(0.58 0.10 228)", "oklch(0.68 0.09 228)", "oklch(0.79 0.07 228)", "oklch(0.90 0.04 228)"] },
-      "primary-deep": { "role": "primary", "displayName": "Harbor Cobalt Deep", "canonical": "oklch(0.48 0.09 228)" },
-      "accent": { "role": "secondary", "displayName": "Ember", "canonical": "oklch(0.68 0.15 45)", "tonalRamp": ["oklch(0.24 0.09 45)", "oklch(0.35 0.12 45)", "oklch(0.46 0.14 45)", "oklch(0.58 0.14 45)", "oklch(0.68 0.15 45)", "oklch(0.77 0.13 45)", "oklch(0.86 0.09 45)", "oklch(0.93 0.05 45)"] },
-      "accent-deep": { "role": "secondary", "displayName": "Ember Deep", "canonical": "oklch(0.58 0.14 45)" },
-      "success": { "role": "status", "displayName": "Moss", "canonical": "oklch(0.62 0.12 145)" },
-      "danger": { "role": "status", "displayName": "Rust", "canonical": "oklch(0.62 0.16 25)" }
+      "bg": { "role": "neutral", "displayName": "Sand", "canonical": "#EDE0C8", "tonalRamp": ["#47433C", "#777064", "#A69D8C", "#D1C5B0", "#EDE0C8", "#F2E8D6", "#F6F0E4", "#FBF7F1"] },
+      "surface": { "role": "neutral", "displayName": "Cream", "canonical": "#FAF3E5", "tonalRamp": ["#4B4945", "#7D7A73", "#AFAAA0", "#DCD6CA", "#FAF3E5", "#FBF6EC", "#FDF9F2", "#FEFCF9"] },
+      "surface-raised": { "role": "neutral", "displayName": "Warm Sand", "canonical": "#F3E7D0", "tonalRamp": ["#49453E", "#7A7468", "#AAA292", "#D6CBB7", "#F3E7D0", "#F6EDDC", "#F9F3E8", "#FCF9F3"] },
+      "surface-sunken": { "role": "neutral", "displayName": "Pale Cream", "canonical": "#FDF8EE" },
+      "chip-bg": { "role": "neutral", "displayName": "Sand Chip", "canonical": "#EFE0C4" },
+      "chip-bg-strong": { "role": "neutral", "displayName": "Sand Chip Strong", "canonical": "#E8CFA9" },
+      "border": { "role": "neutral", "displayName": "Border", "canonical": "#E5D2AF", "tonalRamp": ["#453F35", "#736958", "#A0937B", "#CAB99A", "#E5D2AF", "#ECDDC3", "#F2E9D7", "#F9F4EB"] },
+      "border-dashed": { "role": "neutral", "displayName": "Border Dashed", "canonical": "#D8BC8E" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#43301F", "tonalRamp": ["#140E09", "#221810", "#2F2216", "#3B2A1B", "#43301F", "#726457", "#A1988F", "#D0CBC7"] },
+      "ink-soft": { "role": "neutral", "displayName": "Ink Soft", "canonical": "#6E4E28" },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#8A7256", "tonalRamp": ["#29221A", "#45392B", "#61503C", "#79644C", "#8A7256", "#A79580", "#C5B9AB", "#E2DCD5"] },
+      "muted-soft": { "role": "neutral", "displayName": "Muted Soft", "canonical": "#A08A66" },
+      "label": { "role": "neutral", "displayName": "Label", "canonical": "#A0713C" },
+      "primary": { "role": "primary", "displayName": "Terracotta", "canonical": "#C0532B", "tonalRamp": ["#3A190D", "#602A16", "#863A1E", "#A94926", "#C0532B", "#D07E60", "#E0A995", "#EFD4CA"] },
+      "primary-deep": { "role": "primary", "displayName": "Terracotta Deep", "canonical": "#A8431F" },
+      "success": { "role": "status", "displayName": "Moss", "canonical": "#5A7D46" },
+      "danger": { "role": "status", "displayName": "Rust", "canonical": "#A6503B" }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Page titles only, one per page." },
+      "display": { "displayName": "Display", "purpose": "Page titles, and any large standalone figure (spend total, retention days)." },
       "headline": { "displayName": "Headline", "purpose": "Section headings within a page." },
-      "body": { "displayName": "Body", "purpose": "Draft text, labels, reading content. Cap at 70ch measure." },
+      "body": { "displayName": "Body", "purpose": "Draft text, labels, reading content." },
       "label": { "displayName": "Label", "purpose": "Form labels, button text, nav items." },
       "data": { "displayName": "Data", "purpose": "Costs, timestamps, run IDs, model names — tabular/numeric only." }
     },
     "shadows": [
-      { "name": "float", "value": "0 8px 24px oklch(0 0 0 / 0.45)", "purpose": "Toasts and popovers only — anything floating above document flow via position: fixed." }
+      { "name": "float", "value": "0 8px 24px rgba(0, 0, 0, 0.35)", "purpose": "Toasts and popovers only — anything floating above document flow via position: fixed." },
+      { "name": "cta", "value": "0 6px 16px rgba(160, 63, 30, 0.28)", "purpose": "The sidebar's Run Now button only — the one named exception to shadows-only-on-floating-elements." }
     ],
     "motion": [
       { "name": "ease-standard", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Default ease-out-quart for hover/focus state transitions, 150ms." },
@@ -34,7 +40,7 @@
     ],
     "breakpoints": [
       { "name": "sm", "value": "640px" },
-      { "name": "md", "value": "960px" }
+      { "name": "md", "value": "760px" }
     ]
   },
   "components": [
@@ -42,9 +48,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The one primary action on a view (Save, Run Now, Copy & Mark Posted).",
+      "description": "The one primary action on a view (Run Now, Approve, Save).",
       "html": "<button class=\"ds-btn-primary\">Run Now</button>",
-      "css": ".ds-btn-primary { background: oklch(0.58 0.10 228); color: oklch(0.97 0.01 80); padding: 10px 20px; border-radius: 6px; border: none; font-family: Figtree, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-primary:hover { background: oklch(0.48 0.09 228); } .ds-btn-primary:focus-visible { outline: 2px solid oklch(0.58 0.10 228); outline-offset: 2px; }"
+      "css": ".ds-btn-primary { background: #C0532B; color: #FBF2E4; padding: 16px 18px; border-radius: 18px; border: none; font-family: 'Instrument Sans', system-ui, sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-primary:hover { background: #A8431F; } .ds-btn-primary:focus-visible { outline: 2px solid #C0532B; outline-offset: 2px; }"
     },
     {
       "name": "Ghost Button",
@@ -52,7 +58,7 @@
       "refersTo": "button-ghost",
       "description": "Secondary action — edit, regenerate, cancel. The default button everywhere that isn't the one primary action.",
       "html": "<button class=\"ds-btn-ghost\">Regenerate</button>",
-      "css": ".ds-btn-ghost { background: transparent; color: oklch(0.93 0.012 80); padding: 10px 20px; border-radius: 6px; border: 1px solid transparent; font-family: Figtree, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1), border-color 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-ghost:hover { background: oklch(0.18 0.007 75); border-color: oklch(0.27 0.006 75); } .ds-btn-ghost:focus-visible { outline: 2px solid oklch(0.58 0.10 228); outline-offset: 2px; }"
+      "css": ".ds-btn-ghost { background: transparent; color: #43301F; padding: 10px 20px; border-radius: 14px; border: 1px solid transparent; font-family: 'Instrument Sans', system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1), border-color 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-ghost:hover { background: #F3E7D0; border-color: #E5D2AF; } .ds-btn-ghost:focus-visible { outline: 2px solid #C0532B; outline-offset: 2px; }"
     },
     {
       "name": "Danger Button",
@@ -60,15 +66,15 @@
       "refersTo": "button-danger",
       "description": "Discard, only. Never filled — a filled red button reads as an alarm this product doesn't need to sound.",
       "html": "<button class=\"ds-btn-danger\">Discard</button>",
-      "css": ".ds-btn-danger { background: transparent; color: oklch(0.62 0.16 25); padding: 10px 20px; border-radius: 6px; border: 1px solid transparent; font-family: Figtree, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-danger:hover { background: oklch(0.62 0.16 25 / 0.12); } .ds-btn-danger:focus-visible { outline: 2px solid oklch(0.62 0.16 25); outline-offset: 2px; }"
+      "css": ".ds-btn-danger { background: transparent; color: #A6503B; padding: 10px 20px; border-radius: 14px; border: 1px solid transparent; font-family: 'Instrument Sans', system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-danger:hover { background: rgba(166, 80, 59, 0.12); } .ds-btn-danger:focus-visible { outline: 2px solid #A6503B; outline-offset: 2px; }"
     },
     {
-      "name": "Draft Card",
+      "name": "Content Card",
       "kind": "card",
       "refersTo": "card",
-      "description": "The one legitimate card in the system — a single drafted post in the Review Workspace.",
+      "description": "The default container for any discrete content block — a draft post, a provider row, a settings section, an admin table.",
       "html": "<div class=\"ds-card\"><p class=\"ds-card-meta\">Draft 1 of 3</p><p class=\"ds-card-body\">Sample drafted post text goes here, wrapping naturally across a few lines to show the reading measure.</p></div>",
-      "css": ".ds-card { background: oklch(0.14 0.006 75); border-radius: 10px; padding: 20px; max-width: 70ch; } .ds-card-meta { font-family: Figtree, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; color: oklch(0.60 0.008 78); margin: 0 0 8px; } .ds-card-body { font-family: Figtree, system-ui, sans-serif; font-size: 1rem; line-height: 1.6; color: oklch(0.93 0.012 80); margin: 0; }"
+      "css": ".ds-card { background: #FAF3E5; border-radius: 18px; padding: 16px 24px; } .ds-card-meta { font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; color: #8A7256; margin: 0 0 8px; } .ds-card-body { font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 1rem; line-height: 1.6; color: #43301F; margin: 0; }"
     },
     {
       "name": "Text Input",
@@ -76,57 +82,55 @@
       "refersTo": "input",
       "description": "Standard form field — API keys, source URLs, settings values.",
       "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"https://example.com/feed.xml\" />",
-      "css": ".ds-input { background: oklch(0.14 0.006 75); color: oklch(0.93 0.012 80); border: 1px solid oklch(0.27 0.006 75); border-radius: 6px; padding: 10px 14px; font-family: Figtree, system-ui, sans-serif; font-size: 1rem; width: 100%; transition: border-color 150ms cubic-bezier(0.25, 1, 0.5, 1), box-shadow 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-input::placeholder { color: oklch(0.60 0.008 78); } .ds-input:focus { outline: none; border-color: oklch(0.58 0.10 228); box-shadow: 0 0 0 3px oklch(0.58 0.10 228 / 0.20); }"
+      "css": ".ds-input { background: #FDF8EE; color: #43301F; border: 1px solid #E5D2AF; border-radius: 14px; padding: 10px 14px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 1rem; width: 100%; transition: border-color 150ms cubic-bezier(0.25, 1, 0.5, 1), box-shadow 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-input::placeholder { color: #8A7256; } .ds-input:focus { outline: none; border-color: #C0532B; box-shadow: 0 0 0 3px rgba(192, 83, 43, 0.20); }"
     },
     {
-      "name": "New-Draft Badge",
+      "name": "Id / Status Chip",
       "kind": "chip",
       "refersTo": "badge-accent",
-      "description": "The 'new/unreviewed' marker on a draft, and the content-safety linter's warning flag. Ember is reserved for exactly these personal/attention moments.",
-      "html": "<span class=\"ds-badge-accent\">New</span>",
-      "css": ".ds-badge-accent { display: inline-block; background: oklch(0.68 0.15 45); color: oklch(0.98 0.01 70); padding: 2px 10px; border-radius: 6px; font-family: Figtree, system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; }"
+      "description": "A draft's numeric id, and the 'new/unreviewed' nav badge — the system's one pill-chip language, used freely across the interface.",
+      "html": "<span class=\"ds-badge-accent\">#4187</span>",
+      "css": ".ds-badge-accent { display: inline-block; background: #E8CFA9; color: #6E4E28; padding: 5px 11px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.8125rem; font-weight: 500; }"
     },
     {
-      "name": "Top Navigation",
+      "name": "Sidebar Navigation",
       "kind": "nav",
       "refersTo": "nav",
-      "description": "Single-row nav, active route underlined in primary. No sidebar, no pill background.",
-      "html": "<nav class=\"ds-nav\"><a href=\"#\" class=\"ds-nav-link ds-nav-link-active\">Review</a><a href=\"#\" class=\"ds-nav-link\">API Config</a><a href=\"#\" class=\"ds-nav-link\">Settings</a><a href=\"#\" class=\"ds-nav-link\">Costs</a></nav>",
-      "css": ".ds-nav { display: flex; gap: 24px; align-items: center; padding: 14px 24px; background: oklch(0.14 0.006 75); border-bottom: 1px solid oklch(0.27 0.006 75); } .ds-nav-link { font-family: Figtree, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.01em; color: oklch(0.60 0.008 78); text-decoration: none; padding-bottom: 4px; border-bottom: 2px solid transparent; transition: color 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-nav-link:hover { color: oklch(0.93 0.012 80); } .ds-nav-link-active { color: oklch(0.58 0.10 228); border-bottom-color: oklch(0.58 0.10 228); }"
+      "description": "Persistent left sidebar — brand, Run Now, nav items with a filled-pill active state, footer stat strip. Replaces the previous system's single-row top bar.",
+      "html": "<nav class=\"ds-sidebar-nav\"><a href=\"#\" class=\"ds-nav-item ds-nav-item-active\">Review</a><a href=\"#\" class=\"ds-nav-item\">API Config</a><a href=\"#\" class=\"ds-nav-item\">Settings</a><a href=\"#\" class=\"ds-nav-item\">Costs</a><a href=\"#\" class=\"ds-nav-item\">Admin</a></nav>",
+      "css": ".ds-sidebar-nav { display: flex; flex-direction: column; gap: 6px; } .ds-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; color: #6E4E28; text-decoration: none; transition: background 150ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-nav-item:hover { background: #F3E7D0; } .ds-nav-item-active { background: #43301F; color: #FBF2E4; }"
     }
   ],
   "narrative": {
-    "northStar": "The Study Lamp",
-    "overview": "A single warm reading lamp on in an otherwise dark, quiet room — that's the whole system in one image. sift is checked by exactly one person, most likely at the end of a day, to read a handful of drafted posts, glance at what they cost, and either send them or let them go. The room (the interface) stays out of the way — near-black, unlit, structurally quiet — so the one lit thing (the draft text, the number that matters, the action you're actually here to take) is what the eye lands on. This explicitly rejects the cold ops-dashboard look and the generic SaaS-product look. Warmth comes from a genuinely warm off-white ink color, a warm ember accent reserved for personal moments, and a rounded humanist typeface — never from a beige/cream surface.",
+    "northStar": "Organic",
+    "overview": "A warm studio desk in daylight — sand walls, cream paper, one terracotta accent that shows up everywhere the product wants your attention. Replaces the previous 'Study Lamp' system (a near-black, one-lit-thing reading room) after the self-hoster reviewing this tool asked for something warmer, rounder, and more family-friendly. Warmth is structural, not an accent choice: the background itself is sand, every content block earns a soft cream card, and one terracotta hue carries navigation, primary actions, and the chip/badge language throughout.",
     "keyCharacteristics": [
-      "Near-black, zero-chroma background — the room is dark, not navy, not charcoal-blue.",
-      "One structural color (a deep, muted cobalt) used sparingly for navigation and primary actions.",
-      "One warm color (a terracotta ember) reserved for moments genuinely personal to the user.",
-      "Cards used only where content is genuinely discrete and comparable (draft posts in Review).",
-      "Flat by default; depth comes from tonal layering, not shadows."
+      "Sand background, cream card surfaces — warmth lives in the room itself, not just accents.",
+      "One terracotta hue used liberally: navigation, primary actions, chips, badges.",
+      "Cards are the default content container — sections, rows, and table wrappers all use them.",
+      "Heavy, consistent rounding (14-28px, plus true pills) — playful, never sharp.",
+      "A persistent left sidebar carries navigation, Run Now, and at-a-glance status."
     ],
     "rules": [
-      { "name": "The One Lit Thing Rule", "body": "Any given screen gets exactly one accent-colored element competing for attention, never several.", "section": "colors" },
-      { "name": "The No Warm Surface Rule", "body": "Warmth lives in ink and accent, never in bg. If a background starts reading as brown or cream, its chroma is too high.", "section": "colors" },
-      { "name": "The One Voice Rule", "body": "Every weight and size on screen comes from the Figtree family. A second sans-serif appearing means the system has drifted.", "section": "typography" },
-      { "name": "The Flat-By-Default Rule", "body": "A card sits at rest with zero shadow. Shadows appear only on elements that float above document flow.", "section": "elevation" },
-      { "name": "The Card-Is-Not-Default Rule", "body": "A card is earned by content that is a standalone, comparable unit. Settings sections and cost summaries are a headline and spacing, not a card.", "section": "components" }
+      { "name": "The Warm Surface Rule", "body": "Warmth lives in the background itself, not just ink and accent. bg is deliberately sand, not zero-chroma.", "section": "colors" },
+      { "name": "The Warm Consistency Rule", "body": "Terracotta is the system's one interactive color, used consistently wherever something is active or actionable — no per-screen budget.", "section": "colors" },
+      { "name": "The Two-Voice Rule", "body": "Exactly two sans-serif voices: Bricolage Grotesque for structure/hierarchy, Instrument Sans for everything read or interacted with. A third sans-serif, or either voice appearing in the other's role, is drift.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule (mostly preserved)", "body": "A card sits at rest with zero shadow. The sidebar's Run Now button is the one named exception, earning a colored CTA shadow as a hierarchy signal.", "section": "elevation" },
+      { "name": "The Cards-Are-Default Rule", "body": "Every genuinely discrete content block (a provider, a draft, a table row, a settings section) sits on a card by default. In-progress add/edit mini-forms and sidebar nav items are the narrow exceptions.", "section": "components" }
     ],
     "dos": [
-      "Do keep bg at exactly oklch(0.09 0 0) — zero chroma, no navy or brown tint.",
-      "Do spend accent (Ember) only on genuinely personal moments.",
-      "Do use tonal layering for depth, never a shadow on ordinary at-rest content.",
-      "Do cap draft/body text at ~70ch measure.",
+      "Do keep bg warm and sand-toned — the background carrying warmth is the point now.",
+      "Do wrap genuinely discrete content in a card by default.",
+      "Do use terracotta consistently for every active/primary signal.",
+      "Do cap draft/body text at a comfortable reading measure.",
       "Do respect prefers-reduced-motion on every transition."
     ],
     "donts": [
-      "Don't tint the background warm for coziness — that's the cream/sand AI cliché.",
-      "Don't wrap Settings, API Config, or Costs sections in cards.",
+      "Don't introduce a shadow on an ordinary at-rest card — the CTA button is the one named exception.",
       "Don't use a filled red button for Discard.",
-      "Don't add a gradient anywhere.",
-      "Don't add glassmorphism or a second typeface alongside Figtree.",
-      "Don't put a colored border stripe on any card or list item.",
-      "Don't add an uppercase tracked eyebrow label above section headings."
+      "Don't add a gradient anywhere, or glassmorphism/backdrop-blur.",
+      "Don't introduce a third sans-serif alongside Bricolage Grotesque and Instrument Sans.",
+      "Don't use the uppercase-tracked label style outside Admin's table headers."
     ]
   }
 }

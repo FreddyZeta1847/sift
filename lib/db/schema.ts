@@ -1,3 +1,9 @@
+/**
+ * Drizzle table definitions for sift's one SQLite database — the
+ * "recorded history" half of the config/history split (see
+ * lib/config/* for the JSON-authored counterpart). Tables: pipeline
+ * runs, the source identity registry, candidates, posts, and LLM calls.
+ */
 import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
 
 export const pipelineRunsTable = sqliteTable("pipeline_runs", {
@@ -5,11 +11,17 @@ export const pipelineRunsTable = sqliteTable("pipeline_runs", {
   startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
   finishedAt: integer("finished_at", { mode: "timestamp" }),
   status: text("status", { enum: ["success", "aborted"] }),
-  abortReason: text("abort_reason", { enum: ["budget_cap", "api_error"] }),
+  abortReason: text("abort_reason", { enum: ["budget_cap", "api_error", "server_restart"] }),
   errorMessage: text("error_message"),
   type: text("type", {
     enum: ["scheduled", "catchup", "manual", "regenerate-posts"],
   }).notNull(),
+  // Nullable, free-text — live progress for a run still in flight (e.g.
+  // "Curating 87 candidate(s)…"), written by executePipelineRun() at each
+  // milestone and cleared back to null on both terminal outcomes. Powers
+  // the sidebar's polled Run Now progress display; not a status enum
+  // since the exact wording/counts vary per stage.
+  currentStage: text("current_stage"),
 });
 
 // Deliberately just id/name — an identity registry only, never the owner of

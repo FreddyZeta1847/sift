@@ -246,7 +246,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                 )}
               </div>
             ) : (
-              <div key={p.id} className="provider-row">
+              <div key={p.id} className="provider-row provider-row--card">
                 <span className="list-row-title">{p.label}</span>
                 <span className="list-row-meta data">{p.baseUrl}</span>
                 <span className="tag">{p.kind}</span>
@@ -329,6 +329,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
       <section id="model-assignment">
         <h2>Model assignment</h2>
 
+        <div className="card">
         <div className="stage-grid">
         <div className="stage-block">
           <h3>Curation model</h3>
@@ -399,6 +400,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             {assignStatus}
           </p>
         )}
+        </div>
       </section>
       </div>
     </div>

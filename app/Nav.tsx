@@ -1,32 +1,36 @@
 /**
- * Site navigation — single-row top nav, active route underlined in
- * primary (see DESIGN.md §5, "Navigation"). Client Component: active-route
- * detection needs next/navigation's usePathname hook.
+ * App sidebar — persistent left nav (replaces the old single-row top bar),
+ * active route highlighted as a filled pill (see DESIGN.md, "Organic"
+ * system). Client Component: active-route detection needs next/navigation's
+ * usePathname hook, and Run Now needs live client-side state for its
+ * polled progress display.
  *
- * Also owns the one global primary action, "Run Now" — previously buried
- * inside the Settings page, now reachable from every route since kicking
- * off a pipeline run isn't a settings-configuration concern. Reuses the
- * exact `runNow` Server Action Settings already had (see
- * config/settings/actions.ts); this is a relocation of the trigger, not a
- * new code path. Feedback is a floating toast (DESIGN.md's one sanctioned
- * shadow use) rather than an inline status line, since there's no fixed
- * "page" for that line to live in as the user navigates between routes
- * while a run is in flight.
+ * Owns the one global primary action, "Run Now", via the `startRun`/
+ * `getRunStatus` Server Actions (see config/settings/actions.ts): startRun
+ * hands back a runId immediately and lets the pipeline continue on the
+ * server, so this component can poll getRunStatus(runId) on an interval
+ * and show the run's live currentStage text while it's in flight — a
+ * genuine feature, not cosmetic, since the backend actually reports real
+ * progress now (see scripts/run-pipeline.ts).
  *
- * Nav links use next/link, not a plain `<a>` — critical now that Run Now
+ * `initialInProgress` (fetched server-side in layout.tsx via
+ * lib/review/queries.ts's getInProgressRun) lets the sidebar resume
+ * polling immediately on page load if a scheduled/cron-triggered run is
+ * already underway — otherwise "is a run running" would only ever be
+ * known from this component's own local state, reset to nothing on every
+ * fresh page load.
+ *
+ * Nav links use next/link, not a plain `<a>` — critical since Run Now
  * lives here: a plain `<a>` forces a full page reload on every nav click,
- * which remounts this whole component and resets `isRunning` to false even
- * while a run is still executing server-side. That's exactly the gap that
- * lets a second Run Now click slip past the disabled state mid-run. `Link`
- * keeps this component (and its in-flight `useTransition` state) mounted
- * across navigation instead.
+ * which would remount this component and drop its in-flight polling state
+ * mid-run. `Link` keeps this component mounted across navigation instead.
  */
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { runNow } from "./config/settings/actions";
+import { startRun, getRunStatus } from "./config/settings/actions";
 
 const LINKS = [
   { href: "/review", label: "Review" },
@@ -37,12 +41,30 @@ const LINKS = [
 ];
 
 const TOAST_MS = 4000;
+const POLL_MS = 1500;
 
-export function Nav() {
+function formatRelativeTime(date: Date): string {
+  const diffMin = Math.round((Date.now() - date.getTime()) / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.round(diffHr / 24)}d ago`;
+}
+
+interface NavProps {
+  initialInProgress: { id: number; currentStage: string | null } | null;
+  lastRunFinishedAt: Date | null;
+  undecidedCount: number;
+}
+
+export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: NavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isRunning, startRun] = useTransition();
+  const [runningId, setRunningId] = useState<number | null>(initialInProgress?.id ?? null);
+  const [stage, setStage] = useState<string | null>(initialInProgress?.currentStage ?? null);
   const [toast, setToast] = useState<{ message: string; isError: boolean } | null>(null);
+  const isRunning = runningId !== null;
 
   useEffect(() => {
     if (!toast) return;
@@ -50,41 +72,92 @@ export function Nav() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const handleRunNow = () => {
-    startRun(async () => {
-      const result = await runNow();
-      if (!result.ok) {
-        setToast({ message: result.error ?? "Run failed", isError: true });
-        return;
+  useEffect(() => {
+    if (runningId === null) return;
+    const interval = setInterval(async () => {
+      const result = await getRunStatus(runningId);
+      setStage(result.currentStage);
+      if (result.status) {
+        clearInterval(interval);
+        setRunningId(null);
+        setStage(null);
+        setToast(
+          result.status === "success"
+            ? { message: "Run completed.", isError: false }
+            : { message: `Run aborted: ${result.abortReason}`, isError: true }
+        );
+        router.refresh();
       }
-      setToast({ message: "Run completed.", isError: false });
-      router.refresh();
-    });
+    }, POLL_MS);
+    return () => clearInterval(interval);
+  }, [runningId, router]);
+
+  const handleRunNow = async () => {
+    const result = await startRun();
+    if (!result.ok || result.runId === undefined) {
+      setToast({ message: result.error ?? "Run failed to start", isError: true });
+      return;
+    }
+    setStage(null);
+    setRunningId(result.runId);
   };
 
   return (
-    <>
-      <nav className="site-nav">
-        <div className="site-nav-links">
-          {LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={pathname === link.href || pathname.startsWith(`${link.href}/`) ? "active" : undefined}
-            >
-              {link.label}
-            </Link>
-          ))}
+    <aside className="app-sidebar">
+      <div className="app-sidebar-inner">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">S</div>
+          <div>
+            <div className="sidebar-brand-name">Sift</div>
+            <div className="sidebar-brand-tagline">curation pipeline</div>
+          </div>
         </div>
-        <button className="primary site-nav-run" onClick={handleRunNow} disabled={isRunning}>
-          {isRunning ? "Running…" : "Run Now"}
+
+        <button className="sidebar-run" onClick={handleRunNow} disabled={isRunning}>
+          {isRunning && <span className="sidebar-run-spinner" />}
+          <span>{isRunning ? "Running…" : "Run Now"}</span>
         </button>
-      </nav>
+
+        {isRunning && stage && (
+          <div className="sidebar-stage">
+            <span className="sidebar-stage-dot" />
+            {stage}
+          </div>
+        )}
+
+        <nav className="sidebar-nav">
+          {LINKS.map((link) => {
+            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            return (
+              <Link key={link.href} href={link.href} className={active ? "sidebar-nav-item active" : "sidebar-nav-item"}>
+                <span className="sidebar-nav-dot" />
+                <span className="sidebar-nav-label">{link.label}</span>
+                {link.href === "/review" && undecidedCount > 0 && (
+                  <span className="sidebar-nav-badge">{undecidedCount}</span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          {lastRunFinishedAt ? (
+            <>
+              Last run finished <strong>{formatRelativeTime(lastRunFinishedAt)}</strong>
+            </>
+          ) : (
+            "No runs finished yet"
+          )}
+          <br />
+          {undecidedCount} draft{undecidedCount === 1 ? "" : "s"} awaiting review
+        </div>
+      </div>
+
       {toast && (
         <div className={toast.isError ? "toast toast--danger" : "toast"} role="status">
           {toast.message}
         </div>
       )}
-    </>
+    </aside>
   );
 }

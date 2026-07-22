@@ -1,5 +1,12 @@
-// scripts/run-pipeline.ts
-import { eq } from "drizzle-orm";
+/**
+ * The end-to-end pipeline: ingest -> curate -> draft, recorded as one
+ * pipeline_runs row. Split into createPipelineRun() (row + housekeeping)
+ * and executePipelineRun() (the actual stages) so a caller can start a
+ * run, get its id back immediately, and let it continue in the
+ * background — see app/config/settings/actions.ts's startRun(), which
+ * polls the row's currentStage while the run is in flight.
+ */
+import { eq, isNull } from "drizzle-orm";
 import { getDb } from "../lib/db/client";
 import { runMigrations } from "../lib/db/migrate";
 import { pipelineRunsTable } from "../lib/db/schema";
@@ -16,7 +23,14 @@ export type PipelineOutcome =
   | { status: "success" }
   | { status: "aborted"; abortReason: "budget_cap" | "api_error" };
 
-export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Promise<PipelineOutcome> {
+type PipelineRunType = "scheduled" | "catchup" | "manual";
+
+// Split from the combined runPipeline() below so a caller (the sidebar's
+// startRun() Server Action, see app/config/settings/actions.ts) can create
+// the row and get a runId back immediately, then let executePipelineRun()
+// continue unawaited — the only way real Run Now progress polling is
+// possible, since a runId has to exist *before* the pipeline itself starts.
+export async function createPipelineRun(type: PipelineRunType): Promise<number> {
   // Idempotent — safe to call on every run. Ensures a fresh `data/` directory
   // (first-ever run, a new clone, a fresh Docker volume) works with zero
   // manual setup, per the locked "boots with zero configuration" requirement.
@@ -33,9 +47,14 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
     .insert(pipelineRunsTable)
     .values({ startedAt: new Date(), type })
     .returning({ id: pipelineRunsTable.id });
-  const runId = run.id;
+  return run.id;
+}
+
+export async function executePipelineRun(runId: number): Promise<PipelineOutcome> {
+  const db = getDb();
 
   try {
+    await db.update(pipelineRunsTable).set({ currentStage: "Ingesting sources…" }).where(eq(pipelineRunsTable.id, runId));
     const sources = await getSources();
     const ingested = await runIngestion(sources, runId);
     // eslint-disable-next-line no-console
@@ -51,6 +70,10 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
       console.log(`[sift] Skipped sources (fetch failed): ${ingested.skippedSources.join(", ")}`);
     }
 
+    await db
+      .update(pipelineRunsTable)
+      .set({ currentStage: `Curating ${ingested.written} candidate(s)…` })
+      .where(eq(pipelineRunsTable.id, runId));
     const curated = await runCuration(runId);
     if (curated.length > 0) {
       // eslint-disable-next-line no-console
@@ -59,6 +82,10 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
         // eslint-disable-next-line no-console
         console.log(`  - ${item.url}`);
       }
+      await db
+        .update(pipelineRunsTable)
+        .set({ currentStage: `Drafting ${curated.length} post(s)…` })
+        .where(eq(pipelineRunsTable.id, runId));
       const drafted = await runDraftGenerator(curated, runId);
       // eslint-disable-next-line no-console
       console.log(`[sift] Draft Generator: wrote ${drafted.written} post(s).`);
@@ -69,7 +96,7 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
 
     await db
       .update(pipelineRunsTable)
-      .set({ status: "success", finishedAt: new Date() })
+      .set({ status: "success", finishedAt: new Date(), currentStage: null })
       .where(eq(pipelineRunsTable.id, runId));
     return { status: "success" };
   } catch (err) {
@@ -79,7 +106,7 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
     console.error(`[sift] Pipeline run ${runId} aborted (${abortReason}): ${errorMessage}`);
     await db
       .update(pipelineRunsTable)
-      .set({ status: "aborted", abortReason, errorMessage, finishedAt: new Date() })
+      .set({ status: "aborted", abortReason, errorMessage, finishedAt: new Date(), currentStage: null })
       .where(eq(pipelineRunsTable.id, runId));
     return { status: "aborted", abortReason };
   } finally {
@@ -89,6 +116,31 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
     // candidates' own dedup/backlog sweep).
     await pruneStalePosts();
   }
+}
+
+export async function runPipeline(type: PipelineRunType): Promise<PipelineOutcome> {
+  const runId = await createPipelineRun(type);
+  return executePipelineRun(runId);
+}
+
+// A run whose row still has finishedAt = null when the server starts up
+// didn't just take a while — the process that was executing it is gone
+// (crash, restart, redeploy), so nothing will ever finish it. Left alone,
+// getInProgressRun() would keep surfacing it forever as "still running."
+// Called once at boot (see instrumentation.ts), alongside runMigrations().
+export async function abortOrphanedRuns(): Promise<{ aborted: number }> {
+  const db = getDb();
+  const orphaned = await db
+    .select({ id: pipelineRunsTable.id })
+    .from(pipelineRunsTable)
+    .where(isNull(pipelineRunsTable.finishedAt));
+  if (orphaned.length === 0) return { aborted: 0 };
+
+  await db
+    .update(pipelineRunsTable)
+    .set({ status: "aborted", abortReason: "server_restart", finishedAt: new Date(), currentStage: null })
+    .where(isNull(pipelineRunsTable.finishedAt));
+  return { aborted: orphaned.length };
 }
 
 if (process.argv[1]?.endsWith("run-pipeline.ts")) {

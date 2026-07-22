@@ -1,8 +1,9 @@
 /**
- * Section nav for the Admin page — page-local `.config-nav`, but unlike
- * every other use of that class (Settings/API Config/Costs, all in-page
- * scroll anchors), these are real routes with active-route styling
- * (mirrors app/Nav.tsx's usePathname pattern, just scoped to /admin/*).
+ * Section nav for the Admin page — styled as `.admin-tabs` pill buttons,
+ * visually matching the Organic system's tab language, but these are real
+ * routes with active-route styling (mirrors app/Nav.tsx's usePathname
+ * pattern, just scoped to /admin/*), not in-page anchors like the
+ * `.config-nav` pattern Settings/API Config/Costs use.
  */
 "use client";
 
@@ -19,7 +20,7 @@ const LINKS = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav className="config-nav" aria-label="Admin sections">
+    <nav className="admin-tabs" aria-label="Admin sections">
       {LINKS.map((link) => (
         <Link key={link.href} href={link.href} className={pathname === link.href ? "active" : undefined}>
           {link.label}

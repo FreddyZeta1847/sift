@@ -16,10 +16,10 @@ import { AdminNav } from "./AdminNav";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <main>
-      <h1>Admin</h1>
-      <div className="config-page config-page--with-nav">
+      <div className="config-page">
+        <h1>Admin</h1>
         <AdminNav />
-        <div className="config-content">{children}</div>
+        <div className="card card--table">{children}</div>
       </div>
     </main>
   );

@@ -62,12 +62,14 @@
 │   │   ├── 0002_snapshot.json
 │   │   ├── 0003_snapshot.json
 │   │   ├── 0004_snapshot.json
+│   │   ├── 0005_snapshot.json
 │   │   └── _journal.json
 │   ├── 0000_equal_gladiator.sql
 │   ├── 0001_bumpy_wendell_rand.sql
 │   ├── 0002_unknown_king_cobra.sql
 │   ├── 0003_add_post_title.sql
-│   └── 0004_add-sources-table.sql
+│   ├── 0004_add-sources-table.sql
+│   └── 0005_add-current-stage.sql
 ├── lib/
 │   ├── admin/
 │   │   ├── delete.test.ts

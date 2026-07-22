@@ -255,6 +255,8 @@ Fully discussed and written to vault-sift/features/CONFIG-UI/. Locked design sum
   data — flag prominently when DISTRIBUTION-TRUST's cross-cutting security posture is written.
 - **Deferred as overkill**: auth, settings versioning/audit log, config import/export as a
   first-class feature, a secrets vault/KMS integration.
+- **2026-07-20**: `CONFIG-UI--admin-page` sub-feature added (search/filter/delete across all 4
+  STORAGE-HISTORY tables); `config-ui--recap.html` rebuilt to reflect it.
 
 ## Feature: SCHEDULER + regenerate design + STORAGE-HISTORY schema revision — LOCKED (2026-07-16)
 This is a big, coupled change — read this section in full before touching any vault file, since

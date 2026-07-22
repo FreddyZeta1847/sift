@@ -168,7 +168,7 @@ export function DraftCard({ post }: { post: PostWithPending }) {
     <article className={muted ? "card muted" : "card"}>
       {post.title && <p className="draft-title">{post.title}</p>}
       <p className="status-line" style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0 }}>
-        <span className="data">#{post.id}</span>
+        <span className="data id-chip">#{post.id}</span>
         <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
           {post.url}
         </a>
@@ -181,9 +181,9 @@ export function DraftCard({ post }: { post: PostWithPending }) {
       )}
 
       {muted && (
-        <p className="status-line" style={{ marginTop: 0 }}>
+        <span className="tag" style={{ marginBottom: "var(--space-sm)", display: "inline-block" }}>
           {post.discarded ? "Discarded" : "Posted"}
-        </p>
+        </span>
       )}
 
       {flagged && (

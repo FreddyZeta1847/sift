@@ -284,12 +284,12 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
       <nav className="config-nav" aria-label="Settings sections">
         <a href="#sources">Sources</a>
         <a href="#schedule">Schedule</a>
+        <a href="#retention">Retention</a>
         <a href="#curation">Curation</a>
         <a href="#voice-profile">Voice profile</a>
-        <a href="#retention">Retention</a>
       </nav>
       <div className="config-content">
-      <section id="sources">
+      <section id="sources" className="card">
         <h2>Sources</h2>
         {sourceGroups.map(([category, group]) => (
           <div className="stage-block" key={category}>
@@ -353,7 +353,8 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section id="schedule">
+      <div className="stage-grid">
+      <section id="schedule" className="card">
         <h2>Schedule</h2>
         <p className="status-line">Schedule changes take effect immediately.</p>
         <div className="day-toggle-group">
@@ -375,7 +376,61 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section id="curation">
+      <section id="retention" className="card">
+        <h2>Retention</h2>
+        <div className="field-row">
+          <label>
+            Posts retention (days)
+            <input
+              type="number"
+              min={0}
+              value={postsRetentionDays ?? ""}
+              disabled={postsRetentionDays === null}
+              onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
+            />
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={postsRetentionDays === null}
+              onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
+            />
+            Unlimited
+          </label>
+        </div>
+
+        <div className="field-row">
+          <label>
+            Candidate retention (days)
+            <input
+              type="number"
+              min={0}
+              value={candidateRetentionDays ?? ""}
+              disabled={candidateRetentionDays === null}
+              onChange={(e) =>
+                handleCandidateRetentionChange(e.target.value === "" ? null : Number(e.target.value))
+              }
+            />
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={candidateRetentionDays === null}
+              onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
+            />
+            Unlimited
+          </label>
+        </div>
+
+        {retentionStatus && (
+          <p className={statusTone(retentionStatus)} role="alert">
+            {retentionStatus}
+          </p>
+        )}
+      </section>
+      </div>
+
+      <section id="curation" className="card">
         <h2>Curation</h2>
         <label>
           Posts per run
@@ -400,7 +455,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section id="voice-profile">
+      <section id="voice-profile" className="card">
         <h2>Voice profile</h2>
         <label>
           Tone notes
@@ -455,58 +510,6 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <section id="retention">
-        <h2>Retention</h2>
-        <div className="field-row">
-          <label>
-            Posts retention (days)
-            <input
-              type="number"
-              min={0}
-              value={postsRetentionDays ?? ""}
-              disabled={postsRetentionDays === null}
-              onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
-            />
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={postsRetentionDays === null}
-              onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
-            />
-            Unlimited
-          </label>
-        </div>
-
-        <div className="field-row">
-          <label>
-            Candidate retention (days)
-            <input
-              type="number"
-              min={0}
-              value={candidateRetentionDays ?? ""}
-              disabled={candidateRetentionDays === null}
-              onChange={(e) =>
-                handleCandidateRetentionChange(e.target.value === "" ? null : Number(e.target.value))
-              }
-            />
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={candidateRetentionDays === null}
-              onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
-            />
-            Unlimited
-          </label>
-        </div>
-
-        {retentionStatus && (
-          <p className={statusTone(retentionStatus)} role="alert">
-            {retentionStatus}
-          </p>
-        )}
-      </section>
       </div>
     </div>
   );
