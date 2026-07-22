@@ -4,16 +4,32 @@ import { eq } from "drizzle-orm";
 import { runCuration } from "./run";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, sourcesTable } from "../db/schema";
 import * as providerModule from "../llm/provider";
 import * as costSafetyModule from "../llm/cost-safety";
 import * as settingsModule from "../config/settings";
 import * as providersModule from "../config/providers";
+import * as configSourcesModule from "../config/sources";
 
 const testDbPath = "data/test-curation-run.db";
 
+// Seeds one enabled source row + mocks getSources to report it as enabled —
+// every test needs this now that runCuration filters the pool by enabled
+// source ids (see lib/db/sources.ts's getEnabledSourceIds). Returns the
+// new sourcesTable id so callers can stamp it onto their own seeded
+// candidates.
+async function seedEnabledSource(name = "Test Source"): Promise<number> {
+  const db = getDb();
+  const [row] = await db.insert(sourcesTable).values({ name }).returning({ id: sourcesTable.id });
+  vi.spyOn(configSourcesModule, "getSources").mockResolvedValue([
+    { name, url: "https://source.test/feed", category: "general-tech", enabled: true },
+  ]);
+  return row.id;
+}
+
 describe("runCuration", () => {
   let runId: number;
+  let sourceId: number;
 
   beforeEach(async () => {
     process.env.SIFT_DB_PATH = testDbPath;
@@ -21,10 +37,11 @@ describe("runCuration", () => {
     const db = getDb();
     const [run] = await db.insert(pipelineRunsTable).values({ startedAt: new Date(), type: "manual" }).returning({ id: pipelineRunsTable.id });
     runId = run.id;
+    sourceId = await seedEnabledSource();
     await db.insert(candidatesTable).values([
-      { runId, url: "https://a.test/1", sourceRecap: "Item A", chosen: false, createdAt: new Date() },
-      { runId, url: "https://a.test/2", sourceRecap: "Item B", chosen: false, createdAt: new Date() },
-      { runId, url: "https://a.test/3", sourceRecap: "Item C", chosen: false, createdAt: new Date() },
+      { runId, url: "https://a.test/1", sourceRecap: "Item A", sourceId, chosen: false, createdAt: new Date() },
+      { runId, url: "https://a.test/2", sourceRecap: "Item B", sourceId, chosen: false, createdAt: new Date() },
+      { runId, url: "https://a.test/3", sourceRecap: "Item C", sourceId, chosen: false, createdAt: new Date() },
     ]);
 
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
@@ -161,6 +178,7 @@ describe("runCuration", () => {
       runId: earlierRun.id,
       url: "https://orphan.test/1",
       sourceRecap: "Orphaned Item",
+      sourceId,
       chosen: false,
       createdAt: new Date(),
     });
@@ -172,5 +190,62 @@ describe("runCuration", () => {
     });
 
     await runCuration(runId);
+  });
+
+  it("excludes a stale candidate whose source has since been disabled, even though chosen=false", async () => {
+    const db = getDb();
+    const disabledSourceId = await seedEnabledSource("Disabled Source"); // seeded enabled, then flipped below
+    vi.spyOn(configSourcesModule, "getSources").mockResolvedValue([
+      { name: "Test Source", url: "https://source.test/feed", category: "general-tech", enabled: true },
+      { name: "Disabled Source", url: "https://disabled.test/feed", category: "general-tech", enabled: false },
+    ]);
+    await db.insert(candidatesTable).values({
+      runId,
+      url: "https://stale.test/1",
+      sourceRecap: "Stale Item",
+      sourceId: disabledSourceId,
+      chosen: false,
+      createdAt: new Date(),
+    });
+
+    vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
+      const prompt = messages.map((m) => m.content).join(" ");
+      expect(prompt).not.toContain("Stale Item");
+      return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
+    });
+
+    await runCuration(runId);
+  });
+
+  it("excludes a legacy candidate with sourceId = null even when other sources are enabled", async () => {
+    const db = getDb();
+    await db.insert(candidatesTable).values({
+      runId,
+      url: "https://legacy.test/1",
+      sourceRecap: "Legacy Item",
+      sourceId: null,
+      chosen: false,
+      createdAt: new Date(),
+    });
+
+    vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
+      const prompt = messages.map((m) => m.content).join(" ");
+      expect(prompt).not.toContain("Legacy Item");
+      return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
+    });
+
+    await runCuration(runId);
+  });
+
+  it("returns an empty result without querying candidates when every source is disabled", async () => {
+    vi.spyOn(configSourcesModule, "getSources").mockResolvedValue([
+      { name: "Test Source", url: "https://source.test/feed", category: "general-tech", enabled: false },
+    ]);
+    const callSpy = vi.spyOn(providerModule, "callLLM");
+
+    const result = await runCuration(runId);
+
+    expect(result).toEqual([]);
+    expect(callSpy).not.toHaveBeenCalled();
   });
 });

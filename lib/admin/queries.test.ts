@@ -1,10 +1,10 @@
 // lib/admin/queries.test.ts
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
-import { listRuns, listCandidates, listPosts, listLlmCalls } from "./queries";
+import { listRuns, listCandidates, listPosts, listLlmCalls, listAllSources } from "./queries";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable, sourcesTable } from "../db/schema";
 
 const testDbPath = "data/test-admin-queries.db";
 
@@ -128,6 +128,39 @@ describe("admin queries", () => {
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].id).toBe(candidate.id);
+    });
+
+    it("filters by sourceId and resolves sourceName, with sourceName null when sourceId is null", async () => {
+      const db = getDb();
+      const [run] = await db.insert(pipelineRunsTable).values({ startedAt: new Date(), type: "manual" }).returning({ id: pipelineRunsTable.id });
+      const [source] = await db.insert(sourcesTable).values({ name: "Hacker News" }).returning({ id: sourcesTable.id });
+      await db.insert(candidatesTable).values([
+        { runId: run.id, url: "https://a.test", sourceRecap: "r", sourceId: source.id, chosen: false, createdAt: new Date() },
+        { runId: run.id, url: "https://b.test", sourceRecap: "r", sourceId: null, chosen: false, createdAt: new Date() },
+      ]);
+
+      const bySource = await listCandidates({ sourceId: source.id });
+      expect(bySource.total).toBe(1);
+      expect(bySource.rows[0].sourceName).toBe("Hacker News");
+
+      const withoutSource = await listCandidates({ sourceId: undefined });
+      const legacyRow = withoutSource.rows.find((r) => r.sourceId === null);
+      expect(legacyRow?.sourceName).toBeNull();
+    });
+  });
+
+  describe("listAllSources", () => {
+    it("returns all sources ordered by name", async () => {
+      const db = getDb();
+      await db.insert(sourcesTable).values([{ name: "The Verge" }, { name: "Hacker News" }]);
+
+      const result = await listAllSources();
+
+      expect(result.map((s) => s.name)).toEqual(["Hacker News", "The Verge"]);
+    });
+
+    it("returns an empty array when there are no sources", async () => {
+      expect(await listAllSources()).toEqual([]);
     });
   });
 

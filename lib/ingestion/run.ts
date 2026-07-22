@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { candidatesTable } from "../db/schema";
+import { resolveSourceIds } from "../db/sources";
 import type { Source } from "../config/types";
 import { fetchSource } from "./fetch";
 import { normalize, type NormalizedItem } from "./normalize";
@@ -59,11 +59,16 @@ export async function runIngestion(sources: Source[], runId: number): Promise<In
   }
 
   if (surviving.length > 0) {
+    // Resolved once per unique source among the surviving items, not once
+    // per item — cheap even when hundreds of items share a handful of
+    // sources.
+    const sourceIds = await resolveSourceIds(surviving.map((item) => item.source));
     await db.insert(candidatesTable).values(
       surviving.map((item) => ({
         runId,
         url: item.url,
         sourceRecap: toSourceRecap(item),
+        sourceId: sourceIds.get(item.source) ?? null,
         chosen: false,
         createdAt: new Date(),
       }))

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { runIngestion } from "./run";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, sourcesTable } from "../db/schema";
 import type { Source } from "../config/types";
 import * as fetchModule from "./fetch";
 import * as rateLimitModule from "./rate-limit";
@@ -124,5 +124,35 @@ describe("runIngestion", () => {
     await runIngestion(sources, runId);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves a non-null sourceId matching a real sourcesTable row", async () => {
+    vi.spyOn(fetchModule, "fetchSource").mockResolvedValue([{ title: "Item A", link: "https://example.test/A", summary: "s" }]);
+    const sources: Source[] = [{ name: "A", url: "https://a.test/feed", category: "ai-ml", enabled: true }];
+
+    await runIngestion(sources, runId);
+
+    const db = getDb();
+    const [row] = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    expect(row.sourceId).not.toBeNull();
+    const [source] = await db.select().from(sourcesTable).where(eq(sourcesTable.id, row.sourceId!));
+    expect(source.name).toBe("A");
+  });
+
+  it("resolves the source id once per unique source, not once per item", async () => {
+    vi.spyOn(fetchModule, "fetchSource").mockResolvedValue([
+      { title: "Item 1", link: "https://example.test/1", summary: "s" },
+      { title: "Item 2", link: "https://example.test/2", summary: "s" },
+      { title: "Item 3", link: "https://example.test/3", summary: "s" },
+    ]);
+    const sources: Source[] = [{ name: "A", url: "https://a.test/feed", category: "ai-ml", enabled: true }];
+
+    await runIngestion(sources, runId);
+
+    const db = getDb();
+    const sourceRows = await db.select().from(sourcesTable);
+    expect(sourceRows).toHaveLength(1);
+    const candidateRows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    expect(candidateRows.every((r) => r.sourceId === sourceRows[0].id)).toBe(true);
   });
 });

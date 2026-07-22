@@ -16,7 +16,7 @@ import type { CandidateRowWithPost } from "../../../lib/admin/queries";
 // still has an implicit min-content floor that can overflow a long
 // unbroken URL; minmax(0, 1fr) lets it actually shrink to the
 // overflow:hidden ellipsis on .admin-row > span.
-const GRID = "56px 70px 70px 64px minmax(0,140px) minmax(0,1fr) 64px";
+const GRID = "56px 70px 70px 64px minmax(0,110px) minmax(0,140px) minmax(0,1fr) 64px";
 
 function formatDate(d: Date | string): string {
   return new Date(d).toISOString().slice(0, 16).replace("T", " ");
@@ -27,12 +27,14 @@ export function CandidatesTable({
   total,
   page,
   pageSize,
+  sources,
   filters,
 }: {
   rows: CandidateRowWithPost[];
   total: number;
   page: number;
   pageSize: number;
+  sources: { id: number; name: string }[];
   filters: Record<string, string | undefined>;
 }) {
   const router = useRouter();
@@ -91,6 +93,21 @@ export function CandidatesTable({
           </select>
         </label>
         <label>
+          Source
+          <select
+            key={filters.sourceId ?? ""}
+            defaultValue={filters.sourceId ?? ""}
+            onChange={(e) => pushFilters({ sourceId: e.target.value })}
+          >
+            <option value="">any</option>
+            {sources.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           Search
           <input
             key={filters.q ?? ""}
@@ -110,6 +127,7 @@ export function CandidatesTable({
             <span>Chosen</span>
             <span>Has post</span>
             <span>Run</span>
+            <span>Source</span>
             <span>Created</span>
             <span>URL</span>
             <span />
@@ -121,6 +139,7 @@ export function CandidatesTable({
                 <span>{c.chosen ? "yes" : "no"}</span>
                 <span>{c.hasPost ? "yes" : "no"}</span>
                 <span className="data">#{c.runId}</span>
+                <span>{c.sourceName ?? "—"}</span>
                 <span className="data">{formatDate(c.createdAt)}</span>
                 <a className="data" href={c.url} target="_blank" rel="noopener noreferrer">
                   {c.url}

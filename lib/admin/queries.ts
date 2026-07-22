@@ -16,9 +16,9 @@
  * substring match over each table's free-text columns — not full-text
  * search, which is unnecessary at this project's single-user scale.
  */
-import { and, count, desc, eq, gte, inArray, isNull, like, lt, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, like, lt, or } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable, sourcesTable } from "../db/schema";
 import type { RunRow, PostRow } from "../review/queries";
 
 const PAGE_SIZE = 25;
@@ -91,14 +91,16 @@ export interface ListCandidatesOptions {
   id?: number;
   runId?: number;
   chosen?: boolean;
+  sourceId?: number;
   q?: string;
 }
 
 export interface CandidateRowWithPost extends CandidateRow {
   hasPost: boolean;
+  sourceName: string | null;
 }
 
-async function attachHasPost(rows: CandidateRow[]): Promise<CandidateRowWithPost[]> {
+async function attachHasPost(rows: CandidateRow[]): Promise<(CandidateRow & { hasPost: boolean })[]> {
   if (rows.length === 0) return [];
   const db = getDb();
   const ids = rows.map((r) => r.id);
@@ -110,19 +112,32 @@ async function attachHasPost(rows: CandidateRow[]): Promise<CandidateRowWithPost
   return rows.map((r) => ({ ...r, hasPost: referencedIds.has(r.id) }));
 }
 
+async function attachSourceName(
+  rows: (CandidateRow & { hasPost: boolean })[]
+): Promise<CandidateRowWithPost[]> {
+  const ids = [...new Set(rows.map((r) => r.sourceId).filter((id): id is number => id !== null))];
+  if (ids.length === 0) return rows.map((r) => ({ ...r, sourceName: null }));
+
+  const db = getDb();
+  const sourceRows = await db.select().from(sourcesTable).where(inArray(sourcesTable.id, ids));
+  const nameById = new Map(sourceRows.map((s) => [s.id, s.name]));
+  return rows.map((r) => ({ ...r, sourceName: r.sourceId !== null ? (nameById.get(r.sourceId) ?? null) : null }));
+}
+
 export async function listCandidates(opts: ListCandidatesOptions): Promise<Page<CandidateRowWithPost>> {
   const db = getDb();
   const page = opts.page ?? 1;
 
   if (opts.id !== undefined) {
     const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.id, opts.id));
-    const withPost = await attachHasPost(rows);
+    const withPost = await attachSourceName(await attachHasPost(rows));
     return { rows: withPost, total: rows.length, page: 1, pageSize: PAGE_SIZE };
   }
 
   const conditions = [];
   if (opts.runId !== undefined) conditions.push(eq(candidatesTable.runId, opts.runId));
   if (opts.chosen !== undefined) conditions.push(eq(candidatesTable.chosen, opts.chosen));
+  if (opts.sourceId !== undefined) conditions.push(eq(candidatesTable.sourceId, opts.sourceId));
   if (opts.q) {
     conditions.push(or(like(candidatesTable.url, `%${opts.q}%`), like(candidatesTable.sourceRecap, `%${opts.q}%`)));
   }
@@ -139,8 +154,14 @@ export async function listCandidates(opts: ListCandidatesOptions): Promise<Page<
     db.select({ total: count() }).from(candidatesTable).where(where),
   ]);
 
-  const withPost = await attachHasPost(rows);
+  const withPost = await attachSourceName(await attachHasPost(rows));
   return { rows: withPost, total: Number(total), page, pageSize: PAGE_SIZE };
+}
+
+// Feeds the Admin → Candidates source filter dropdown.
+export async function listAllSources(): Promise<{ id: number; name: string }[]> {
+  const db = getDb();
+  return db.select({ id: sourcesTable.id, name: sourcesTable.name }).from(sourcesTable).orderBy(asc(sourcesTable.name));
 }
 
 // ---------------------------------------------------------------------

@@ -30,7 +30,7 @@ interface DraftEntry {
   imagePrompt: string;
 }
 
-const MAX_OUTPUT_TOKENS = 4000;
+const MAX_OUTPUT_TOKENS = 8000;
 
 function extractJson(content: string): string {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);

@@ -12,6 +12,14 @@ export const pipelineRunsTable = sqliteTable("pipeline_runs", {
   }).notNull(),
 });
 
+// Deliberately just id/name — an identity registry only, never the owner of
+// `enabled` (that stays in config/sources.json; duplicating it here would be
+// a dual-write hazard between JSON and DB). See lib/db/sources.ts.
+export const sourcesTable = sqliteTable("sources", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+});
+
 export const candidatesTable = sqliteTable("candidates", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   runId: integer("run_id")
@@ -19,6 +27,13 @@ export const candidatesTable = sqliteTable("candidates", {
     .references(() => pipelineRunsTable.id),
   url: text("url").notNull(),
   sourceRecap: text("source_recap").notNull(),
+  // Nullable at the DB level, not just by convention — legacy rows ingested
+  // before this column existed (and any that fail the one-time regex
+  // backfill, see lib/candidates/backfill-source.ts) have no way to resolve
+  // a source and are permanently excluded from curation as a result (SQL
+  // IN never matches NULL). Ingestion guarantees non-null for every row it
+  // writes from here on.
+  sourceId: integer("source_id").references(() => sourcesTable.id),
   chosen: integer("chosen", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });

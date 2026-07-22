@@ -9,6 +9,7 @@ import { runCuration } from "../lib/curation/run";
 import { runDraftGenerator } from "../lib/draft/run";
 import { BudgetCapAbort } from "../lib/llm/cost-safety";
 import { pruneStaleCandidates } from "../lib/candidates/retention";
+import { backfillCandidateSourceIds } from "../lib/candidates/backfill-source";
 import { pruneStalePosts } from "../lib/posts/retention";
 
 export type PipelineOutcome =
@@ -21,6 +22,11 @@ export async function runPipeline(type: "scheduled" | "catchup" | "manual"): Pro
   // manual setup, per the locked "boots with zero configuration" requirement.
   runMigrations();
   await pruneStaleCandidates();
+  // Backfills sourceId for any candidate rows still missing it (legacy
+  // rows from before this column existed) — a no-op once everything
+  // resolvable has been resolved. Must run before runCuration() below, not
+  // after, so this run's own pool query already benefits from it.
+  await backfillCandidateSourceIds();
 
   const db = getDb();
   const [run] = await db

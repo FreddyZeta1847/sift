@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getTableColumns } from "drizzle-orm";
-import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable } from "./schema";
+import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable, sourcesTable } from "./schema";
 
 describe("pipelineRunsTable", () => {
   it("has the expected columns", () => {
@@ -15,8 +15,15 @@ describe("candidatesTable", () => {
   it("has the expected columns", () => {
     const columns = Object.keys(getTableColumns(candidatesTable));
     expect(columns).toEqual(
-      expect.arrayContaining(["id", "runId", "url", "sourceRecap", "chosen", "createdAt"])
+      expect.arrayContaining(["id", "runId", "url", "sourceRecap", "sourceId", "chosen", "createdAt"])
     );
+  });
+});
+
+describe("sourcesTable", () => {
+  it("has the expected columns", () => {
+    const columns = Object.keys(getTableColumns(sourcesTable));
+    expect(columns).toEqual(expect.arrayContaining(["id", "name"]));
   });
 });
 

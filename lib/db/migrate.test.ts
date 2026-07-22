@@ -16,7 +16,7 @@ describe("runMigrations", () => {
     if (existsSync(`${testDbPath}-shm`)) rmSync(`${testDbPath}-shm`);
   });
 
-  it("creates all 4 tables against a fresh database", () => {
+  it("creates all 5 tables against a fresh database", () => {
     process.env.SIFT_DB_PATH = testDbPath;
     runMigrations();
 
@@ -32,6 +32,7 @@ describe("runMigrations", () => {
       "llm_calls",
       "pipeline_runs",
       "posts",
+      "sources",
       "sqlite_sequence",
     ]);
     sqlite.close();

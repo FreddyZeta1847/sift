@@ -1,6 +1,7 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { candidatesTable } from "../db/schema";
+import { getEnabledSourceIds } from "../db/sources";
 import { getSettings } from "../config/settings";
 import { getProviders } from "../config/providers";
 import { callLLM } from "../llm/provider";
@@ -28,15 +29,27 @@ function extractJson(content: string): string {
 export async function runCuration(runId: number): Promise<CuratedItem[]> {
   const db = getDb();
 
+  // Every source disabled → nothing is eligible regardless of the
+  // candidates table's contents; short-circuit before even querying it,
+  // mirroring the empty-pool check just below.
+  const enabledSourceIds = await getEnabledSourceIds();
+  if (enabledSourceIds.length === 0) {
+    return [];
+  }
+
   // Not scoped to this run's own ingestion: a candidate ingested by an
   // earlier run that never reached curation (aborted run, dedup meant this
   // run found nothing new) must still be eligible — runId on a candidate
   // records which run discovered it, not an expiry boundary. Oldest first
-  // so a backlog drains in order instead of newest-always-wins.
+  // so a backlog drains in order instead of newest-always-wins. Also
+  // excludes candidates from a since-disabled source — a candidate whose
+  // sourceId isn't in enabledSourceIds (including sourceId = NULL, for
+  // legacy/unparseable rows — SQL IN never matches NULL) never enters the
+  // pool, regardless of how long ago it was ingested.
   const pool = await db
     .select()
     .from(candidatesTable)
-    .where(eq(candidatesTable.chosen, false))
+    .where(and(eq(candidatesTable.chosen, false), inArray(candidatesTable.sourceId, enabledSourceIds)))
     .orderBy(asc(candidatesTable.id));
 
   const guarded = pool.slice(0, INPUT_GUARD_LIMIT);
