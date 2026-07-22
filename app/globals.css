@@ -555,55 +555,12 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
 
 /* h2 already resets its own top margin when it's a section's first child,
    so the rhythm *between* sections has to come from the section wrapper
-   itself, not from the heading. Targets both a bare `.config-page` (Costs,
-   two short sections, no side nav needed) and `.config-content` (the
-   sectioned column inside `.config-page--with-nav`, see below). */
-.config-page > section + section,
-.config-content > section + section {
+   itself, not from the heading. */
+.config-page > section + section {
   margin-top: var(--space-xl);
   padding-top: var(--space-lg);
   border-top: 1px solid var(--border);
 }
-
-/* Settings/API Config: a page long enough to have several sections earns a
-   sticky section nav instead of forcing a blind scroll to find one. Not a
-   sidebar in the generic-admin sense (DESIGN.md's Navigation stays a single
-   top row) — this is page-local wayfinding for one long form, scoped to
-   just the pages that need it. */
-.config-page--with-nav {
-  display: grid;
-  grid-template-columns: 168px 1fr;
-  gap: var(--space-xl);
-  align-items: start;
-}
-.config-nav {
-  position: sticky;
-  top: var(--space-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.config-nav a {
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  transition: color var(--duration-fast) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard);
-}
-.config-nav a:hover { color: var(--ink); background: var(--surface-raised); }
-.config-nav a:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-/* Only the Admin page's nav is real routes (Settings/API Config/Costs's
-   .config-nav is always in-page scroll anchors, no active-route concept
-   until now) — mirrors .site-nav a.active's treatment. */
-.config-nav a.active { color: var(--primary); background: var(--surface-raised); }
-.config-content { min-width: 0; }
-/* Small breathing-room buffer so a .config-nav anchor jump doesn't land a
-   section heading flush against the viewport's top edge. */
-.config-content > section[id] { scroll-margin-top: var(--space-lg); }
 
 @media (max-width: 760px) {
   /* A fixed 272px sidebar would leave a narrow phone with no room for
@@ -613,17 +570,6 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
   .app-shell { flex-direction: column; }
   .app-sidebar { position: static; width: auto; height: auto; padding: var(--space-sm); }
   .app-sidebar-inner { flex: none; }
-
-  .config-page--with-nav { grid-template-columns: 1fr; }
-  .config-nav {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    padding-bottom: var(--space-md);
-    border-bottom: 1px solid var(--border);
-    margin-bottom: var(--space-md);
-  }
 }
 
 /* Third-level heading for a labeled sub-group within a section (e.g.

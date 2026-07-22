@@ -1,9 +1,8 @@
 /**
  * Section nav for the Admin page — styled as `.admin-tabs` pill buttons,
- * visually matching the Organic system's tab language, but these are real
+ * visually matching the Organic system's tab language. These are real
  * routes with active-route styling (mirrors app/Nav.tsx's usePathname
- * pattern, just scoped to /admin/*), not in-page anchors like the
- * `.config-nav` pattern Settings/API Config/Costs use.
+ * pattern, just scoped to /admin/*).
  */
 "use client";
 

@@ -98,14 +98,7 @@ export function CostsForm({
   const spendTone = capRatio === null ? "" : capRatio >= 0.8 ? "figure-lg--danger" : "figure-lg--success";
 
   return (
-    <div className="config-page config-page--with-nav">
-      <nav className="config-nav" aria-label="Costs sections">
-        <a href="#budget-cap">Budget cap</a>
-        <a href="#this-month">This month</a>
-        <a href="#daily-spend">Daily spend</a>
-        <a href="#by-model">By model</a>
-      </nav>
-      <div className="config-content">
+    <div className="config-page">
       <div className="stage-grid">
       <section id="budget-cap" className="card">
         <h2>Budget cap</h2>
@@ -220,7 +213,6 @@ export function CostsForm({
           <p className="empty-state">No calls recorded yet this month.</p>
         )}
       </section>
-      </div>
       </div>
     </div>
   );

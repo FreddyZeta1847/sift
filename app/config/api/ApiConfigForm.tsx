@@ -173,12 +173,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   };
 
   return (
-    <div className="config-page config-page--with-nav">
-      <nav className="config-nav" aria-label="API Config sections">
-        <a href="#providers">Providers</a>
-        <a href="#model-assignment">Model assignment</a>
-      </nav>
-      <div className="config-content">
+    <div className="config-page">
       <section id="providers">
         <h2>Providers</h2>
         <div className="provider-table">
@@ -422,7 +417,6 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
         )}
         </div>
       </section>
-      </div>
     </div>
   );
 }

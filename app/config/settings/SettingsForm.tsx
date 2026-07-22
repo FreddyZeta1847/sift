@@ -280,15 +280,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   };
 
   return (
-    <div className="config-page config-page--with-nav">
-      <nav className="config-nav" aria-label="Settings sections">
-        <a href="#sources">Sources</a>
-        <a href="#schedule">Schedule</a>
-        <a href="#retention">Retention</a>
-        <a href="#curation">Curation</a>
-        <a href="#voice-profile">Voice profile</a>
-      </nav>
-      <div className="config-content">
+    <div className="config-page">
       <section id="sources" className="card">
         <h2>Sources</h2>
         {sourceGroups.map(([category, group]) => (
@@ -516,8 +508,6 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           </p>
         )}
       </section>
-
-      </div>
     </div>
   );
 }
