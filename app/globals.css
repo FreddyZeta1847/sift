@@ -175,6 +175,28 @@ input[type="checkbox"] {
    config-page containers stretch retention counts/budget caps absurdly. */
 input[type="number"] { max-width: 160px; }
 
+input[type="range"] {
+  flex: 1;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* A range slider paired with a live numeric readout — retention day-counts
+   and curation's posts-per-run read as a position along a bounded scale
+   instead of a bare number field. */
+.range-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.range-value {
+  flex-shrink: 0;
+  min-width: 72px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 input:disabled,
 select:disabled,
 textarea:disabled {
@@ -862,9 +884,10 @@ h3:first-child { margin-top: 0; }
   margin-top: var(--space-md);
 }
 
-/* Collapsed "Add provider" affordance — a bare "+" until clicked, instead
-   of the full add-form taking up space by default. */
-.add-provider-toggle {
+/* Collapsed "Add ___" affordance (providers, sources, anything list-shaped)
+   — a bare "+" until clicked, instead of the full add-form taking up space
+   by default. */
+.add-toggle {
   width: 44px;
   height: 44px;
   padding: 0;
@@ -874,13 +897,13 @@ h3:first-child { margin-top: 0; }
   justify-content: center;
   margin-top: var(--space-md);
   /* A filled CTA, not another ghost icon-button — this is the only way to
-     add a provider now that the form starts collapsed, so it needs to
-     read as a clear affordance rather than blend into the row above it. */
+     add an item now that the form starts collapsed, so it needs to read
+     as a clear affordance rather than blend into the row above it. */
   background: var(--primary);
   color: var(--primary-text);
   box-shadow: var(--shadow-cta);
 }
-.add-provider-toggle:hover:not(:disabled) { background: var(--primary-deep); color: var(--primary-text); }
+.add-toggle:hover:not(:disabled) { background: var(--primary-deep); color: var(--primary-text); }
 
 /* A small "how do I know this?" hint next to a field label — native title
    tooltip on hover/focus, same convention as the icon-buttons' title

@@ -13,7 +13,16 @@
  * the new list; only the add-source mini-form is local state, since that's
  * user-in-progress input. There is no delete-source action in this task's
  * scope — disabling via the toggle is the only way to remove a source from
- * active use.
+ * active use. The add-source form starts collapsed behind a bare "+"
+ * button (`showAddSource`), same pattern as ApiConfigForm's add-provider
+ * toggle (`.add-toggle`) — submitting or cancelling collapses it back.
+ *
+ * Retention day-counts and curation's posts-per-run render as range
+ * sliders (`.range-field`) with a live numeric readout instead of plain
+ * number inputs — both are inherently bounded quantities (a day count up
+ * to a year is "unlimited" territory anyway; posts-per-run is capped at
+ * 40 by the curation guard), so a bounded slider fits better than a free
+ * text field a user could type an arbitrary value into.
  *
  * The schedule checkboxes are local state seeded from `settings.scheduleDays`,
  * and the `<input type="time">` is local state seeded from
@@ -35,10 +44,11 @@
  * blur, example-post/interest add or remove immediately) saves the whole
  * assembled profile object rather than building a diffing form.
  *
- * Retention pairs a number input with an "unlimited" checkbox for each of
+ * Retention pairs a range slider with an "unlimited" switch for each of
  * the two retention settings; checking "unlimited" passes `null` to
- * `saveRetention` instead of the number. Both fields are saved together
- * whenever either changes, since `saveRetention` takes both values at once.
+ * `saveRetention` instead of the number (the slider itself disables and
+ * reads 0 while unlimited is on). Both fields are saved together whenever
+ * either changes, since `saveRetention` takes both values at once.
  *
  * Curation's "posts per run" is a single positive-integer field (no
  * unlimited option — Curation Engine's input guard caps the candidate pool
@@ -111,6 +121,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   const [newSource, setNewSource] = useState(EMPTY_NEW_SOURCE);
   const [addSourceStatus, setAddSourceStatus] = useState<string | null>(null);
   const [toggleErrors, setToggleErrors] = useState<Record<string, string>>({});
+  const [showAddSource, setShowAddSource] = useState(false);
 
   const [scheduleDays, setScheduleDays] = useState<string[]>(settings.scheduleDays);
   const [scheduleTime, setScheduleTime] = useState<string>(settings.scheduleTime);
@@ -157,7 +168,14 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     }
     setAddSourceStatus("Source added.");
     setNewSource(EMPTY_NEW_SOURCE);
+    setShowAddSource(false);
     router.refresh();
+  };
+
+  const handleCancelAddSource = () => {
+    setShowAddSource(false);
+    setNewSource(EMPTY_NEW_SOURCE);
+    setAddSourceStatus(null);
   };
 
   const handleToggleDay = async (day: string) => {
@@ -310,39 +328,57 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           </div>
         ))}
 
-        <form className="add-form row-fields" onSubmit={handleAddSource}>
-          <label>
-            Name
-            <input
-              value={newSource.name}
-              onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            URL
-            <input
-              value={newSource.url}
-              onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Category
-            <input
-              value={newSource.category}
-              onChange={(e) => setNewSource({ ...newSource, category: e.target.value })}
-              required
-            />
-          </label>
-          <div className="row-actions">
-            <button type="submit">Add source</button>
-          </div>
-        </form>
-        {addSourceStatus && (
-          <p className={statusTone(addSourceStatus)} role="alert">
-            {addSourceStatus}
-          </p>
+        {!showAddSource ? (
+          <button
+            type="button"
+            className="icon-button add-toggle"
+            onClick={() => setShowAddSource(true)}
+            aria-label="Add source"
+            title="Add source"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        ) : (
+          <>
+            <form className="add-form row-fields" onSubmit={handleAddSource}>
+              <label>
+                Name
+                <input
+                  value={newSource.name}
+                  onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                URL
+                <input
+                  value={newSource.url}
+                  onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Category
+                <input
+                  value={newSource.category}
+                  onChange={(e) => setNewSource({ ...newSource, category: e.target.value })}
+                  required
+                />
+              </label>
+              <div className="row-actions">
+                <button type="submit">Add source</button>
+                <button type="button" onClick={handleCancelAddSource}>Cancel</button>
+              </div>
+            </form>
+            {addSourceStatus && (
+              <p className={statusTone(addSourceStatus)} role="alert">
+                {addSourceStatus}
+              </p>
+            )}
+          </>
         )}
       </section>
 
@@ -374,13 +410,19 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         <div className="field-row">
           <label>
             Posts retention (days)
-            <input
-              type="number"
-              min={0}
-              value={postsRetentionDays ?? ""}
-              disabled={postsRetentionDays === null}
-              onChange={(e) => handlePostsRetentionChange(e.target.value === "" ? null : Number(e.target.value))}
-            />
+            <div className="range-field">
+              <input
+                type="range"
+                min={0}
+                max={365}
+                value={postsRetentionDays ?? 0}
+                disabled={postsRetentionDays === null}
+                onChange={(e) => handlePostsRetentionChange(Number(e.target.value))}
+              />
+              <span className="range-value data">
+                {postsRetentionDays === null ? "Unlimited" : `${postsRetentionDays} day${postsRetentionDays === 1 ? "" : "s"}`}
+              </span>
+            </div>
           </label>
           <label className="checkbox-label">
             <span className="switch">
@@ -398,15 +440,21 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         <div className="field-row">
           <label>
             Candidate retention (days)
-            <input
-              type="number"
-              min={0}
-              value={candidateRetentionDays ?? ""}
-              disabled={candidateRetentionDays === null}
-              onChange={(e) =>
-                handleCandidateRetentionChange(e.target.value === "" ? null : Number(e.target.value))
-              }
-            />
+            <div className="range-field">
+              <input
+                type="range"
+                min={0}
+                max={365}
+                value={candidateRetentionDays ?? 0}
+                disabled={candidateRetentionDays === null}
+                onChange={(e) => handleCandidateRetentionChange(Number(e.target.value))}
+              />
+              <span className="range-value data">
+                {candidateRetentionDays === null
+                  ? "Unlimited"
+                  : `${candidateRetentionDays} day${candidateRetentionDays === 1 ? "" : "s"}`}
+              </span>
+            </div>
           </label>
           <label className="checkbox-label">
             <span className="switch">
@@ -433,16 +481,16 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         <h2>Curation</h2>
         <label>
           Posts per run
-          <input
-            type="number"
-            min={1}
-            max={40}
-            value={curationTopN}
-            onChange={(e) => {
-              const value = Number(e.target.value);
-              if (value >= 1) handleCurationTopNChange(value);
-            }}
-          />
+          <div className="range-field">
+            <input
+              type="range"
+              min={1}
+              max={40}
+              value={curationTopN}
+              onChange={(e) => handleCurationTopNChange(Number(e.target.value))}
+            />
+            <span className="range-value data">{curationTopN} post{curationTopN === 1 ? "" : "s"}</span>
+          </div>
         </label>
         <p className="status-line">
           The upper bound — curation only picks fewer if fewer items are genuinely worth posting.

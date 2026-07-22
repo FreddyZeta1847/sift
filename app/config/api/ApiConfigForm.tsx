@@ -339,7 +339,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
         {!showAddForm ? (
           <button
             type="button"
-            className="icon-button add-provider-toggle"
+            className="icon-button add-toggle"
             onClick={() => setShowAddForm(true)}
             aria-label="Add provider"
             title="Add provider"
