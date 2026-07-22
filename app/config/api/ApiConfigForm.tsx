@@ -37,14 +37,11 @@
  * `editStatus`, clears `editingId`, and refreshes; "Cancel" just clears
  * `editingId` without persisting anything.
  *
- * Each provider row leads with a key-status dot (green when `apiKey` is
- * non-empty, matching the same `--success` green as Settings' toggle
- * switches, muted otherwise) and, for a default/known provider (its id is
- * in `KNOWN_PROVIDER_IDS`), a small colored monogram (`PROVIDER_BRAND`) —
- * not a real logo/trademark reproduction, just a scannable color+initial.
- * Edit is an icon button on every row; Delete is hidden entirely for known
- * providers — there's no reason to force-remove a seeded default a user
- * isn't using, they can just leave its key blank.
+ * Each provider row leads with a red warning icon when `apiKey` is empty
+ * (nothing shown once a key is set — the row just reads clean). Edit is an
+ * icon button on every row; Delete is hidden entirely for known providers
+ * (their id is in `KNOWN_PROVIDER_IDS`) — there's no reason to force-remove
+ * a seeded default a user isn't using, they can just leave its key blank.
  *
  * The add-provider form starts collapsed behind a bare "+" button
  * (`showAddForm`) rather than always taking up page space; submitting or
@@ -68,19 +65,6 @@ const EMPTY_NEW_PROVIDER = {
   baseUrl: "",
   apiKey: "",
   kind: "openai-compatible" as Provider["kind"],
-};
-
-// A simple colored monogram for each known/default provider (see
-// known-providers.ts) — not a reproduction of any real brand logo/trademark,
-// just a recognizable color+initial pairing so a default row is scannable
-// at a glance. Shown only next to rows whose id matches one of these.
-const PROVIDER_BRAND: Record<string, { initials: string; color: string }> = {
-  anthropic: { initials: "A", color: "#C0532B" },
-  openai: { initials: "O", color: "#10A37F" },
-  "google-gemini": { initials: "G", color: "#4285F4" },
-  "nvidia-nim": { initials: "N", color: "#76B900" },
-  openrouter: { initials: "OR", color: "#6B5B95" },
-  deepseek: { initials: "D", color: "#2563EB" },
 };
 
 const KNOWN_PROVIDER_IDS = new Set(KNOWN_PROVIDERS.map((p) => p.suggestedId));
@@ -302,25 +286,13 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             ) : (
               <div key={p.id} className="provider-row provider-row--card">
                 <span className="provider-label-cell">
-                  <span
-                    className={p.apiKey ? "key-status-dot key-status-dot--ok" : "key-status-dot key-status-dot--missing"}
-                    title={p.apiKey ? "API key set" : "API key missing"}
-                    aria-label={p.apiKey ? "API key set" : "API key missing"}
-                  >
-                    {p.apiKey ? (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
+                  {!p.apiKey && (
+                    <span className="key-missing-icon" title="API key missing" aria-label="API key missing">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                    ) : (
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
-                        <line x1="12" y1="6" x2="12" y2="14" />
-                        <line x1="12" y1="18" x2="12.01" y2="18" />
-                      </svg>
-                    )}
-                  </span>
-                  {PROVIDER_BRAND[p.id] && (
-                    <span className="provider-logo" style={{ background: PROVIDER_BRAND[p.id].color }} aria-hidden="true">
-                      {PROVIDER_BRAND[p.id].initials}
                     </span>
                   )}
                   <span className="list-row-title">{p.label}</span>

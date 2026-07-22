@@ -731,10 +731,10 @@ h3:first-child { margin-top: 0; }
   letter-spacing: 0.01em;
   padding: 0 var(--space-lg) var(--space-xs);
 }
-/* The label cell now packs a key-status dot, an optional brand monogram
-   (default/known providers only), and the label text — override the
-   plain-text single-line-ellipsis rule above (meant for a bare text cell)
-   since this cell holds multiple child elements, not raw text. */
+/* The label cell now packs a key-missing warning icon (shown only when
+   there's no key yet) and the label text — override the plain-text
+   single-line-ellipsis rule above (meant for a bare text cell) since this
+   cell holds multiple child elements, not raw text. */
 .provider-row > .provider-label-cell {
   display: flex;
   align-items: center;
@@ -748,31 +748,7 @@ h3:first-child { margin-top: 0; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.key-status-dot {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.key-status-dot--ok { background: var(--success); color: var(--primary-text); }
-.key-status-dot--missing { background: var(--chip-bg); color: var(--muted); }
-.provider-logo {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
-  font-weight: 700;
-  font-size: 0.6875rem;
-  letter-spacing: -0.02em;
-}
+.key-missing-icon { flex-shrink: 0; display: flex; color: var(--danger); }
 /* Each provider, individually, is genuinely a discrete comparable unit —
    the Organic system's Card-Is-Not-Default retirement applies here first. */
 .provider-row--card {
@@ -897,7 +873,14 @@ h3:first-child { margin-top: 0; }
   align-items: center;
   justify-content: center;
   margin-top: var(--space-md);
+  /* A filled CTA, not another ghost icon-button — this is the only way to
+     add a provider now that the form starts collapsed, so it needs to
+     read as a clear affordance rather than blend into the row above it. */
+  background: var(--primary);
+  color: var(--primary-text);
+  box-shadow: var(--shadow-cta);
 }
+.add-provider-toggle:hover:not(:disabled) { background: var(--primary-deep); color: var(--primary-text); }
 
 /* A small "how do I know this?" hint next to a field label — native title
    tooltip on hover/focus, same convention as the icon-buttons' title
