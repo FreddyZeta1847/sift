@@ -24,12 +24,83 @@ interface RankingResponse {
   selected: { id: string; whyPicked: string }[];
 }
 
-const MAX_OUTPUT_TOKENS = 1000;
+// Originally 1000 — enough for a non-reasoning model's small JSON output,
+// but measured against a real reasoning model (Gemini's
+// gemini-flash-latest) with a full 40-item pool: it spent ~957 of the
+// 1000 tokens on hidden reasoning before writing any visible JSON, got
+// cut off mid-structure (finish_reason: "length") with only 39 visible
+// tokens written. A real, working model/key/prompt, failing purely
+// because the budget left no room for both the hidden reasoning AND the
+// actual output. 4000 gives real headroom for that reasoning overhead on
+// top of the small JSON payload this stage actually needs.
+const MAX_OUTPUT_TOKENS = 4000;
 const INPUT_GUARD_LIMIT = 40;
 
 function extractJson(content: string): string {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   return (fenced ? fenced[1] : content).trim();
+}
+
+// Balances which sources make it into the guarded pool, so a single
+// prolific source (one that simply ingests far more often than others)
+// can't crowd out every other source before the diversity filter below
+// ever gets real alternatives to work with — a real observed case: with
+// plain oldest-N truncation, the guarded pool came back 100% from one
+// source, leaving the final-pick diversity filter nothing to diversify
+// against.
+//
+// Groups by source FIRST, rather than walking the overall oldest-first
+// list and stopping cold once `limit` items are collected — that
+// simpler-looking single-pass approach was tried and measured against
+// real data (12 distinct sources) to be subtly broken: sources whose
+// oldest items happen to sort later in the *overall* interleaved id
+// order got arbitrarily shortchanged below their fair share (one source
+// vanished entirely) purely because of processing order, not because
+// they lacked data. Grouping by source first guarantees every source
+// gets a genuine shot at its full fair share before any trimming happens.
+//
+// Every distinct source gets an even share (`ceil(limit / distinct
+// source count)`) of its own oldest items. If the combined fair shares
+// exceed `limit`, trim down to the oldest `limit` across that combined,
+// already-capped set (still bounded per source, so trimming can't
+// re-introduce the crowding-out problem). If they fall short (some
+// source didn't have enough to fill its share), top off with whatever's
+// left over each source's cap, oldest-first, regardless of source.
+function buildBalancedGuardedPool<T extends { id: number; sourceId: number | null }>(
+  pool: T[],
+  limit: number
+): T[] {
+  if (pool.length <= limit) return pool;
+
+  const bySource = new Map<number | null, T[]>();
+  for (const row of pool) {
+    const list = bySource.get(row.sourceId);
+    if (list) list.push(row);
+    else bySource.set(row.sourceId, [row]);
+  }
+  // `pool` is already oldest-first overall, so each per-source bucket
+  // built by iterating it in order is also oldest-first.
+
+  const perSourceCap = Math.ceil(limit / bySource.size);
+  const fairShare: T[] = [];
+  const leftover: T[] = [];
+  for (const rows of bySource.values()) {
+    fairShare.push(...rows.slice(0, perSourceCap));
+    leftover.push(...rows.slice(perSourceCap));
+  }
+  fairShare.sort((a, b) => a.id - b.id);
+
+  if (fairShare.length >= limit) {
+    return fairShare.slice(0, limit);
+  }
+
+  leftover.sort((a, b) => a.id - b.id);
+  const guarded = fairShare;
+  for (const row of leftover) {
+    if (guarded.length >= limit) break;
+    guarded.push(row);
+  }
+  return guarded.sort((a, b) => a.id - b.id);
 }
 
 export async function runCuration(runId: number): Promise<CuratedItem[]> {
@@ -59,7 +130,7 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     .where(and(eq(candidatesTable.chosen, false), inArray(candidatesTable.sourceId, enabledSourceIds)))
     .orderBy(asc(candidatesTable.id));
 
-  const guarded = pool.slice(0, INPUT_GUARD_LIMIT);
+  const guarded = buildBalancedGuardedPool(pool, INPUT_GUARD_LIMIT);
   // Written here, not by the caller (executePipelineRun) — the pool size
   // (the whole eligible backlog, capped at INPUT_GUARD_LIMIT) is only known
   // once this query runs, and is very often much larger than "candidates
@@ -80,7 +151,17 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     throw new Error("No curation provider/model configured");
   }
 
-  const promptText = buildRankingPrompt(guarded, settings.voiceProfile, settings.curationTopN);
+  // Ask for a ranked shortlist well beyond curationTopN — the source-
+  // diversity filter below needs real alternatives to fall back to. Enforcing
+  // "no two picks from the same source" is a deterministic, code-side
+  // constraint, not something asked of the model: an LLM instruction to
+  // "avoid picking from the same source twice" is exactly the kind of hard
+  // structural rule this project has repeatedly found LLMs unreliable at
+  // self-enforcing (see the parse-failure/hallucination handling above,
+  // and the global issue log) — a query-level filter over a large enough
+  // ranked list is deterministic and can't be talked out of it.
+  const shortlistSize = Math.min(guarded.length, settings.curationTopN * 5);
+  const promptText = buildRankingPrompt(guarded, settings.voiceProfile, shortlistSize);
   const promptTokens = Math.ceil(promptText.length / 4); // rough estimate, refined by real usage post-call
 
   await assertBudgetAvailable(settings.curationModel, promptTokens, MAX_OUTPUT_TOKENS);
@@ -128,25 +209,42 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     throw new Error(`Curation selected ${parsed.selected.length} item(s) but none matched a real candidate id.`);
   }
 
-  if (resolved.length > 0) {
+  // Deterministic source-diversity filter: walk the model's ranked shortlist
+  // in order and keep its first pick per source, skipping any later item
+  // whose source was already used — never two posts from the same source
+  // in one run's final selection. `guarded` (not `resolved`, which lost the
+  // sourceId field) is the lookup for each candidate's actual source.
+  const sourceIdById = new Map(guarded.map((row) => [row.id, row.sourceId]));
+  const diverse: CuratedItem[] = [];
+  const usedSourceIds = new Set<number | null>();
+  for (const item of resolved) {
+    const sourceId = sourceIdById.get(item.id) ?? null;
+    if (usedSourceIds.has(sourceId)) continue;
+    usedSourceIds.add(sourceId);
+    diverse.push(item);
+    if (diverse.length >= settings.curationTopN) break;
+  }
+
+  if (diverse.length > 0) {
     await db.update(candidatesTable).set({ chosen: true }).where(
-      inArray(candidatesTable.id, resolved.map((r) => r.id))
+      inArray(candidatesTable.id, diverse.map((r) => r.id))
     );
   }
 
-  return resolved;
+  return diverse;
 }
 
 function buildRankingPrompt(
   pool: { id: number; sourceRecap: string }[],
   profile: { toneNotes: string; interests: string[] },
-  topN: number
+  shortlistSize: number
 ): string {
   const itemLines = pool.map((item) => `- id ${item.id}: ${item.sourceRecap}`).join("\n");
   return [
     "You are ranking news items for a user with these interests: " + profile.interests.join(", ") + ".",
-    `Pick up to ${topN} of the most important/relevant items from the list below, personalized to those interests.`,
-    `Only include items that are genuinely worth posting about — picking fewer than ${topN} is fine if that's all that qualifies, never pad the list with weak picks just to hit the number.`,
+    `Rank up to ${shortlistSize} of the most important/relevant items from the list below, best first, personalized to those interests.`,
+    `Only include items that are genuinely worth posting about — a shorter list is fine if fewer items qualify, never pad the list with weak picks just to hit the number.`,
+    "Order matters: put your single best pick first, then the next-best, and so on — a later step may not use every item you list, and relies on this ordering to decide which ones it actually uses.",
     "Respond with ONLY valid JSON matching this shape: {\"selected\": [{\"id\": string, \"whyPicked\": string}]}.",
     "Return only the ids from the list below — never invent an id.",
     "",

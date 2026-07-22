@@ -20,6 +20,15 @@ describe("probeModel", () => {
     expect(await probeModel(provider, "m")).toBe("fail");
   });
 
+  it("returns fail (not unreachable) when the model responds but with no usable content — e.g. a reasoning model that spent its whole budget on hidden reasoning", async () => {
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: undefined as unknown as string,
+      inputTokens: 5,
+      outputTokens: 0,
+    });
+    expect(await probeModel(provider, "m")).toBe("fail");
+  });
+
   it("returns unreachable when the call throws", async () => {
     vi.spyOn(providerModule, "callLLM").mockRejectedValue(new Error("ECONNREFUSED"));
     expect(await probeModel(provider, "m")).toBe("unreachable");

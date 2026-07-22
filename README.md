@@ -70,6 +70,48 @@ Same zero-config first run: database migrations run automatically on server star
 
 For repeated local development, `npm link` (or `npm install -g .`) once registers a `sift-server` global command that runs the dev server from any directory — a convenience for people already comfortable with the Node toolchain, not part of the main quick-start flow.
 
+## Configuring an LLM provider
+
+The easiest path: on the **API Config** page, use the **"Quick add a known provider"** dropdown
+above the add-provider form — pick Anthropic, OpenAI, Google Gemini, NVIDIA NIM, OpenRouter, or
+DeepSeek, and it pre-fills the Base URL and Kind for you. Paste an API key, pick a model, and
+assign it to the Curation/Drafting stages.
+
+For anything else (or to understand what the quick-add is actually doing), add a provider
+manually (ID, Label, Base URL, API key, Kind). Two provider "Kind" values exist, and the
+difference matters:
+
+- **`anthropic`** — Anthropic's own API specifically. `Base URL` is ignored for this kind (the
+  underlying SDK always talks to Anthropic's own endpoint) — enter any placeholder value, only
+  the API key matters.
+- **`openai-compatible`** — everything else. A growing number of providers (OpenAI itself, and
+  many third-party hosts) expose an endpoint that speaks the same request/response shape as
+  OpenAI's Chat Completions API — if a provider advertises "OpenAI-compatible" or "drop-in OpenAI
+  replacement," this is the Kind to use, with their real Base URL.
+
+| Provider | Kind | Base URL | Get a key | Notes |
+|---|---|---|---|---|
+| Anthropic | `anthropic` | *(ignored, see above)* | [console.anthropic.com](https://console.anthropic.com) | Pay-as-you-go, no free tier |
+| OpenAI | `openai-compatible` | `https://api.openai.com/v1` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | |
+| Google Gemini | `openai-compatible` | `https://generativelanguage.googleapis.com/v1beta/openai` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Has a genuine free tier |
+| NVIDIA NIM | `openai-compatible` | `https://integrate.api.nvidia.com/v1` | [build.nvidia.com](https://build.nvidia.com) | Free tier, but a shared endpoint — latency/reliability varies noticeably by model |
+| OpenRouter | `openai-compatible` | `https://openrouter.ai/api/v1` | [openrouter.ai/keys](https://openrouter.ai/keys) | Aggregates many underlying models behind one key |
+| DeepSeek | `openai-compatible` | `https://api.deepseek.com` | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) | |
+
+**A real gotcha worth knowing before you pick a model**: many current models are "reasoning"
+models that spend a chunk of their output-token budget on hidden reasoning before writing any
+visible answer — sometimes 90%+ of the budget on a small prompt. If a model's responses come back
+truncated or empty, it's very often this, not a broken key or endpoint — the fix is a larger
+`max_tokens` budget, not a different provider. Always confirm a model actually works with
+**"Test this model"** before assigning it to a pipeline stage; a working key/endpoint can still
+report a failure if the model itself can't produce usable output in the available budget.
+
+**Model names aren't listed here on purpose** — every provider adds and retires models over time,
+so a hardcoded list here would go stale. Check the provider's own docs or dashboard for current
+model ids, then use the **"Test this model"** button on the API Config page before assigning it to
+a pipeline stage — it makes one real call and tells you immediately whether the id/key/endpoint
+actually work together, rather than finding out during a real run.
+
 ## Security — no built-in authentication
 
 **sift has no login system.** This is a deliberate design choice for a single self-hoster running a local instance, not an oversight. Anyone who can reach the app — a VPS, a NAS with a forwarded port, a reverse-proxied subdomain — can open the Config UI and view or replace your API keys with zero barrier.

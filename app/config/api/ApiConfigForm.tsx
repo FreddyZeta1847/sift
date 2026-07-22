@@ -44,6 +44,7 @@ import { useRouter } from "next/navigation";
 import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
 import type { Provider, Settings } from "../../../lib/config/types";
 import type { ProbeResult } from "../../../lib/config/test-model-probe";
+import { KNOWN_PROVIDERS } from "../../../lib/config/known-providers";
 
 const EMPTY_NEW_PROVIDER = {
   id: "",
@@ -91,6 +92,13 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   const [draftingProbeResult, setDraftingProbeResult] = useState<ProbeResult | null>(null);
   const [isCurationProbing, startCurationProbe] = useTransition();
   const [isDraftingProbing, startDraftingProbe] = useTransition();
+
+  const handleQuickAdd = (suggestedId: string) => {
+    if (!suggestedId) return;
+    const preset = KNOWN_PROVIDERS.find((p) => p.suggestedId === suggestedId);
+    if (!preset) return;
+    setNewProvider({ id: preset.suggestedId, label: preset.label, baseUrl: preset.baseUrl, apiKey: "", kind: preset.kind });
+  };
 
   const handleAddProvider = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,6 +278,18 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             {editStatus}
           </p>
         )}
+
+        <label className="quick-add-provider">
+          Quick add a known provider
+          <select value="" onChange={(e) => handleQuickAdd(e.target.value)}>
+            <option value="">— choose a provider — (or fill in the form below manually)</option>
+            {KNOWN_PROVIDERS.map((p) => (
+              <option key={p.suggestedId} value={p.suggestedId}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <form className="add-form row-fields" onSubmit={handleAddProvider}>
           <label>

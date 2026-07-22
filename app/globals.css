@@ -819,6 +819,14 @@ h3:first-child { margin-top: 0; }
 
 .add-form { margin-top: var(--space-md); }
 
+/* Quick-add preset dropdown above the add-provider form — a narrower,
+   standalone field rather than the full-width row-fields grid used by
+   the form it feeds into. */
+.quick-add-provider {
+  max-width: 320px;
+  margin-top: var(--space-md);
+}
+
 /* Wrapper for a section's single closing action (e.g. "Save model
    assignment") when it isn't already inside a <form>. */
 .section-actions { margin-top: var(--space-md); }

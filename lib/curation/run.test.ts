@@ -67,9 +67,23 @@ describe("runCuration", () => {
 
   it("resolves ids locally and marks chosen=true on picks", async () => {
     const db = getDb();
+    // Two picks from two DIFFERENT sources — the diversity filter (see
+    // below) would otherwise collapse two same-source picks down to one,
+    // which isn't what this test is checking.
+    const otherSourceId = await seedEnabledSource("Other Source");
+    vi.spyOn(configSourcesModule, "getSources").mockResolvedValue([
+      { name: "Test Source", url: "https://source.test/feed", category: "general-tech", enabled: true },
+      { name: "Other Source", url: "https://other.test/feed", category: "general-tech", enabled: true },
+    ]);
+    const [otherRow] = await db
+      .insert(candidatesTable)
+      .values({ runId, url: "https://a.test/4", sourceRecap: "Item D", sourceId: otherSourceId, chosen: false, createdAt: new Date() })
+      .returning();
     const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    const itemA = rows.find((r) => r.sourceRecap === "Item A")!;
+
     vi.spyOn(providerModule, "callLLM").mockResolvedValue({
-      content: JSON.stringify({ selected: [{ id: String(rows[0].id), whyPicked: "relevant" }, { id: String(rows[1].id), whyPicked: "also relevant" }] }),
+      content: JSON.stringify({ selected: [{ id: String(itemA.id), whyPicked: "relevant" }, { id: String(otherRow.id), whyPicked: "also relevant" }] }),
       inputTokens: 500, outputTokens: 50,
     });
 
@@ -79,6 +93,31 @@ describe("runCuration", () => {
     expect(result.map((r) => r.whyPicked)).toEqual(["relevant", "also relevant"]);
     const updated = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
     expect(updated.filter((r) => r.chosen)).toHaveLength(2);
+  });
+
+  it("keeps only the first pick from a repeated source, deterministically, even though the model ranked both highly", async () => {
+    const db = getDb();
+    const rows = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    // All 3 beforeEach candidates share the same source — a perfect case
+    // for the diversity filter to prove it caps at one pick per source.
+    vi.spyOn(providerModule, "callLLM").mockResolvedValue({
+      content: JSON.stringify({
+        selected: [
+          { id: String(rows[0].id), whyPicked: "best" },
+          { id: String(rows[1].id), whyPicked: "second best, same source" },
+        ],
+      }),
+      inputTokens: 500, outputTokens: 50,
+    });
+
+    const result = await runCuration(runId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].whyPicked).toBe("best");
+    const updated = await db.select().from(candidatesTable).where(eq(candidatesTable.runId, runId));
+    expect(updated.filter((r) => r.chosen)).toHaveLength(1);
+    expect(updated.find((r) => r.id === rows[0].id)?.chosen).toBe(true);
+    expect(updated.find((r) => r.id === rows[1].id)?.chosen).toBe(false);
   });
 
   it("throws when every selected id is hallucinated (matches no real candidate) instead of silently returning nothing", async () => {
@@ -233,15 +272,24 @@ describe("runCuration", () => {
     await runCuration(runId);
   });
 
-  it("uses settings.curationTopN as the pick ceiling instead of a hardcoded number", async () => {
+  it("scales the requested shortlist with settings.curationTopN (5x, capped by pool size) instead of a hardcoded number", async () => {
+    const db = getDb();
+    // A large enough pool that the shortlist is driven by curationTopN * 5,
+    // not clamped down to the pool's own size — proves topN actually flows
+    // through to the prompt rather than a hardcoded shortlist size.
+    await db.insert(candidatesTable).values(
+      Array.from({ length: 20 }, (_, i) => ({
+        runId, url: `https://a.test/extra-${i}`, sourceRecap: `Extra ${i}`, sourceId, chosen: false, createdAt: new Date(),
+      }))
+    );
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
-      curationTopN: 7,
+      curationTopN: 2,
     });
     vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
       const prompt = messages.map((m) => m.content).join(" ");
-      expect(prompt).toContain("up to 7");
+      expect(prompt).toContain("up to 10"); // 2 * 5, well under the 23-item pool
       return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
     });
 
@@ -311,6 +359,40 @@ describe("runCuration", () => {
     vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
       const prompt = messages.map((m) => m.content).join(" ");
       expect(prompt).not.toContain("Legacy Item");
+      return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
+    });
+
+    await runCuration(runId);
+  });
+
+  it("balances the guarded pool across sources so a prolific source can't crowd out a smaller one entirely", async () => {
+    const db = getDb();
+    const smallSourceId = await seedEnabledSource("Small Source");
+    vi.spyOn(configSourcesModule, "getSources").mockResolvedValue([
+      { name: "Test Source", url: "https://source.test/feed", category: "general-tech", enabled: true },
+      { name: "Small Source", url: "https://small.test/feed", category: "general-tech", enabled: true },
+    ]);
+    // "Test Source" ends up with 43 candidates (3 from beforeEach + 40
+    // more) vs. "Small Source"'s 3 — well past INPUT_GUARD_LIMIT (40)
+    // combined, and heavily lopsided toward one source.
+    await db.insert(candidatesTable).values(
+      Array.from({ length: 40 }, (_, i) => ({
+        runId, url: `https://a.test/bulk-${i}`, sourceRecap: `Bulk ${i}`, sourceId, chosen: false, createdAt: new Date(),
+      }))
+    );
+    await db.insert(candidatesTable).values(
+      Array.from({ length: 3 }, (_, i) => ({
+        runId, url: `https://small.test/${i}`, sourceRecap: `Small Item ${i}`, sourceId: smallSourceId, chosen: false, createdAt: new Date(),
+      }))
+    );
+
+    vi.spyOn(providerModule, "callLLM").mockImplementation(async (_p, _m, messages) => {
+      const prompt = messages.map((m) => m.content).join(" ");
+      // All 3 "Small Source" items survive the guard — a plain oldest-40
+      // truncation would have buried them under "Test Source"'s 43.
+      expect(prompt).toContain("Small Item 0");
+      expect(prompt).toContain("Small Item 1");
+      expect(prompt).toContain("Small Item 2");
       return { content: JSON.stringify({ selected: [] }), inputTokens: 10, outputTokens: 5 };
     });
 

@@ -84,6 +84,7 @@
 │   ├── config/
 │   │   ├── cost-history.test.ts
 │   │   ├── cost-history.ts
+│   │   ├── known-providers.ts
 │   │   ├── providers.test.ts
 │   │   ├── providers.ts
 │   │   ├── read-config.test.ts
@@ -133,6 +134,8 @@
 │   ├── llm/
 │   │   ├── cost-safety.test.ts
 │   │   ├── cost-safety.ts
+│   │   ├── json-repair.test.ts
+│   │   ├── json-repair.ts
 │   │   ├── pricing.test.ts
 │   │   ├── pricing.ts
 │   │   ├── provider.test.ts

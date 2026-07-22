@@ -1,3 +1,10 @@
+/**
+ * Tests for the API Config page's server actions (add/update/delete provider,
+ * assign models, probe a model). Each test resets config/providers.json to an
+ * explicit empty list before running, since getProviders() now seeds every
+ * known provider by default on a fresh-install file (lib/config/providers.ts)
+ * — these tests care about CRUD behavior in isolation, not that seed.
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
@@ -9,8 +16,13 @@ import * as probeModule from "../../../lib/config/test-model-probe";
 const testConfigDir = "data/test-config-api-actions";
 
 describe("api config actions", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.SIFT_CONFIG_DIR = testConfigDir;
+    // getProviders() now seeds every known provider as the default when
+    // providers.json doesn't exist yet (a fresh install — see
+    // lib/config/providers.ts). These tests care about CRUD behavior in
+    // isolation, not the seeding default, so start from a real, empty file.
+    await saveProviders([]);
   });
 
   afterEach(() => {

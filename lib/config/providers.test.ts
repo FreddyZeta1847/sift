@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { getProviders, saveProviders } from "./providers";
+import { KNOWN_PROVIDERS } from "./known-providers";
 
 const testConfigDir = "data/test-config-providers";
 
@@ -14,9 +15,11 @@ describe("getProviders", () => {
     if (existsSync(testConfigDir)) rmSync(testConfigDir, { recursive: true, force: true });
   });
 
-  it("returns an empty array by default", async () => {
+  it("seeds every known provider (empty api key, ready to fill in) on a fresh install", async () => {
     const result = await getProviders();
-    expect(result).toEqual([]);
+    expect(result).toHaveLength(KNOWN_PROVIDERS.length);
+    expect(result.every((p) => p.apiKey === "")).toBe(true);
+    expect(result.map((p) => p.id).sort()).toEqual(KNOWN_PROVIDERS.map((p) => p.suggestedId).sort());
   });
 
   it("returns configured providers", async () => {
