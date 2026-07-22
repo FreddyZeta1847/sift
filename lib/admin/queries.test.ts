@@ -1,4 +1,10 @@
-// lib/admin/queries.test.ts
+/**
+ * Tests for the Admin page's read-only list/search/paginate layer
+ * (lib/admin/queries.ts) — one describe block per table (runs, candidates,
+ * posts, llm calls, the all-sources lookup), each against a real throwaway
+ * SQLite file so filtering/pagination/joins are exercised against actual
+ * SQL rather than mocked query builders.
+ */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { listRuns, listCandidates, listPosts, listLlmCalls, listAllSources } from "./queries";
@@ -189,6 +195,27 @@ describe("admin queries", () => {
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].id).toBe(post.id);
+    });
+
+    it("resolves sourceName two hops out via the post's candidate, null when the candidate has no source", async () => {
+      const db = getDb();
+      const [run] = await db.insert(pipelineRunsTable).values({ startedAt: new Date(), type: "manual" }).returning({ id: pipelineRunsTable.id });
+      const [source] = await db.insert(sourcesTable).values({ name: "Hacker News" }).returning({ id: sourcesTable.id });
+      const [withSource] = await db
+        .insert(candidatesTable)
+        .values({ runId: run.id, url: "https://a.test", sourceRecap: "r", sourceId: source.id, chosen: true, createdAt: new Date() })
+        .returning({ id: candidatesTable.id });
+      const [withoutSource] = await db
+        .insert(candidatesTable)
+        .values({ runId: run.id, url: "https://b.test", sourceRecap: "r", sourceId: null, chosen: true, createdAt: new Date() })
+        .returning({ id: candidatesTable.id });
+      await db.insert(postsTable).values({ candidateId: withSource.id, runId: run.id, url: "https://a.test", originalText: "x", imagePrompt: "p" });
+      await db.insert(postsTable).values({ candidateId: withoutSource.id, runId: run.id, url: "https://b.test", originalText: "y", imagePrompt: "p" });
+
+      const result = await listPosts({ runId: run.id });
+
+      expect(result.rows.find((r) => r.url === "https://a.test")?.sourceName).toBe("Hacker News");
+      expect(result.rows.find((r) => r.url === "https://b.test")?.sourceName).toBeNull();
     });
   });
 

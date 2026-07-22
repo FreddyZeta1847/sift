@@ -74,7 +74,7 @@ export function CandidatesTable({
   return (
     <section>
       <h2>Candidates</h2>
-      <div className="row-fields">
+      <div className="row-fields admin-filters">
         <label>
           ID
           <input key={filters.id ?? ""} type="number" defaultValue={filters.id ?? ""} onBlur={(e) => pushFilters({ id: e.target.value })} />

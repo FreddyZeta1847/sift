@@ -2,17 +2,23 @@
  * Posts table (Admin — `/admin/posts`). Posts are leaf rows (nothing
  * references a post's id — see lib/admin/delete.ts), so Delete here is
  * always allowed, no pre-check needed unlike Candidates.
+ *
+ * `sourceName` (see `PostRowWithSource` / `attachSourceViaCandidate` in
+ * lib/admin/queries.ts) is resolved two hops out — a post has no sourceId
+ * column of its own, it traces back via candidateId -> candidate.sourceId
+ * -> source.name, the same relationship CandidatesTable.tsx shows more
+ * directly since a candidate's sourceId is right there on the row.
  */
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deletePostAction } from "../actions";
-import type { PostRow } from "../../../lib/review/queries";
+import type { PostRowWithSource } from "../../../lib/admin/queries";
 
 // minmax(0, 1fr) for the title column — same reasoning as
 // CandidatesTable.tsx's URL column.
-const GRID = "56px minmax(0,1fr) 64px 70px 80px 64px";
+const GRID = "56px minmax(0,1fr) 64px minmax(0,140px) 70px 80px 64px";
 
 export function PostsTable({
   rows,
@@ -21,7 +27,7 @@ export function PostsTable({
   pageSize,
   filters,
 }: {
-  rows: PostRow[];
+  rows: PostRowWithSource[];
   total: number;
   page: number;
   pageSize: number;
@@ -60,7 +66,7 @@ export function PostsTable({
   return (
     <section>
       <h2>Posts</h2>
-      <div className="row-fields">
+      <div className="row-fields admin-filters">
         <label>
           ID
           <input key={filters.id ?? ""} type="number" defaultValue={filters.id ?? ""} onBlur={(e) => pushFilters({ id: e.target.value })} />
@@ -113,6 +119,7 @@ export function PostsTable({
             <span>ID</span>
             <span>Title</span>
             <span>Run</span>
+            <span>Source</span>
             <span>Posted</span>
             <span>Discarded</span>
             <span />
@@ -123,6 +130,7 @@ export function PostsTable({
                 <span className="data">#{p.id}</span>
                 <span>{p.title ?? "(untitled)"}</span>
                 <span className="data">#{p.runId}</span>
+                <span>{p.sourceName ?? "—"}</span>
                 <span>{p.posted ? "yes" : "no"}</span>
                 <span>{p.discarded ? "yes" : "no"}</span>
                 <div className="row-actions">

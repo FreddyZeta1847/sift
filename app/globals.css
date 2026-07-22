@@ -247,6 +247,13 @@ button.primary:hover:not(:disabled) { background: var(--primary-deep); }
 button.danger { color: var(--danger); }
 button.danger:hover:not(:disabled) { background: var(--danger-tint); border-color: transparent; }
 
+/* Secondary button — a visible outline at rest (the plain default only
+   gets a border on hover), for a "Cancel" sitting next to a `.primary`
+   submit — without this it reads as barely a button at all next to a
+   filled one. */
+button.secondary { border-color: var(--border); }
+button.secondary:hover:not(:disabled) { background: var(--surface-raised); border-color: var(--border-dashed); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     transition-duration: 0.01ms !important;
@@ -863,6 +870,29 @@ h3:first-child { margin-top: 0; }
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--space-sm);
   margin-bottom: var(--space-sm);
+}
+
+/* Admin table filter bars — a modifier on .row-fields. The grid above
+   wraps to a second row once its columns can't all fit at their 160px
+   floor, which is exactly what was happening here (the ID field ending up
+   alone on its own line above the rest). Filters read much worse split
+   across two rows than slightly narrower on one, so force a single
+   nowrap row instead — fields shrink together rather than wrapping, with
+   a horizontal-scroll fallback if the viewport is genuinely too narrow. */
+.admin-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  overflow-x: auto;
+}
+.admin-filters > label {
+  flex: 1 1 0;
+  min-width: 120px;
+}
+.admin-filters input,
+.admin-filters select {
+  width: 100%;
+  max-width: none;
 }
 
 /* A tight cluster of action buttons (Edit/Delete, Save/Cancel, a probe

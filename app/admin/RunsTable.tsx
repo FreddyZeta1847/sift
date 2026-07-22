@@ -76,7 +76,7 @@ export function RunsTable({
   return (
     <section>
       <h2>Pipeline Runs</h2>
-      <div className="row-fields">
+      <div className="row-fields admin-filters">
         <label>
           ID
           <input

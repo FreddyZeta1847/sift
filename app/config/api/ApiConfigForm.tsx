@@ -39,9 +39,12 @@
  *
  * Each provider row leads with a red warning icon when `apiKey` is empty
  * (nothing shown once a key is set — the row just reads clean). Edit is an
- * icon button on every row; Delete is hidden entirely for known providers
- * (their id is in `KNOWN_PROVIDER_IDS`) — there's no reason to force-remove
- * a seeded default a user isn't using, they can just leave its key blank.
+ * icon button on every row; Delete is hidden entirely for known providers,
+ * per `isKnownProvider` — matched by id OR by baseUrl, since a provider
+ * added before the known-provider seeding feature existed (or manually
+ * re-added) can carry a real known endpoint under a custom/legacy id, not
+ * just the seeded `suggestedId`. There's no reason to force-remove a
+ * default a user isn't using, they can just leave its key blank.
  *
  * The add-provider form starts collapsed behind a bare "+" button
  * (`showAddForm`) rather than always taking up page space; submitting or
@@ -68,6 +71,15 @@ const EMPTY_NEW_PROVIDER = {
 };
 
 const KNOWN_PROVIDER_IDS = new Set(KNOWN_PROVIDERS.map((p) => p.suggestedId));
+// A provider added before the known-provider seeding feature existed (or
+// re-added by hand) can have a real known baseUrl under a custom/legacy
+// id — matching by id alone missed these, so also recognize a known
+// service by its endpoint, which is the more stable signal anyway.
+const KNOWN_PROVIDER_BASE_URLS = new Set(KNOWN_PROVIDERS.map((p) => p.baseUrl));
+
+function isKnownProvider(p: Provider): boolean {
+  return KNOWN_PROVIDER_IDS.has(p.id) || KNOWN_PROVIDER_BASE_URLS.has(p.baseUrl);
+}
 
 const KIND_HINT =
   "anthropic = Anthropic's own API (Base URL is ignored — the SDK always targets Anthropic's endpoint, only the key matters). " +
@@ -305,7 +317,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                     </svg>
                   </button>
-                  {!KNOWN_PROVIDER_IDS.has(p.id) && (
+                  {!isKnownProvider(p) && (
                     <button
                       className="icon-button icon-button--danger"
                       onClick={() => handleDelete(p.id)}
@@ -415,8 +427,8 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                 </select>
               </label>
               <div className="row-actions">
-                <button type="submit">Add provider</button>
-                <button type="button" onClick={handleCancelAdd}>Cancel</button>
+                <button type="submit" className="primary">Add provider</button>
+                <button type="button" className="secondary" onClick={handleCancelAdd}>Cancel</button>
               </div>
             </form>
             {addStatus && (

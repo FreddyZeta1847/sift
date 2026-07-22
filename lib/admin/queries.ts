@@ -177,13 +177,45 @@ export interface ListPostsOptions {
   q?: string;
 }
 
-export async function listPosts(opts: ListPostsOptions): Promise<Page<PostRow>> {
+export interface PostRowWithSource extends PostRow {
+  sourceName: string | null;
+}
+
+// A post has no sourceId column of its own — it traces back to a source
+// two hops out (post.candidateId -> candidate.id -> candidate.sourceId ->
+// source.id/name), the same relationship candidates.sourceId already
+// resolves directly. Two batched lookups (never one join per row) so this
+// stays cheap regardless of page size.
+async function attachSourceViaCandidate(rows: PostRow[]): Promise<PostRowWithSource[]> {
+  if (rows.length === 0) return [];
+  const db = getDb();
+
+  const candidateIds = [...new Set(rows.map((r) => r.candidateId))];
+  const candidateRows = await db
+    .select({ id: candidatesTable.id, sourceId: candidatesTable.sourceId })
+    .from(candidatesTable)
+    .where(inArray(candidatesTable.id, candidateIds));
+  const sourceIdByCandidateId = new Map(candidateRows.map((c) => [c.id, c.sourceId]));
+
+  const sourceIds = [...new Set(candidateRows.map((c) => c.sourceId).filter((id): id is number => id !== null))];
+  const sourceRows =
+    sourceIds.length > 0 ? await db.select().from(sourcesTable).where(inArray(sourcesTable.id, sourceIds)) : [];
+  const nameBySourceId = new Map(sourceRows.map((s) => [s.id, s.name]));
+
+  return rows.map((r) => {
+    const sourceId = sourceIdByCandidateId.get(r.candidateId) ?? null;
+    return { ...r, sourceName: sourceId !== null ? (nameBySourceId.get(sourceId) ?? null) : null };
+  });
+}
+
+export async function listPosts(opts: ListPostsOptions): Promise<Page<PostRowWithSource>> {
   const db = getDb();
   const page = opts.page ?? 1;
 
   if (opts.id !== undefined) {
     const rows = await db.select().from(postsTable).where(eq(postsTable.id, opts.id));
-    return { rows, total: rows.length, page: 1, pageSize: PAGE_SIZE };
+    const withSource = await attachSourceViaCandidate(rows);
+    return { rows: withSource, total: rows.length, page: 1, pageSize: PAGE_SIZE };
   }
 
   const conditions = [];
@@ -213,7 +245,8 @@ export async function listPosts(opts: ListPostsOptions): Promise<Page<PostRow>> 
     db.select({ total: count() }).from(postsTable).where(where),
   ]);
 
-  return { rows, total: Number(total), page, pageSize: PAGE_SIZE };
+  const withSource = await attachSourceViaCandidate(rows);
+  return { rows: withSource, total: Number(total), page, pageSize: PAGE_SIZE };
 }
 
 // ---------------------------------------------------------------------

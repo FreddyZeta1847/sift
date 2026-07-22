@@ -68,7 +68,7 @@ export function LlmCallsTable({
   return (
     <section>
       <h2>LLM Calls</h2>
-      <div className="row-fields">
+      <div className="row-fields admin-filters">
         <label>
           ID
           <input key={filters.id ?? ""} type="number" defaultValue={filters.id ?? ""} onBlur={(e) => pushFilters({ id: e.target.value })} />

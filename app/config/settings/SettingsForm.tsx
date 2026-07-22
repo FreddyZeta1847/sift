@@ -369,8 +369,8 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
                 />
               </label>
               <div className="row-actions">
-                <button type="submit">Add source</button>
-                <button type="button" onClick={handleCancelAddSource}>Cancel</button>
+                <button type="submit" className="primary">Add source</button>
+                <button type="button" className="secondary" onClick={handleCancelAddSource}>Cancel</button>
               </div>
             </form>
             {addSourceStatus && (
