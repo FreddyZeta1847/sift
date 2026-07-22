@@ -36,14 +36,21 @@
  * Visual pass only (see DESIGN.md): the draft text is this card's "one lit
  * thing" — read at body typography, capped to a ~70ch measure, everything
  * else (badge, prompt, buttons) recedes around it. "Copy & Mark Posted" is
- * the card's one primary action; "Discard" stays a ghost/danger button
- * (never filled, per the Flat-By-Default / danger-button rules — a filled
- * red Discard would read as a false alarm); "Regenerate" and "Copy prompt"
- * are plain ghost buttons. The content-safety badge sits at the top of the
- * card, on its own line, so it can't be missed. The pending-version compare
- * is visually separated by `.pending-compare`'s top border and stacked
- * clearly under the current draft so "keep new" vs. "keep original" reads
- * unambiguously.
+ * the card's one primary action and stays a full text button; "Copy
+ * prompt", "Regenerate", and "Discard" are icon-only ghost buttons (see
+ * `.icon-button` in globals.css) — same actions, more compact chrome. The
+ * content-safety badge sits at the top of the card, on its own line, so it
+ * can't be missed. The pending-version compare is visually separated by
+ * `.pending-compare`'s top border and stacked clearly under the current
+ * draft so "keep new" vs. "keep original" reads unambiguously.
+ *
+ * `index` (the post's 1-based position within the run, passed by
+ * review/page.tsx) renders as a numbered circle absolutely positioned in
+ * the card's top-right corner, above the id-chip/title rows (see
+ * `.draft-index-badge` in globals.css — a light tint of the accent color,
+ * not the sidebar's dark active-pill fill). Both the title and status-line
+ * rows reserve right-side padding so their text never runs under it.
+ * `.draft-card` is `position: relative` so the badge anchors to this card.
  *
  * The draft textarea auto-grows to its content's `scrollHeight` (see the
  * `resizeTextarea` effect below) instead of sitting at a fixed height with
@@ -63,7 +70,7 @@ import { saveEdit, discardPost, markPosted, regeneratePost, keepVersion } from "
 import { isFlagged } from "../../lib/safety/leakage-linter";
 import type { PostWithPending } from "../../lib/review/queries";
 
-export function DraftCard({ post }: { post: PostWithPending }) {
+export function DraftCard({ post, index }: { post: PostWithPending; index: number }) {
   const router = useRouter();
   const [text, setText] = useState(post.editedText ?? post.originalText);
   const [status, setStatus] = useState<string | null>(null);
@@ -165,9 +172,15 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   const flagged = isFlagged(text);
 
   return (
-    <article className={muted ? "card muted" : "card"}>
-      {post.title && <p className="draft-title">{post.title}</p>}
-      <p className="status-line" style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0 }}>
+    <article className={muted ? "card draft-card muted" : "card draft-card"}>
+      <span className="draft-index-badge" aria-hidden="true">
+        {index}
+      </span>
+      {post.title && <p className="draft-title" style={{ paddingRight: "50px" }}>{post.title}</p>}
+      <p
+        className="status-line"
+        style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0, paddingRight: "50px" }}
+      >
         <span className="data id-chip">#{post.id}</span>
         <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
           {post.url}
@@ -224,13 +237,45 @@ export function DraftCard({ post }: { post: PostWithPending }) {
         }}
       >
         <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-          <button onClick={handleCopyPrompt}>Copy prompt</button>
-          <button onClick={handleRegenerate} disabled={muted || isRegenerating || !!post.pendingVersion}>
-            {isRegenerating ? "Regenerating…" : "Regenerate"}
+          <button className="icon-button" onClick={handleCopyPrompt} aria-label="Copy image prompt" title="Copy image prompt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+          <button
+            className="icon-button"
+            onClick={handleRegenerate}
+            disabled={muted || isRegenerating || !!post.pendingVersion}
+            aria-label={isRegenerating ? "Regenerating…" : "Regenerate"}
+            title={isRegenerating ? "Regenerating…" : "Regenerate"}
+          >
+            <svg
+              className={isRegenerating ? "spin-icon" : undefined}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
           </button>
         </div>
         <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-          <button className="danger" onClick={handleDiscard} disabled={muted}>Discard</button>
+          <button className="icon-button icon-button--danger" onClick={handleDiscard} disabled={muted} aria-label="Discard" title="Discard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </button>
           <button className="primary" onClick={handleCopyAndPost} disabled={muted}>Copy &amp; Mark Posted</button>
         </div>
       </div>

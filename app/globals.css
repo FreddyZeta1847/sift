@@ -63,6 +63,13 @@
   /* Elevation — see DESIGN.md §4 */
   --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-cta: 0 6px 16px rgba(160, 63, 30, 0.28);
+
+  /* The "this is the open/selected thing" signal on the sidebar's active
+     nav pill — a solid dark fill. */
+  --gradient-active: linear-gradient(135deg, var(--ink-soft), var(--ink));
+  /* A draft card's position badge: a light tint of the accent color rather
+     than the sidebar's dark fill — the number itself stays ink-brown. */
+  --gradient-badge: linear-gradient(135deg, rgba(192, 83, 43, 0.16), rgba(192, 83, 43, 0.34));
 }
 
 * { box-sizing: border-box; }
@@ -333,16 +340,31 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
   margin: 0;
 }
 
-/* The Review Workspace's run picker (RunPicker.tsx) — inherits the shared
-   `select` styling but sits compact and inline where the old static "Run
-   #N — X post(s)" status line used to be, not stretched to the page's
-   full 70ch reading measure. */
+/* The Review Workspace's run picker (RunPicker.tsx) — matches the Claude
+   Design mockup exactly: a labeled pill ("Pipeline run") wrapping a
+   chip-styled native select, rather than a bare dropdown. */
+.run-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-bottom: var(--space-lg);
+}
 .run-picker {
   width: auto;
-  display: inline-block;
-  font-size: 0.8125rem;
-  padding: 6px 10px;
-  margin-bottom: var(--space-lg);
+  border: none;
+  background: var(--chip-bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .pending-compare {
@@ -350,6 +372,51 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
   margin-top: var(--space-md);
   padding-top: var(--space-md);
   animation: fade-slide-in var(--duration-base) var(--ease-standard);
+}
+
+/* A draft card's position within its run (1, 2, 3…) — a large, light tint
+   of the accent color (see --gradient-badge) with the number itself in
+   plain ink-brown, rather than a filled dark circle with light text. */
+.draft-index-badge {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--gradient-badge);
+  color: var(--ink);
+  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon-only action buttons (copy prompt, regenerate, discard) — same ghost
+   treatment as their text-button predecessors, just compact and glyph-led.
+   "Copy & Mark Posted" stays a full text button; it's the card's one
+   primary action and earns the extra weight. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+}
+.icon-button:hover:not(:disabled) { background: var(--surface-raised); color: var(--ink); }
+.icon-button--danger { color: var(--danger); }
+.icon-button--danger:hover:not(:disabled) { background: var(--danger-tint); color: var(--danger); }
+.icon-button .spin-icon { animation: spin 0.9s linear infinite; }
+
+/* Positioned so .draft-index-badge (absolutely positioned) anchors to this
+   card rather than some further-out ancestor. */
+.draft-card {
+  position: relative;
 }
 
 .status-line {
@@ -496,7 +563,7 @@ button.danger:hover:not(:disabled) { background: var(--danger-tint); border-colo
     color var(--duration-fast) var(--ease-standard);
 }
 .sidebar-nav-item:hover { background: var(--surface-raised); }
-.sidebar-nav-item.active { background: var(--ink); color: var(--primary-text); }
+.sidebar-nav-item.active { background: var(--gradient-active); color: var(--primary-text); }
 .sidebar-nav-dot {
   width: 9px;
   height: 9px;

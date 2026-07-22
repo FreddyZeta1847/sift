@@ -74,8 +74,8 @@ export default async function ReviewPage({
     <main>
       <h1>Review</h1>
       <RunPicker runs={recentRuns} currentRunId={runId} />
-      {posts.map((post) => (
-        <DraftCard key={post.id} post={post} />
+      {posts.map((post, i) => (
+        <DraftCard key={post.id} post={post} index={i + 1} />
       ))}
     </main>
   );
