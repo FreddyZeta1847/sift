@@ -23,19 +23,35 @@
  * server data.
  *
  * Editing an existing provider reuses this same add-provider field shape:
- * clicking "Edit" on a row sets `editingId` to that provider's id and swaps
- * the row's static text for the identical set of inputs, pre-filled from the
- * provider's current values and held in `editProvider` state. The `id` input
- * is disabled in edit mode: `updateProvider` matches the row to replace by
- * the submitted id, so letting a user retype it risks a silent no-op or
- * overwriting an unrelated provider — ids are only ever chosen in the
- * add-provider form. Since these inputs live in the `<ul>` rather than a
+ * clicking the edit icon on a row sets `editingId` to that provider's id and
+ * swaps the row's static text for the identical set of inputs, pre-filled
+ * from the provider's current values and held in `editProvider` state. The
+ * `id` input is disabled in edit mode: `updateProvider` matches the row to
+ * replace by the submitted id, so letting a user retype it risks a silent
+ * no-op or overwriting an unrelated provider — ids are only ever chosen in
+ * the add-provider form. Since these inputs live in the `<ul>` rather than a
  * `<form>`, their `required` attributes don't enforce anything on their own,
  * so "Save" is additionally disabled whenever `label`/`baseUrl`/`apiKey` is
  * blank (mirroring the "Save model assignment" guard below). "Save" calls
  * `updateProvider` and, on success, shows "Provider updated." via
  * `editStatus`, clears `editingId`, and refreshes; "Cancel" just clears
  * `editingId` without persisting anything.
+ *
+ * Each provider row leads with a key-status dot (green when `apiKey` is
+ * non-empty, matching the same `--success` green as Settings' toggle
+ * switches, muted otherwise) and, for a default/known provider (its id is
+ * in `KNOWN_PROVIDER_IDS`), a small colored monogram (`PROVIDER_BRAND`) —
+ * not a real logo/trademark reproduction, just a scannable color+initial.
+ * Edit is an icon button on every row; Delete is hidden entirely for known
+ * providers — there's no reason to force-remove a seeded default a user
+ * isn't using, they can just leave its key blank.
+ *
+ * The add-provider form starts collapsed behind a bare "+" button
+ * (`showAddForm`) rather than always taking up page space; submitting or
+ * cancelling collapses it back. The Kind field (both add and edit forms)
+ * carries an inline info icon whose `title` explains the `anthropic` vs.
+ * `openai-compatible` distinction (`KIND_HINT`) — the same guidance given
+ * in the README, surfaced right where the decision is made.
  */
 "use client";
 
@@ -53,6 +69,26 @@ const EMPTY_NEW_PROVIDER = {
   apiKey: "",
   kind: "openai-compatible" as Provider["kind"],
 };
+
+// A simple colored monogram for each known/default provider (see
+// known-providers.ts) — not a reproduction of any real brand logo/trademark,
+// just a recognizable color+initial pairing so a default row is scannable
+// at a glance. Shown only next to rows whose id matches one of these.
+const PROVIDER_BRAND: Record<string, { initials: string; color: string }> = {
+  anthropic: { initials: "A", color: "#C0532B" },
+  openai: { initials: "O", color: "#10A37F" },
+  "google-gemini": { initials: "G", color: "#4285F4" },
+  "nvidia-nim": { initials: "N", color: "#76B900" },
+  openrouter: { initials: "OR", color: "#6B5B95" },
+  deepseek: { initials: "D", color: "#2563EB" },
+};
+
+const KNOWN_PROVIDER_IDS = new Set(KNOWN_PROVIDERS.map((p) => p.suggestedId));
+
+const KIND_HINT =
+  "anthropic = Anthropic's own API (Base URL is ignored — the SDK always targets Anthropic's endpoint, only the key matters). " +
+  "openai-compatible = everything else: OpenAI itself, and any provider whose endpoint matches OpenAI's request/response shape " +
+  "(Google Gemini, NVIDIA NIM, OpenRouter, DeepSeek, etc.) — use their real Base URL.";
 
 // Visual-only helper: every failure message produced in this file follows
 // an "X failed: ..." shape (see the handlers below), so matching that
@@ -76,6 +112,7 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
   const [newProvider, setNewProvider] = useState(EMPTY_NEW_PROVIDER);
   const [addStatus, setAddStatus] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editProvider, setEditProvider] = useState(EMPTY_NEW_PROVIDER);
@@ -109,7 +146,14 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
     }
     setAddStatus("Provider added.");
     setNewProvider(EMPTY_NEW_PROVIDER);
+    setShowAddForm(false);
     router.refresh();
+  };
+
+  const handleCancelAdd = () => {
+    setShowAddForm(false);
+    setNewProvider(EMPTY_NEW_PROVIDER);
+    setAddStatus(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -223,6 +267,13 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                   </label>
                   <label>
                     Kind
+                    <span className="info-icon" title={KIND_HINT} aria-label="How to choose Kind">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </span>
                     <select
                       value={editProvider.kind}
                       onChange={(e) => setEditProvider({ ...editProvider, kind: e.target.value as Provider["kind"] })}
@@ -250,14 +301,53 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
               </div>
             ) : (
               <div key={p.id} className="provider-row provider-row--card">
-                <span className="list-row-title">{p.label}</span>
+                <span className="provider-label-cell">
+                  <span
+                    className={p.apiKey ? "key-status-dot key-status-dot--ok" : "key-status-dot key-status-dot--missing"}
+                    title={p.apiKey ? "API key set" : "API key missing"}
+                    aria-label={p.apiKey ? "API key set" : "API key missing"}
+                  >
+                    {p.apiKey ? (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
+                        <line x1="12" y1="6" x2="12" y2="14" />
+                        <line x1="12" y1="18" x2="12.01" y2="18" />
+                      </svg>
+                    )}
+                  </span>
+                  {PROVIDER_BRAND[p.id] && (
+                    <span className="provider-logo" style={{ background: PROVIDER_BRAND[p.id].color }} aria-hidden="true">
+                      {PROVIDER_BRAND[p.id].initials}
+                    </span>
+                  )}
+                  <span className="list-row-title">{p.label}</span>
+                </span>
                 <span className="list-row-meta data">{p.baseUrl}</span>
                 <span className="tag">{p.kind}</span>
                 <div className="row-actions">
-                  <button onClick={() => handleStartEdit(p)}>Edit</button>
-                  <button className="danger" onClick={() => handleDelete(p.id)}>
-                    Delete
+                  <button className="icon-button" onClick={() => handleStartEdit(p)} aria-label="Edit provider" title="Edit provider">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    </svg>
                   </button>
+                  {!KNOWN_PROVIDER_IDS.has(p.id) && (
+                    <button
+                      className="icon-button icon-button--danger"
+                      onClick={() => handleDelete(p.id)}
+                      aria-label="Delete provider"
+                      title="Delete provider"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 {deleteErrors[p.id] && (
                   <p className="status-line status-line--danger" role="alert">
@@ -274,70 +364,95 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
           </p>
         )}
 
-        <label className="quick-add-provider">
-          Quick add a known provider
-          <select value="" onChange={(e) => handleQuickAdd(e.target.value)}>
-            <option value="">— choose a provider — (or fill in the form below manually)</option>
-            {KNOWN_PROVIDERS.map((p) => (
-              <option key={p.suggestedId} value={p.suggestedId}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!showAddForm ? (
+          <button
+            type="button"
+            className="icon-button add-provider-toggle"
+            onClick={() => setShowAddForm(true)}
+            aria-label="Add provider"
+            title="Add provider"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        ) : (
+          <>
+            <label className="quick-add-provider">
+              Quick add a known provider
+              <select value="" onChange={(e) => handleQuickAdd(e.target.value)}>
+                <option value="">— choose a provider — (or fill in the form below manually)</option>
+                {KNOWN_PROVIDERS.map((p) => (
+                  <option key={p.suggestedId} value={p.suggestedId}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <form className="add-form row-fields" onSubmit={handleAddProvider}>
-          <label>
-            ID
-            <input
-              value={newProvider.id}
-              onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Label
-            <input
-              value={newProvider.label}
-              onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Base URL
-            <input
-              value={newProvider.baseUrl}
-              onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            API key
-            <input
-              type="password"
-              value={newProvider.apiKey}
-              onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            Kind
-            <select
-              value={newProvider.kind}
-              onChange={(e) => setNewProvider({ ...newProvider, kind: e.target.value as Provider["kind"] })}
-            >
-              <option value="openai-compatible">openai-compatible</option>
-              <option value="anthropic">anthropic</option>
-            </select>
-          </label>
-          <div className="row-actions">
-            <button type="submit">Add provider</button>
-          </div>
-        </form>
-        {addStatus && (
-          <p className={statusTone(addStatus)} role="alert">
-            {addStatus}
-          </p>
+            <form className="add-form row-fields" onSubmit={handleAddProvider}>
+              <label>
+                ID
+                <input
+                  value={newProvider.id}
+                  onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Label
+                <input
+                  value={newProvider.label}
+                  onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Base URL
+                <input
+                  value={newProvider.baseUrl}
+                  onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                API key
+                <input
+                  type="password"
+                  value={newProvider.apiKey}
+                  onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Kind
+                <span className="info-icon" title={KIND_HINT} aria-label="How to choose Kind">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </span>
+                <select
+                  value={newProvider.kind}
+                  onChange={(e) => setNewProvider({ ...newProvider, kind: e.target.value as Provider["kind"] })}
+                >
+                  <option value="openai-compatible">openai-compatible</option>
+                  <option value="anthropic">anthropic</option>
+                </select>
+              </label>
+              <div className="row-actions">
+                <button type="submit">Add provider</button>
+                <button type="button" onClick={handleCancelAdd}>Cancel</button>
+              </div>
+            </form>
+            {addStatus && (
+              <p className={statusTone(addStatus)} role="alert">
+                {addStatus}
+              </p>
+            )}
+          </>
         )}
       </section>
 
@@ -367,6 +482,9 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
           </div>
           <div className="row-actions">
             <button onClick={handleTestCuration} disabled={isCurationProbing || !curationProviderId || !curationModel}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "-2px" }}>
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
               {isCurationProbing ? "Testing…" : "Test this model"}
             </button>
             {curationProbeResult && <span className={probeTone(curationProbeResult)}>{curationProbeResult}</span>}
@@ -394,6 +512,9 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
           </div>
           <div className="row-actions">
             <button onClick={handleTestDrafting} disabled={isDraftingProbing || !draftingProviderId || !draftingModel}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "-2px" }}>
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
               {isDraftingProbing ? "Testing…" : "Test this model"}
             </button>
             {draftingProbeResult && <span className={probeTone(draftingProbeResult)}>{draftingProbeResult}</span>}

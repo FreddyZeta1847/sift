@@ -720,12 +720,58 @@ h3:first-child { margin-top: 0; }
 .provider-row:last-child { border-bottom: none; }
 .provider-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .provider-row > .tag { overflow: visible; white-space: nowrap; justify-self: start; }
+/* Matches .provider-row--card's own horizontal padding below — without
+   this, the header's "Label"/"Base URL"/"Kind" text sits flush left/right
+   while the data rows below it are inset by --space-lg, throwing off the
+   alignment of every column (worst on "Kind", the narrowest one). */
 .provider-row--head {
   color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.01em;
-  padding-bottom: var(--space-xs);
+  padding: 0 var(--space-lg) var(--space-xs);
+}
+/* The label cell now packs a key-status dot, an optional brand monogram
+   (default/known providers only), and the label text — override the
+   plain-text single-line-ellipsis rule above (meant for a bare text cell)
+   since this cell holds multiple child elements, not raw text. */
+.provider-row > .provider-label-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+  white-space: normal;
+}
+.provider-label-cell .list-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.key-status-dot {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.key-status-dot--ok { background: var(--success); color: var(--primary-text); }
+.key-status-dot--missing { background: var(--chip-bg); color: var(--muted); }
+.provider-logo {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.6875rem;
+  letter-spacing: -0.02em;
 }
 /* Each provider, individually, is genuinely a discrete comparable unit —
    the Organic system's Card-Is-Not-Default retirement applies here first. */
@@ -839,6 +885,30 @@ h3:first-child { margin-top: 0; }
   max-width: 320px;
   margin-top: var(--space-md);
 }
+
+/* Collapsed "Add provider" affordance — a bare "+" until clicked, instead
+   of the full add-form taking up space by default. */
+.add-provider-toggle {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-md);
+}
+
+/* A small "how do I know this?" hint next to a field label — native title
+   tooltip on hover/focus, same convention as the icon-buttons' title
+   attribute elsewhere on this page. */
+.info-icon {
+  display: inline-flex;
+  color: var(--muted);
+  cursor: help;
+  vertical-align: -3px;
+}
+.info-icon:hover { color: var(--ink-soft); }
 
 /* Wrapper for a section's single closing action (e.g. "Save model
    assignment") when it isn't already inside a <form>. */
