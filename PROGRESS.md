@@ -6,3 +6,4 @@
 - 2026-07-20 — CONFIG-UI--admin-page: new sub-feature added (data-management surface, delete-integrity decision)
 - 2026-07-20 — STORAGE-HISTORY: retention decision revisited (posts retention mechanism)
 - 2026-07-22 — CURATION-ENGINE/STORAGE-HISTORY: resilience issue logged and fixed (source-aware candidate pool filtering, schema addition)
+- 2026-08-02 — DEV-ENVIRONMENT: tooling issue logged (stale dev-server process squatting on a local port, Windows)
