@@ -34,6 +34,7 @@ import { startRun, getRunStatus } from "./config/settings/actions";
 
 const LINKS = [
   { href: "/review", label: "Review" },
+  { href: "/posted", label: "Posted" },
   { href: "/config/api", label: "API Config" },
   { href: "/config/settings", label: "Settings" },
   { href: "/config/costs", label: "Costs" },
