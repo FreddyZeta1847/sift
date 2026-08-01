@@ -1176,6 +1176,34 @@ h3:first-child { margin-top: 0; }
 .bar-chart-col:hover .bar-chart-tooltip,
 .bar-chart-col:focus-visible .bar-chart-tooltip { opacity: 1; }
 
+/* Generalized hover-tooltip recipe (same visual language as
+   .bar-chart-tooltip above) for any element that needs a fast, styled
+   hover label instead of the browser's native `title` delay — e.g. the
+   DraftCard action buttons in app/review/DraftCard.tsx. Wrap the trigger
+   element in .tooltip-target and place a .tooltip-bubble inside it with
+   the label text; keep title/aria-label on the trigger too, for
+   accessibility and the no-JS/no-hover fallback. */
+.tooltip-target { position: relative; display: inline-flex; }
+.tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+  z-index: 5;
+}
+.tooltip-target:hover .tooltip-bubble,
+.tooltip-target:focus-within .tooltip-bubble { opacity: 1; }
+
 /* A save/failure line conveys a state change as it appears — this small
    entrance is what makes that legible as "something just happened" rather
    than text popping into a static page. */
