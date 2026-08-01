@@ -22,6 +22,7 @@
  * `.empty-state` class but get a short, reassuring sub-line and some
  * breathing room so an empty run doesn't read as a broken page.
  */
+import { redirect } from "next/navigation";
 import { resolveRunIdForDate, getPostsForRun, getRecentRuns } from "../../lib/review/queries";
 import { DraftCard } from "./DraftCard";
 import { RunPicker } from "./RunPicker";
@@ -37,6 +38,17 @@ export default async function ReviewPage({
 
   const recentRuns = await getRecentRuns();
   const runId = runIdParam ? Number(runIdParam) : await resolveRunIdForDate(resolvedDate);
+
+  // Pin an unpinned ("today"/date-resolved) visit to its resolved run right
+  // away — otherwise a later Nav router.refresh() (fired when a new run
+  // finishes) would re-run resolveRunIdForDate and silently swap the drafts
+  // out from under whoever is mid-review, since it always prefers the
+  // latest successful run for the date. Once the URL carries an explicit
+  // runId, refreshes keep showing the same run; a new run finishing is only
+  // ever surfaced via the sidebar's completion toast.
+  if (!runIdParam && runId) {
+    redirect(`/review?runId=${runId}`);
+  }
 
   if (!runId) {
     return (
