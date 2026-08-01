@@ -1,4 +1,14 @@
-// lib/draft/safe-fetch.ts
+/**
+ * lib/draft/safe-fetch.ts
+ *
+ * SSRF-hardened HTML fetcher used by the drafting pipeline's article
+ * enrichment step (see enrich.ts). Validates and pins the connection to
+ * the already-resolved IP (closing the DNS-rebinding TOCTOU window),
+ * follows redirects manually up to a cap, streams the body under a size
+ * cap, and rejects non-text/html and non-2xx responses outright — the
+ * latter so a bot-block/rate-limit page (403/429/503) can never be
+ * mistaken downstream for real article content.
+ */
 import { Agent } from "undici";
 import { resolveAndCheck } from "./ssrf-guard";
 import { SIFT_USER_AGENT } from "../ingestion/rate-limit";
@@ -67,6 +77,14 @@ export async function safeFetchHtml(url: string): Promise<string> {
     if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
       currentUrl = new URL(res.headers.get("location")!, currentUrl).toString();
       continue;
+    }
+
+    // A non-2xx response (commonly a 403/429/503 from a bot-block/rate-limit
+    // page) must not be treated as real content — letting it through here
+    // used to mean Readability would happily "extract" a challenge page's
+    // own text and hand it to the drafting LLM as if it were the article.
+    if (!res.ok) {
+      throw new Error(`Fetch failed with status ${res.status}`);
     }
 
     const contentType = res.headers.get("content-type") ?? "";

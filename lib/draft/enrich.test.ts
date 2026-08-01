@@ -1,4 +1,11 @@
-// lib/draft/enrich.test.ts
+/**
+ * lib/draft/enrich.test.ts
+ *
+ * Tests enrichWithArticleContent's fallback-to-sourceRecap behavior: on
+ * fetch failure, on empty extraction, and on a successfully-fetched page
+ * whose text looks like a bot-verification/challenge page rather than a
+ * real article.
+ */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { enrichWithArticleContent } from "./enrich";
 import type { CuratedItem } from "../curation/run";
@@ -34,6 +41,18 @@ describe("enrichWithArticleContent", () => {
     const safeFetch = await import("./safe-fetch");
     vi.spyOn(safeFetch, "safeFetchHtml").mockResolvedValue("<html><body></body></html>");
     const item: CuratedItem = { id: 3, url: "https://example.test/empty", sourceRecap: "fallback recap", whyPicked: "why" };
+
+    const result = await enrichWithArticleContent(item);
+
+    expect(result.articleText).toBe("fallback recap");
+  });
+
+  it("falls back to sourceRecap when the extracted text looks like a bot-verification page", async () => {
+    const safeFetch = await import("./safe-fetch");
+    vi.spyOn(safeFetch, "safeFetchHtml").mockResolvedValue(
+      "<html><body><article><h1>Security Checkpoint</h1><p>Checking your browser before accessing this site. This process is automatic. Your browser will redirect shortly. Please enable JavaScript and cookies to continue.</p></article></body></html>"
+    );
+    const item: CuratedItem = { id: 4, url: "https://example.test/checkpoint", sourceRecap: "fallback recap", whyPicked: "why" };
 
     const result = await enrichWithArticleContent(item);
 

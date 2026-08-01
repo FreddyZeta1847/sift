@@ -1,4 +1,9 @@
-// lib/draft/safe-fetch.test.ts
+/**
+ * lib/draft/safe-fetch.test.ts
+ *
+ * Tests safeFetchHtml's SSRF pinning, redirect handling, and content
+ * validation (content-type, status code, size cap) via mocked fetch/undici.
+ */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { safeFetchHtml } from "./safe-fetch";
 
@@ -51,6 +56,13 @@ describe("safeFetchHtml", () => {
   it("rejects a non-text/html content-type", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("binary", { status: 200, headers: { "Content-Type": "application/pdf" } }));
     await expect(safeFetchHtml("https://example.test/file.pdf")).rejects.toThrow(/content-type/i);
+  });
+
+  it("rejects a non-2xx response instead of returning a block/error page as content", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html><body>Access Denied</body></html>", { status: 403, headers: { "Content-Type": "text/html" } })
+    );
+    await expect(safeFetchHtml("https://example.test/blocked")).rejects.toThrow(/status 403/i);
   });
 
   it("throws after exceeding the redirect cap", async () => {
