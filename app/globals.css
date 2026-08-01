@@ -639,6 +639,7 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   animation: toast-in var(--duration-base) var(--ease-standard);
 }
 .toast--danger { color: var(--danger); }
+.toast--success { background: var(--success-bg); color: var(--success-deep); }
 
 /* ---------------------------------------------------------------------
  * Config surface (Settings / API Config / Costs) — per DESIGN.md's

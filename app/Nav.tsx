@@ -63,7 +63,7 @@ export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: Na
   const router = useRouter();
   const [runningId, setRunningId] = useState<number | null>(initialInProgress?.id ?? null);
   const [stage, setStage] = useState<string | null>(initialInProgress?.currentStage ?? null);
-  const [toast, setToast] = useState<{ message: string; isError: boolean } | null>(null);
+  const [toast, setToast] = useState<{ message: string; kind: "success" | "error" } | null>(null);
   const isRunning = runningId !== null;
 
   useEffect(() => {
@@ -83,8 +83,8 @@ export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: Na
         setStage(null);
         setToast(
           result.status === "success"
-            ? { message: "Run completed.", isError: false }
-            : { message: `Run aborted: ${result.abortReason}`, isError: true }
+            ? { message: "Run completed.", kind: "success" }
+            : { message: `Run aborted: ${result.abortReason}`, kind: "error" }
         );
         router.refresh();
       }
@@ -95,7 +95,7 @@ export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: Na
   const handleRunNow = async () => {
     const result = await startRun();
     if (!result.ok || result.runId === undefined) {
-      setToast({ message: result.error ?? "Run failed to start", isError: true });
+      setToast({ message: result.error ?? "Run failed to start", kind: "error" });
       return;
     }
     setStage(null);
@@ -154,7 +154,7 @@ export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: Na
       </div>
 
       {toast && (
-        <div className={toast.isError ? "toast toast--danger" : "toast"} role="status">
+        <div className={toast.kind === "error" ? "toast toast--danger" : "toast toast--success"} role="status">
           {toast.message}
         </div>
       )}
