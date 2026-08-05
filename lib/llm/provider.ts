@@ -23,6 +23,29 @@ import type { Provider } from "../config/types";
 // safety net this timeout exists for.
 const LLM_TIMEOUT_MS = 180_000;
 
+// The Anthropic SDK already retries transient failures internally
+// (`maxRetries`, default 2 — see @anthropic-ai/sdk's client.d.ts), covering
+// timeouts, 429, and 5xx. The OpenAI-compatible path below is hand-rolled
+// fetch(), so it has no such safety net — this is what actually broke: a
+// pipeline run aborting outright on a single slow/overloaded call to
+// Gemini's OpenAI-compat endpoint (generativelanguage.googleapis.com),
+// even though .claude/issues/002 already documented that 429 (quota) and
+// 503 (overload) are provider-side signals that just need a retry, not a
+// hard failure. Retries only these two conditions plus a timeout — any
+// other status (auth, bad request, etc.) is a real config problem and
+// still fails immediately, matching DRAFT-GENERATOR--resilience.md's
+// "hard failure aborts the run" contract for anything that isn't transient.
+const MAX_ATTEMPTS = 3;
+const RETRY_BACKOFF_MS = [2_000, 8_000];
+
+function isTransientStatus(status: number): boolean {
+  return status === 429 || status === 503;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export interface LlmMessage {
   role: "system" | "user";
   content: string;
@@ -45,7 +68,7 @@ export interface LlmCallResult {
 // Phase 3's CONFIG-UI "test this model" button is the actual surfaced check
 // for this — if it fails, the user should try a stronger model.
 
-async function callOpenAICompatible(
+async function callOpenAICompatibleOnce(
   provider: Provider,
   model: string,
   messages: LlmMessage[],
@@ -70,7 +93,9 @@ async function callOpenAICompatible(
     });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error(`LLM call failed: ${provider.baseUrl} timed out after ${LLM_TIMEOUT_MS}ms`);
+      const timeoutErr = new Error(`LLM call failed: ${provider.baseUrl} timed out after ${LLM_TIMEOUT_MS}ms`);
+      timeoutErr.name = "TransientLlmError";
+      throw timeoutErr;
     }
     throw err;
   } finally {
@@ -79,7 +104,9 @@ async function callOpenAICompatible(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`LLM call failed: ${provider.baseUrl} returned ${res.status}: ${body}`);
+    const statusErr = new Error(`LLM call failed: ${provider.baseUrl} returned ${res.status}: ${body}`);
+    if (isTransientStatus(res.status)) statusErr.name = "TransientLlmError";
+    throw statusErr;
   }
 
   const data = await res.json();
@@ -88,6 +115,25 @@ async function callOpenAICompatible(
     inputTokens: data.usage.prompt_tokens,
     outputTokens: data.usage.completion_tokens,
   };
+}
+
+async function callOpenAICompatible(
+  provider: Provider,
+  model: string,
+  messages: LlmMessage[],
+  options: LlmCallOptions
+): Promise<LlmCallResult> {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      return await callOpenAICompatibleOnce(provider, model, messages, options);
+    } catch (err) {
+      const isTransient = err instanceof Error && err.name === "TransientLlmError";
+      if (!isTransient || attempt === MAX_ATTEMPTS - 1) throw err;
+      await sleep(RETRY_BACKOFF_MS[attempt]);
+    }
+  }
+  // Unreachable — the loop above always either returns or throws.
+  throw new Error("unreachable");
 }
 
 export async function callLLM(

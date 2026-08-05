@@ -1,3 +1,9 @@
+/**
+ * Tests for lib/llm/provider.ts's callLLM — covers request shaping for both
+ * provider kinds (Anthropic SDK, OpenAI-compatible fetch) and the
+ * OpenAI-compatible path's retry-on-transient-status behavior (429/503),
+ * added after a real pipeline run aborted on a single timed-out Gemini call.
+ */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { callLLM } from "./provider";
 import type { Provider } from "../config/types";
@@ -66,6 +72,54 @@ describe("callLLM — openai-compatible", () => {
     await expect(
       callLLM(provider, "gpt-4o-mini", [{ role: "user", content: "hi" }], { maxOutputTokens: 100 })
     ).rejects.toThrow(/Function not found for account/);
+  });
+
+  it("does not retry a non-transient status (500) — fails on the first attempt", async () => {
+    const provider: Provider = { id: "p1", label: "Test", baseUrl: "https://example.test/v1", apiKey: "k", kind: "openai-compatible" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("server error", { status: 500 }));
+
+    await expect(
+      callLLM(provider, "gpt-4o-mini", [{ role: "user", content: "hi" }], { maxOutputTokens: 100 })
+    ).rejects.toThrow(/500/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient status (429) and succeeds once the provider recovers", async () => {
+    const provider: Provider = { id: "p1", label: "Test", baseUrl: "https://example.test/v1", apiKey: "k", kind: "openai-compatible" };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("quota exceeded", { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: "ok" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout);
+
+    const result = await callLLM(provider, "gpt-4o-mini", [{ role: "user", content: "hi" }], { maxOutputTokens: 100 });
+
+    expect(result.content).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a transient status (503) up to the attempt cap, then throws", async () => {
+    const provider: Provider = { id: "p1", label: "Test", baseUrl: "https://example.test/v1", apiKey: "k", kind: "openai-compatible" };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response("overloaded", { status: 503 }));
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout);
+
+    await expect(
+      callLLM(provider, "gpt-4o-mini", [{ role: "user", content: "hi" }], { maxOutputTokens: 100 })
+    ).rejects.toThrow(/503/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 
