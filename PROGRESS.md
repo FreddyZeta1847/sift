@@ -10,3 +10,4 @@
 - 2026-08-05 — CURATION-ENGINE/DRAFT-GENERATOR: resilience issue logged and fixed (LLM-call failure-handling revisited)
 - 2026-08-05 — TRANSLATION: new feature added to the vault (architecture, technologies, caching, security, resilience, on-demand flow)
 - 2026-08-05 — TRANSLATION/REVIEW-WORKSPACE/STORAGE-HISTORY/CONFIG-UI/DISTRIBUTION-TRUST: cross-review findings resolved (write-path coverage, delete-cascade integrity, terminology, a scope-boundary note, a citation fix)
+- 2026-08-06 — PHASE-6-TRANSLATION: new implementation phase added (two substeps planned)
