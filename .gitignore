@@ -16,3 +16,4 @@ data/
 *.tsbuildinfo
 next-env.d.ts
 graphify-out/
+.claude/
