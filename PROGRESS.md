@@ -19,4 +19,7 @@
 - 2026-08-06 — PHASE-6-TRANSLATION--review-ui-integration: step 2 implemented (review actions, cascade-delete integrity, UI wiring), tests verified
 - 2026-08-06 — TRANSLATION/REVIEW-WORKSPACE/STORAGE-HISTORY: a cross-feature mechanism claim found wrong during implementation, corrected across vault + recap
 - 2026-08-06 — TRANSLATION: UI/UX feedback round (switcher redesign, a formatting bug fixed, resilience issue logged)
+- 2026-08-06 — DISTRIBUTION-TRUST: resilience issue logged and fixed (a fresh Docker build path, unrelated to TRANSLATION)
+- 2026-08-06 — DRAFT-GENERATOR: doc drift corrected (a stale description reconciled with the real implementation)
+- 2026-08-06 — README updated (new feature documented, a dependency badge added)
 - 2026-08-06 — TRANSLATION: implementation issue logged and fixed (batched-inference artifact, architecture doc corrected)

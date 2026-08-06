@@ -6,6 +6,20 @@
  * finished run, and the undecided-post count for its badge/footer stat),
  * and renders the persistent sidebar alongside every page's content
  * inside the .app-shell flex layout.
+ *
+ * `export const dynamic = "force-dynamic"` (found necessary 2026-08-06,
+ * verifying a fresh `docker compose build`): without it, `next build`
+ * tries to statically prerender "/" at build time, which runs this
+ * layout's DB queries before any database exists in a truly fresh
+ * environment (no `data/sift.db` yet — migrations only run at container
+ * startup, not image build time) and fails with `SqliteError: no such
+ * table: pipeline_runs`. This had been silently masked in every local
+ * dev/test build because a migrated `data/sift.db` already existed from
+ * prior work — it only surfaces on a genuinely fresh clone+build, which
+ * is exactly what `docker compose up -d` does for a new self-hoster.
+ * Every real page here needs live DB data anyway (no actual static
+ * content exists in this app), so forcing the whole tree dynamic has no
+ * downside.
  */
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
@@ -36,6 +50,8 @@ export const metadata: Metadata = {
   title: "sift",
   description: "RSS in, LinkedIn drafts out.",
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [inProgress, lastRun, undecidedCount] = await Promise.all([
