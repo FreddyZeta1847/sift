@@ -15,3 +15,4 @@
 - 2026-08-06 — TRANSLATION: language-list decision revisited (model-availability constraint)
 - 2026-08-06 — TRANSLATION: implementation issue logged and fixed (build-tooling/module-resolution)
 - 2026-08-06 — DEV-ENVIRONMENT: tooling issue logged and fixed (build/dev cache collision)
+- 2026-08-06 — TRANSLATION: vault corrected and recap rebuilt to match the language-list revision
