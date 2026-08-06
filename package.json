@@ -7,8 +7,11 @@
     "sift-server": "./bin/sift-server.js"
   },
   "scripts": {
+    "predev": "npm run build:worker",
     "dev": "next dev",
+    "prebuild": "npm run build:worker",
     "build": "next build",
+    "build:worker": "tsc -p lib/translation/tsconfig.worker.json",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.1",
+    "@huggingface/transformers": "^4.2.0",
     "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^11.8.1",
     "drizzle-orm": "^0.38.4",

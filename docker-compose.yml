@@ -20,6 +20,12 @@ services:
     environment:
       - SIFT_DB_PATH=/app/data/sift.db
       - SIFT_CONFIG_DIR=/app/config
+      # Local translation's downloaded ONNX model weights — kept inside
+      # this same ./data volume (not a new mount) so they persist across
+      # container recreates instead of landing in an unconfigured default
+      # cache location. See TRANSLATION--technologies.md /
+      # TRANSLATION--caching.md.
+      - SIFT_MODELS_PATH=/app/data/models
     # Optional and normally unnecessary: no API key is required to boot —
     # keys are entered through the running app's Config UI, and there is no
     # env-var path for them. .env only matters if you want to override

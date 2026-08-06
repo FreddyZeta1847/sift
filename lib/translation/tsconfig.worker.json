@@ -1,0 +1,19 @@
+{
+  "//": "Standalone tsconfig for compiling worker.ts (+ its local models.ts import) to plain, directly Node-runnable JS. Deliberately separate from the root tsconfig.json (which has noEmit:true and moduleResolution:Bundler for Next's own build): worker.ts is loaded at runtime via `new Worker(path)`, entirely outside Next's and vitest's module graphs, so it needs a real .js file on disk — see lib/translation/translate.ts for why. Run via `npm run build:worker`.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "rootDir": ".",
+    "outDir": "./dist"
+  },
+  "include": ["worker.ts", "models.ts", "protocol.ts"]
+}

@@ -1,3 +1,9 @@
+/**
+ * Tests for lib/db/migrate.ts's runMigrations — confirms a fresh
+ * database ends up with every table the schema currently defines, and
+ * that re-running migrations against an already-migrated database is a
+ * no-op rather than an error.
+ */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import Database from "better-sqlite3";
@@ -16,7 +22,7 @@ describe("runMigrations", () => {
     if (existsSync(`${testDbPath}-shm`)) rmSync(`${testDbPath}-shm`);
   });
 
-  it("creates all 5 tables against a fresh database", () => {
+  it("creates all 6 tables against a fresh database", () => {
     process.env.SIFT_DB_PATH = testDbPath;
     runMigrations();
 
@@ -31,6 +37,7 @@ describe("runMigrations", () => {
       "candidates",
       "llm_calls",
       "pipeline_runs",
+      "post_translations",
       "posts",
       "sources",
       "sqlite_sequence",

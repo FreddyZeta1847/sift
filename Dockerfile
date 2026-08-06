@@ -36,6 +36,14 @@ COPY --from=build --chown=sift:sift /app/.next/static ./.next/static
 # not imported — Next's standalone output tracing only follows JS imports,
 # so this folder is never included automatically and must be copied by hand.
 COPY --from=build --chown=sift:sift /app/drizzle ./drizzle
+# Same reasoning as drizzle/ above: lib/translation/dist/worker.js is
+# loaded at runtime via `new Worker(path)` (lib/translation/translate.ts),
+# a raw path string, not a JS import — standalone tracing has been
+# observed to sometimes pick this up via its dynamic-require heuristics,
+# but that isn't a guarantee to build a production image on, so it's
+# copied explicitly here too. Built by `npm run build:worker`, which
+# `npm run build` already runs as its `prebuild` step.
+COPY --from=build --chown=sift:sift /app/lib/translation/dist ./lib/translation/dist
 
 USER sift
 EXPOSE 3000

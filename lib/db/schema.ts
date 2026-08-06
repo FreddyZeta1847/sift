@@ -2,7 +2,8 @@
  * Drizzle table definitions for sift's one SQLite database — the
  * "recorded history" half of the config/history split (see
  * lib/config/* for the JSON-authored counterpart). Tables: pipeline
- * runs, the source identity registry, candidates, posts, and LLM calls.
+ * runs, the source identity registry, candidates, posts, LLM calls,
+ * and post translations.
  */
 import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
 
@@ -80,4 +81,26 @@ export const llmCallsTable = sqliteTable("llm_calls", {
   inputTokens: integer("input_tokens").notNull(),
   outputTokens: integer("output_tokens").notNull(),
   estimatedCost: real("estimated_cost").notNull(),
+});
+
+// One row per (postId, language) pair — not versioned, matching the
+// project's established "no edit-history" pattern (see
+// TRANSLATION--architecture.md). Re-translating an already-translated
+// post/language overwrites translatedText in place and resets outdated
+// to false, rather than adding a new row.
+export const postTranslationsTable = sqliteTable("post_translations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  postId: integer("post_id")
+    .notNull()
+    .references(() => postsTable.id),
+  language: text("language", { enum: ["es", "fr", "de", "it", "pt"] }).notNull(),
+  translatedText: text("translated_text").notNull(),
+  // Flipped true whenever posts.editedText or posts.originalText changes
+  // for this postId after a translation already exists — see
+  // TRANSLATION--architecture.md's "Staleness" section. Writing that flip
+  // is the responsibility of REVIEW-WORKSPACE's edit-save and
+  // regenerate-pick-winner Server Actions, not this module.
+  outdated: integer("outdated", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
