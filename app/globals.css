@@ -336,8 +336,8 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 }
 .lang-dropdown--corner {
   position: absolute;
-  top: 30px;
-  right: 4px;
+  top: 18px;
+  right: 16px;
   margin-bottom: 0;
 }
 .lang-dropdown-trigger {
@@ -373,8 +373,18 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   justify-content: center;
   gap: 0;
   border-radius: 50%;
+  overflow: hidden;
   background: var(--gradient-badge);
   color: var(--ink);
+}
+/* The flag SVG is rendered larger than the 42px circle it sits in (see
+   FlagIcon usage in DraftCard.tsx) specifically so it fully bleeds past
+   every edge before this `overflow: hidden` clips it — the flag should
+   read as filling the whole circular badge, not as a small square icon
+   floating in the middle of it with the gradient background showing
+   around it. */
+.lang-dropdown-trigger--badge svg {
+  flex-shrink: 0;
 }
 .lang-dropdown-trigger--badge:hover { background: var(--border); }
 .lang-dropdown-trigger--badge[aria-expanded="true"] { background: var(--ink); color: var(--primary-text); }

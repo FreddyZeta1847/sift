@@ -109,14 +109,25 @@
  * - The trigger itself sits in the card's top-right corner as a circular
  *   badge (`.lang-dropdown--corner` + `.lang-dropdown-trigger--badge` in
  *   globals.css) — same visual family as the numbered index badge this
- *   replaced (circular, similarly sized at 42px), just nudged further
- *   right and further down (`top: 30px; right: 4px` vs. the old badge's
- *   `top: 14px; right: 20px`) since a flag glyph reads better a little
- *   further into the corner than a two-digit number did. Its footprint
- *   from the card's right edge (`right` + width = 46px) is actually
- *   slightly smaller than the old badge's (62px), so the title/status-line
- *   rows' existing `paddingRight: 50px` reservation still clears it without
- *   needing to change.
+ *   replaced (circular, 42px). Position (`top: 18px; right: 16px`) was
+ *   nudged after live UI feedback — up and left from an earlier attempt
+ *   that sat too low and too tight into the corner. Its footprint from the
+ *   card's right edge (`right` + width = 58px) is why the title/status-line
+ *   rows' `paddingRight` was bumped to `66px` — the old `50px` reservation
+ *   no longer cleared it once the badge moved left.
+ *
+ * - The flag itself fills the entire circle edge-to-edge (per follow-up
+ *   feedback: "the whole circle should be the flag, not a squared flag
+ *   inside it") rather than sitting as a small icon with the badge's
+ *   gradient background showing around it. `FlagIcon`'s `size` is 44 here
+ *   (bigger than the 42px circle) specifically so the square SVG fully
+ *   bleeds past every edge of the circle before `.lang-dropdown-trigger
+ *   --badge`'s `overflow: hidden` clips it — each flag's `<rect>`/`<path>`
+ *   shapes already cover their full `0 0 24 24` viewBox with no internal
+ *   padding, so scaling up and clipping to a circle doesn't reveal any
+ *   background at the edges. The panel's flags (next to each language's
+ *   name) stay at the smaller default size — this only applies to the
+ *   corner trigger, where "be the whole circle" was the actual ask.
  *
  * - The single flat `text` state this component used to have is now split
  *   two ways: `englishText` (was `text`, same role) and `translationTexts`
@@ -494,7 +505,7 @@ export function DraftCard({ post }: { post: PostWithPending }) {
           aria-label={`Language: ${activeTab === "en" ? "English" : LANGUAGE_LABELS[activeTab]}. Click to change language.`}
           onClick={() => setIsLangMenuOpen((open) => !open)}
         >
-          <FlagIcon language={activeTab} size={22} />
+          <FlagIcon language={activeTab} size={44} />
           <svg
             className="lang-dropdown-caret"
             width="12"
@@ -554,10 +565,10 @@ export function DraftCard({ post }: { post: PostWithPending }) {
           </div>
         )}
       </div>
-      {post.title && <p className="draft-title" style={{ paddingRight: "50px" }}>{post.title}</p>}
+      {post.title && <p className="draft-title" style={{ paddingRight: "66px" }}>{post.title}</p>}
       <p
         className="status-line"
-        style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0, paddingRight: "50px" }}
+        style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0, paddingRight: "66px" }}
       >
         <span className="data id-chip">#{post.id}</span>
         <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
