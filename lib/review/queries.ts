@@ -11,14 +11,26 @@
  * Also backs the sidebar's footer stat strip and its Run Now progress
  * resume-on-load behavior (getMostRecentFinishedRun, getUndecidedPostCount,
  * getInProgressRun) — read-only, so they live here rather than a new module.
+ *
+ * getPostsForRun also attaches each post's existing post_translations rows
+ * (PHASE-6 TRANSLATION) as `translations` — a plain second select keyed by
+ * postId, matching this file's existing "no ORM relations config" style
+ * rather than a Drizzle `with` query. DraftCard.tsx (built in a later step)
+ * needs this to know which languages already have a translation, what the
+ * text is, and whether it's outdated, in order to render its tab switcher.
+ * Deliberately sourced from the *displayed* (non-pending) row only — a
+ * pendingVersion sibling is an unconfirmed regenerate candidate, not
+ * something a user has translated yet.
  */
 import { and, count, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { pipelineRunsTable, postsTable } from "../db/schema";
+import { pipelineRunsTable, postsTable, postTranslationsTable } from "../db/schema";
 
 export type PostRow = typeof postsTable.$inferSelect;
+export type TranslationRow = typeof postTranslationsTable.$inferSelect;
 export interface PostWithPending extends PostRow {
   pendingVersion?: PostRow;
+  translations: TranslationRow[];
 }
 
 export type RunRow = typeof pipelineRunsTable.$inferSelect;
@@ -128,11 +140,23 @@ export async function getPostsForRun(runId: number): Promise<PostWithPending[]> 
     byCandidate.set(row.candidateId, list);
   }
 
+  const postIds = rows.map((r) => r.id);
+  const translationRows = postIds.length
+    ? await db.select().from(postTranslationsTable).where(inArray(postTranslationsTable.postId, postIds))
+    : [];
+  const translationsByPostId = new Map<number, TranslationRow[]>();
+  for (const t of translationRows) {
+    const list = translationsByPostId.get(t.postId) ?? [];
+    list.push(t);
+    translationsByPostId.set(t.postId, list);
+  }
+
   const result: PostWithPending[] = [];
   for (const group of byCandidate.values()) {
     const original = group.find((r) => !r.pending) ?? group[0];
     const pendingVersion = group.find((r) => r.pending && r.id !== original.id);
-    result.push(pendingVersion ? { ...original, pendingVersion } : original);
+    const translations = translationsByPostId.get(original.id) ?? [];
+    result.push(pendingVersion ? { ...original, pendingVersion, translations } : { ...original, translations });
   }
   return result;
 }

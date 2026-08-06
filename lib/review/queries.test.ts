@@ -1,7 +1,9 @@
 /**
  * Tests for lib/review/queries.ts — the review-page data layer.
- * Covers resolving a pipeline run from a date and pairing posts with
- * their pending (regenerated-but-unconfirmed) sibling by candidateId.
+ * Covers resolving a pipeline run from a date, pairing posts with their
+ * pending (regenerated-but-unconfirmed) sibling by candidateId, and
+ * attaching each post's existing post_translations rows (PHASE-6
+ * TRANSLATION).
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
@@ -15,7 +17,7 @@ import {
 } from "./queries";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable, postsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, postTranslationsTable } from "../db/schema";
 
 const testDbPath = "data/test-review-queries.db";
 
@@ -88,6 +90,53 @@ describe("review queries", () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].pendingVersion).toBeUndefined();
+  });
+
+  it("getPostsForRun attaches a post's existing post_translations rows", async () => {
+    const db = getDb();
+    const [run] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date(), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+    const [candidate] = await db
+      .insert(candidatesTable)
+      .values({ runId: run.id, url: "https://a.test", sourceRecap: "r", chosen: true, createdAt: new Date() })
+      .returning({ id: candidatesTable.id });
+    const [post] = await db
+      .insert(postsTable)
+      .values({ candidateId: candidate.id, runId: run.id, url: "https://a.test", originalText: "only", imagePrompt: "p" })
+      .returning({ id: postsTable.id });
+    await db.insert(postTranslationsTable).values({
+      postId: post.id,
+      language: "es",
+      translatedText: "solo",
+      outdated: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const rows = await getPostsForRun(run.id);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].translations).toHaveLength(1);
+    expect(rows[0].translations[0]).toMatchObject({ language: "es", translatedText: "solo", outdated: true });
+  });
+
+  it("getPostsForRun returns an empty translations array for a post with none", async () => {
+    const db = getDb();
+    const [run] = await db
+      .insert(pipelineRunsTable)
+      .values({ startedAt: new Date(), type: "manual" })
+      .returning({ id: pipelineRunsTable.id });
+    const [candidate] = await db
+      .insert(candidatesTable)
+      .values({ runId: run.id, url: "https://a.test", sourceRecap: "r", chosen: true, createdAt: new Date() })
+      .returning({ id: candidatesTable.id });
+    await db.insert(postsTable).values({ candidateId: candidate.id, runId: run.id, url: "https://a.test", originalText: "only", imagePrompt: "p" });
+
+    const rows = await getPostsForRun(run.id);
+
+    expect(rows[0].translations).toEqual([]);
   });
 
   it("resolveRunIdForDate returns the most recent run on the same date", async () => {

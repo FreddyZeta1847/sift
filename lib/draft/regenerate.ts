@@ -13,11 +13,21 @@
  *
  * `keepVersion` resolves the propose/compare UI once the user has picked a
  * winner: it deletes the loser and clears `pending` on the keeper, leaving
- * exactly one row for that candidate again.
+ * exactly one row for that candidate again. It also cascades the loser's
+ * `post_translations` rows (FK enforcement is OFF in this database, see
+ * lib/admin/delete.ts's header) — the third of the three places a `posts`
+ * row can be hard-deleted, alongside lib/admin/delete.ts's `deletePost()`
+ * and lib/posts/retention.ts's `pruneStalePosts()`. Note this is a delete,
+ * not a staleness flip: `keepVersion` never edits a *surviving* row's text
+ * in place (it either keeps the untouched original, or keeps a
+ * brand-new — never-before-translated — regenerated row), so there is no
+ * surviving row that needs `outdated` set on it here. See
+ * lib/translation/actions.ts's header for the one call site that does need
+ * that flip (`saveEdit` in app/review/actions.ts).
  */
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { pipelineRunsTable, postsTable, candidatesTable } from "../db/schema";
+import { pipelineRunsTable, postsTable, candidatesTable, postTranslationsTable } from "../db/schema";
 import { generateDrafts } from "./generate";
 import { checkAndSetRunning, clearRunning } from "../pipeline/run-guard";
 
@@ -91,6 +101,7 @@ export async function regeneratePost(postId: number): Promise<ActionResult> {
 export async function keepVersion(keptPostId: number, deletedPostId: number): Promise<ActionResult> {
   try {
     const db = getDb();
+    await db.delete(postTranslationsTable).where(eq(postTranslationsTable.postId, deletedPostId));
     await db.delete(postsTable).where(eq(postsTable.id, deletedPostId));
     await db.update(postsTable).set({ pending: false }).where(eq(postsTable.id, keptPostId));
     return { ok: true };

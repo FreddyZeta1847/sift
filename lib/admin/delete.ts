@@ -8,8 +8,14 @@
  * already establishes for age-based pruning, just applied to a direct
  * user-initiated delete instead:
  *
- * - `llm_calls`, `posts` — leaf rows, nothing in this schema references
- *   either one's id, so deletion is always allowed.
+ * - `llm_calls` — a leaf row, nothing in this schema references its id, so
+ *   deletion is always allowed.
+ * - `posts` — deletion is still always allowed (no new blocking check), but
+ *   it is no longer an unconditional leaf: `post_translations.postId`
+ *   references it (PHASE-6 TRANSLATION). Deleting a post cascades in
+ *   application code to its own `post_translations` rows first, the same
+ *   "delete the dependents before the row they depend on" pattern used
+ *   below for `pipeline_runs`'s `llm_calls`/`candidates`.
  * - `candidates` — blocked if any `posts.candidateId` references it.
  * - `pipeline_runs` — blocked if the run has its own posts, OR if a
  *   candidate it produced was later drafted into a post by a *different*
@@ -21,7 +27,7 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable, postTranslationsTable } from "../db/schema";
 
 export interface DeleteResult {
   ok: boolean;
@@ -36,6 +42,7 @@ export async function deleteLlmCall(id: number): Promise<DeleteResult> {
 
 export async function deletePost(id: number): Promise<DeleteResult> {
   const db = getDb();
+  await db.delete(postTranslationsTable).where(eq(postTranslationsTable.postId, id));
   await db.delete(postsTable).where(eq(postsTable.id, id));
   return { ok: true };
 }

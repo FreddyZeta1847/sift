@@ -1,10 +1,17 @@
+/**
+ * Tests for lib/draft/regenerate.ts — the per-post Regenerate action.
+ * Covers regeneratePost's pending-sibling insert and run-guard behavior,
+ * and keepVersion's winner/loser resolution, including that it cascades a
+ * deleted loser's post_translations rows (PHASE-6 TRANSLATION's third
+ * cascade-delete point — see that file's header).
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { regeneratePost, keepVersion } from "./regenerate";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable, postsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, postTranslationsTable } from "../db/schema";
 import * as generateModule from "./generate";
 import * as runGuardModule from "../pipeline/run-guard";
 
@@ -129,5 +136,23 @@ describe("keepVersion", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(originalId);
     expect(rows[0].pending).toBe(false);
+  });
+
+  it("cascades the loser's post_translations rows along with the deleted loser post", async () => {
+    const db = getDb();
+    await db.insert(postTranslationsTable).values({
+      postId: originalId,
+      language: "es",
+      translatedText: "vieja",
+      outdated: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await keepVersion(pendingId, originalId);
+
+    expect(result.ok).toBe(true);
+    const rows = await db.select().from(postTranslationsTable).where(eq(postTranslationsTable.postId, originalId));
+    expect(rows).toHaveLength(0);
   });
 });

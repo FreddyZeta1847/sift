@@ -25,13 +25,24 @@
  *
  * `regeneratePost`/`keepVersion` (Task 6) live in lib/draft/regenerate.ts so
  * the batch pipeline and the per-post Regenerate UI share one implementation
- * (see that file's header). They are wrapped here as local async function
- * declarations rather than re-exported directly (`export { x } from "..."`)
- * because Next's "use server" compiler statically requires every top-level
- * export of a "use server" file to be an async function declaration — a
- * bare re-export trips "Only async functions are allowed to be exported in
- * a 'use server' file" at dev/build time even though the re-exported values
- * are themselves async functions.
+ * (see that file's header). `translatePost`/`saveTranslationEdit` (PHASE-6
+ * TRANSLATION) live in lib/translation/actions.ts for the same reason —
+ * this file is a thin wrapper, not where the logic is implemented. All four
+ * are wrapped here as local async function declarations rather than
+ * re-exported directly (`export { x } from "..."`) because Next's
+ * "use server" compiler statically requires every top-level export of a
+ * "use server" file to be an async function declaration — a bare re-export
+ * trips "Only async functions are allowed to be exported in a 'use server'
+ * file" at dev/build time even though the re-exported values are
+ * themselves async functions.
+ *
+ * `saveEdit` also flips `outdated: true` on every post_translations row for
+ * the post once its editedText write succeeds — this is the only place in
+ * the codebase that mutates a post's live English text in place, so it is
+ * the sole call site for that staleness flip (see
+ * lib/translation/actions.ts's header for why keepVersion() does NOT also
+ * need one). The flip is best-effort: a failure there must not undo the
+ * just-succeeded editedText write or flip saveEdit's own result to failure.
  */
 "use server";
 
@@ -39,6 +50,12 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../lib/db/client";
 import { postsTable } from "../../lib/db/schema";
 import { regeneratePost as regeneratePostImpl, keepVersion as keepVersionImpl } from "../../lib/draft/regenerate";
+import {
+  translatePost as translatePostImpl,
+  saveTranslationEdit as saveTranslationEditImpl,
+  markTranslationsOutdated,
+} from "../../lib/translation/actions";
+import type { Language } from "../../lib/translation/models";
 
 interface ActionResult {
   ok: boolean;
@@ -71,7 +88,18 @@ async function safeUpdate(postId: number, values: Partial<typeof postsTable.$inf
 }
 
 export async function saveEdit(postId: number, text: string): Promise<ActionResult> {
-  return safeUpdate(postId, { editedText: text });
+  const result = await safeUpdate(postId, { editedText: text });
+  if (result.ok) {
+    try {
+      await markTranslationsOutdated(postId);
+    } catch {
+      // Best-effort: the editedText write already succeeded and is what
+      // this function's result reports on. A failure flipping `outdated`
+      // is a secondary side effect and must not be reported as saveEdit
+      // itself having failed.
+    }
+  }
+  return result;
 }
 
 export async function discardPost(postId: number): Promise<ActionResult> {
@@ -98,4 +126,12 @@ export async function regeneratePost(postId: number): Promise<ActionResult> {
 
 export async function keepVersion(keptPostId: number, deletedPostId: number): Promise<ActionResult> {
   return keepVersionImpl(keptPostId, deletedPostId);
+}
+
+export async function translatePost(postId: number, language: Language): Promise<ActionResult> {
+  return translatePostImpl(postId, language);
+}
+
+export async function saveTranslationEdit(postId: number, language: Language, text: string): Promise<ActionResult> {
+  return saveTranslationEditImpl(postId, language, text);
 }

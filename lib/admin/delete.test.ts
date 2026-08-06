@@ -1,10 +1,16 @@
-// lib/admin/delete.test.ts
+/**
+ * Tests for lib/admin/delete.ts — the Admin page's guarded row deletion.
+ * Covers each table's blocking rules and cascade behavior, including that
+ * deletePost cascades post_translations rows (PHASE-6 TRANSLATION's second
+ * cascade-delete point — see that file's header).
+ */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
+import { eq } from "drizzle-orm";
 import { deleteLlmCall, deletePost, deleteCandidate, deleteRun } from "./delete";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, llmCallsTable, postTranslationsTable } from "../db/schema";
 
 const testDbPath = "data/test-admin-delete.db";
 
@@ -52,6 +58,33 @@ describe("admin delete", () => {
 
     expect(result).toEqual({ ok: true });
     expect(await db.select().from(postsTable)).toHaveLength(0);
+  });
+
+  it("deletePost cascades its post_translations rows", async () => {
+    const db = getDb();
+    const [run] = await db.insert(pipelineRunsTable).values({ startedAt: new Date(), type: "manual" }).returning({ id: pipelineRunsTable.id });
+    const [candidate] = await db
+      .insert(candidatesTable)
+      .values({ runId: run.id, url: "https://a.test", sourceRecap: "r", chosen: true, createdAt: new Date() })
+      .returning({ id: candidatesTable.id });
+    const [post] = await db
+      .insert(postsTable)
+      .values({ candidateId: candidate.id, runId: run.id, url: "https://a.test", originalText: "x", imagePrompt: "p" })
+      .returning({ id: postsTable.id });
+    await db.insert(postTranslationsTable).values({
+      postId: post.id,
+      language: "es",
+      translatedText: "y",
+      outdated: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await deletePost(post.id);
+
+    expect(result).toEqual({ ok: true });
+    expect(await db.select().from(postsTable)).toHaveLength(0);
+    expect(await db.select().from(postTranslationsTable).where(eq(postTranslationsTable.postId, post.id))).toHaveLength(0);
   });
 
   it("deleteCandidate succeeds when no post references it", async () => {

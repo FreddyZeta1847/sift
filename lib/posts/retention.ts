@@ -17,10 +17,17 @@
  * pruning has no relationship to the current run's own outcome, so there's
  * no reason to skip it just because that run's ingestion/curation/drafting
  * failed.
+ *
+ * Also cascades post_translations rows for every post it deletes. FK
+ * enforcement is OFF in this database (see lib/admin/delete.ts's header),
+ * so nothing does this automatically — deleting the translations first,
+ * ahead of the posts they reference, is application-level integrity, same
+ * pattern lib/admin/delete.ts and lib/draft/regenerate.ts's keepVersion()
+ * use at their own posts-deletion points.
  */
 import { eq, inArray, lt } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { postsTable, pipelineRunsTable } from "../db/schema";
+import { postsTable, pipelineRunsTable, postTranslationsTable } from "../db/schema";
 import { getSettings } from "../config/settings";
 
 export async function pruneStalePosts(): Promise<{ deleted: number }> {
@@ -42,14 +49,13 @@ export async function pruneStalePosts(): Promise<{ deleted: number }> {
     return { deleted: 0 };
   }
 
+  const staleIds = stale.map((s) => s.id);
+
+  await db.delete(postTranslationsTable).where(inArray(postTranslationsTable.postId, staleIds));
+
   const deleted = await db
     .delete(postsTable)
-    .where(
-      inArray(
-        postsTable.id,
-        stale.map((s) => s.id)
-      )
-    )
+    .where(inArray(postsTable.id, staleIds))
     .returning({ id: postsTable.id });
 
   return { deleted: deleted.length };

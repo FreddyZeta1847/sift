@@ -301,6 +301,38 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 
 .empty-state { color: var(--muted); }
 
+/* DraftCard.tsx's language tab switcher (PHASE-6 TRANSLATION) — English
+   plus one pill per language, one text shown at a time (never side by
+   side; that visual language is reserved for the pending-version compare
+   below it). Compact pills sized to sit inside a card, unlike
+   `.admin-tabs`'s larger routed nav pills which this deliberately does not
+   reuse (that bar is a router styled as tabs; this is an in-card view
+   switcher over local state — see CONFIG-UI--admin-page.md vs.
+   TRANSLATION--on-demand-translation.md). An untranslated tab's label is
+   "Translate to {Language}" rather than a blank pane — see DraftCard.tsx's
+   header for the click-to-translate flow this implies. */
+.lang-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm);
+}
+.lang-tab {
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--chip-bg);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+.lang-tab:hover:not(:disabled) { background: var(--border); }
+.lang-tab:disabled { cursor: default; opacity: 0.6; }
+.lang-tab--active { background: var(--ink); color: var(--primary-text); }
+
 /* Draft text — the card's "one lit thing" (DESIGN.md). Auto-grows in
    DraftCard.tsx (height set from scrollHeight) so a typical post reads in
    full without an inner scrollbar. */

@@ -16,3 +16,5 @@
 - 2026-08-06 — TRANSLATION: implementation issue logged and fixed (build-tooling/module-resolution)
 - 2026-08-06 — DEV-ENVIRONMENT: tooling issue logged and fixed (build/dev cache collision)
 - 2026-08-06 — TRANSLATION: vault corrected and recap rebuilt to match the language-list revision
+- 2026-08-06 — PHASE-6-TRANSLATION--review-ui-integration: step 2 implemented (review actions, cascade-delete integrity, UI wiring), tests verified
+- 2026-08-06 — TRANSLATION/REVIEW-WORKSPACE/STORAGE-HISTORY: a cross-feature mechanism claim found wrong during implementation, corrected across vault + recap

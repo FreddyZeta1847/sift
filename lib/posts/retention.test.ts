@@ -1,10 +1,17 @@
-// lib/posts/retention.test.ts
+/**
+ * Tests for lib/posts/retention.ts's pruneStalePosts(). Covers the
+ * retention-window on/off toggle, age-based pruning uniform across
+ * posted/unposted posts, and that it cascades post_translations rows for
+ * every post it deletes (PHASE-6 TRANSLATION's first cascade-delete
+ * point — see that file's header).
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
+import { eq } from "drizzle-orm";
 import { pruneStalePosts } from "./retention";
 import { getDb, closeDb } from "../db/client";
 import { runMigrations } from "../db/migrate";
-import { pipelineRunsTable, candidatesTable, postsTable } from "../db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, postTranslationsTable } from "../db/schema";
 import * as settingsModule from "../config/settings";
 
 const testDbPath = "data/test-posts-retention.db";
@@ -90,5 +97,24 @@ describe("pruneStalePosts", () => {
     expect(result).toEqual({ deleted: 1 });
     const db = getDb();
     expect(await db.select().from(postsTable)).toHaveLength(0);
+  });
+
+  it("cascades post_translations rows for every post it prunes", async () => {
+    vi.spyOn(settingsModule, "getSettings").mockResolvedValue(settingsWithRetention(7));
+    const { postId: oldId } = await makeRunAndPost(new Date(Date.now() - 10 * DAY_MS));
+    const db = getDb();
+    await db.insert(postTranslationsTable).values({
+      postId: oldId,
+      language: "es",
+      translatedText: "vieja",
+      outdated: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await pruneStalePosts();
+
+    expect(result).toEqual({ deleted: 1 });
+    expect(await db.select().from(postTranslationsTable).where(eq(postTranslationsTable.postId, oldId))).toHaveLength(0);
   });
 });

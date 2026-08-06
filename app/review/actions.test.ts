@@ -1,10 +1,19 @@
+/**
+ * Tests for app/review/actions.ts — the Review Workspace's "use server"
+ * wrapper. Covers saveEdit/discardPost/markPosted's own contracts, the
+ * saveEdit-triggers-outdated-flip behavior added for PHASE-6 TRANSLATION,
+ * and that regeneratePost/keepVersion/translatePost/saveTranslationEdit are
+ * all present as real wrapped exports (not bare re-exports, which Next's
+ * "use server" compiler rejects — see actions.ts's header).
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { saveEdit, discardPost, markPosted } from "./actions";
+import { saveEdit, discardPost, markPosted, translatePost, saveTranslationEdit } from "./actions";
 import { getDb, closeDb } from "../../lib/db/client";
 import { runMigrations } from "../../lib/db/migrate";
-import { pipelineRunsTable, candidatesTable, postsTable } from "../../lib/db/schema";
+import { pipelineRunsTable, candidatesTable, postsTable, postTranslationsTable } from "../../lib/db/schema";
+import * as translateModule from "../../lib/translation/translate";
 
 const testDbPath = "data/test-review-actions.db";
 
@@ -99,7 +108,11 @@ describe("review actions", () => {
     try {
       const result = await saveEdit(postId, "retried edit");
       expect(result.ok).toBe(true);
-      expect(calls).toBe(2);
+      // 2 calls for the editedText write itself (1 failure + 1 successful
+      // retry), plus 1 more for the markTranslationsOutdated flip that
+      // saveEdit fires once that write succeeds (see saveEdit's header) —
+      // that third call also goes through this same spied db.update.
+      expect(calls).toBe(3);
 
       const [row] = await db.select().from(postsTable).where(eq(postsTable.id, postId));
       expect(row.editedText).toBe("retried edit");
@@ -127,5 +140,57 @@ describe("review actions", () => {
     const mod = await import("./actions");
     expect(typeof mod.regeneratePost).toBe("function");
     expect(typeof mod.keepVersion).toBe("function");
+  });
+
+  it("saveEdit flips outdated=true on every existing post_translations row for the post", async () => {
+    const db = getDb();
+    await db.insert(postTranslationsTable).values([
+      { postId, language: "es", translatedText: "hola", outdated: false, createdAt: new Date(), updatedAt: new Date() },
+      { postId, language: "fr", translatedText: "bonjour", outdated: false, createdAt: new Date(), updatedAt: new Date() },
+    ]);
+
+    const result = await saveEdit(postId, "edited version");
+
+    expect(result.ok).toBe(true);
+    const rows = await db.select().from(postTranslationsTable).where(eq(postTranslationsTable.postId, postId));
+    expect(rows.every((r) => r.outdated)).toBe(true);
+  });
+
+  it("saveEdit is a no-op on post_translations when the post has no translations yet", async () => {
+    const result = await saveEdit(postId, "edited version");
+
+    expect(result.ok).toBe(true);
+    const db = getDb();
+    expect(await db.select().from(postTranslationsTable)).toHaveLength(0);
+  });
+
+  it("translatePost is wrapped and upserts a translation via lib/translation/actions.ts", async () => {
+    const translateSpy = vi.spyOn(translateModule, "translate").mockResolvedValue("hola");
+
+    const result = await translatePost(postId, "es");
+
+    expect(result.ok).toBe(true);
+    const db = getDb();
+    const [row] = await db.select().from(postTranslationsTable).where(eq(postTranslationsTable.postId, postId));
+    expect(row.translatedText).toBe("hola");
+    translateSpy.mockRestore();
+  });
+
+  it("saveTranslationEdit is wrapped and updates an existing translation row", async () => {
+    const db = getDb();
+    await db.insert(postTranslationsTable).values({
+      postId,
+      language: "es",
+      translatedText: "hola",
+      outdated: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await saveTranslationEdit(postId, "es", "hola editado");
+
+    expect(result.ok).toBe(true);
+    const [row] = await db.select().from(postTranslationsTable).where(eq(postTranslationsTable.postId, postId));
+    expect(row.translatedText).toBe("hola editado");
   });
 });
