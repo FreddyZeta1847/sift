@@ -39,8 +39,10 @@ describe("worker.ts handleRequest", () => {
 
     expect(response).toEqual({ id: 1, ok: true, text: "Hola mundo" });
     expect(pipelineMock).toHaveBeenCalledWith("translation", "Xenova/opus-mt-en-es");
-    // Single-line input still goes through the batched call — as a
-    // one-element array — rather than a bare string.
+    // Each line is sent as its own one-element-array call — never
+    // batched together with any other line — so a batch never contains
+    // sequences of different lengths. See worker.ts's translateLines()
+    // comment for why that matters.
     expect(translator).toHaveBeenCalledWith(["Hello world"]);
   });
 
@@ -85,10 +87,11 @@ describe("worker.ts handleRequest", () => {
     expect(translator).toHaveBeenCalledTimes(2);
   });
 
-  it("translates each paragraph of a multi-paragraph post and preserves the blank-line separators", async () => {
-    // Mirrors a real LinkedIn post: two paragraphs, a bullet point, and a
-    // trailing hashtag line, separated by blank lines.
-    const input = ["Paragraph one.", "", "Paragraph two.", "- Bullet point", "", "#hashtag"].join("\n");
+  it("translates each paragraph of a multi-paragraph post individually and preserves the blank-line separators", async () => {
+    // Mirrors a real LinkedIn post: two paragraphs and a bullet point,
+    // separated by blank lines. (The trailing hashtag-only line case is
+    // covered separately below, since it must NOT reach the translator.)
+    const input = ["Paragraph one.", "", "Paragraph two.", "- Bullet point"].join("\n");
     const translator = vi.fn().mockImplementation((lines: string[]) =>
       Promise.resolve(lines.map((line) => ({ translation_text: `[ES] ${line}` }))),
     );
@@ -97,14 +100,75 @@ describe("worker.ts handleRequest", () => {
 
     const response = await handleRequest({ id: 7, text: input, language: "es" });
 
-    // Only the non-blank lines are sent to the model, batched in one call.
-    expect(translator).toHaveBeenCalledTimes(1);
-    expect(translator).toHaveBeenCalledWith(["Paragraph one.", "Paragraph two.", "- Bullet point", "#hashtag"]);
+    // Only the non-blank lines are sent to the model, one call per line —
+    // never batched together, since a mixed-length batch is exactly what
+    // triggers the padding-artifact bug (see worker.ts).
+    expect(translator).toHaveBeenCalledTimes(3);
+    expect(translator).toHaveBeenNthCalledWith(1, ["Paragraph one."]);
+    expect(translator).toHaveBeenNthCalledWith(2, ["Paragraph two."]);
+    expect(translator).toHaveBeenNthCalledWith(3, ["- Bullet point"]);
     expect(response).toEqual({
       id: 7,
       ok: true,
-      text: ["[ES] Paragraph one.", "", "[ES] Paragraph two.", "[ES] - Bullet point", "", "[ES] #hashtag"].join("\n"),
+      text: ["[ES] Paragraph one.", "", "[ES] Paragraph two.", "[ES] - Bullet point"].join("\n"),
     });
+  });
+
+  it("passes a hashtag-only line through untranslated without ever calling the translator for it", async () => {
+    const input = ["Great news today.", "", "#AIAgents #MachineLearning #PromptEngineering #LLM"].join("\n");
+    const translator = vi.fn().mockImplementation((lines: string[]) =>
+      Promise.resolve(lines.map((line) => ({ translation_text: `[ES] ${line}` }))),
+    );
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 10, text: input, language: "es" });
+
+    // Only the prose line reaches the translator; the hashtag-only line
+    // is never passed to it.
+    expect(translator).toHaveBeenCalledTimes(1);
+    expect(translator).toHaveBeenCalledWith(["Great news today."]);
+    expect(response).toEqual({
+      id: 10,
+      ok: true,
+      text: ["[ES] Great news today.", "", "#AIAgents #MachineLearning #PromptEngineering #LLM"].join("\n"),
+    });
+  });
+
+  it("still translates a line that only mentions a hashtag partway through normal text", async () => {
+    const input = "Check out #AI trends this year";
+    const translator = vi.fn().mockResolvedValue([{ translation_text: "[ES] Check out #AI trends this year" }]);
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 11, text: input, language: "es" });
+
+    expect(translator).toHaveBeenCalledTimes(1);
+    expect(translator).toHaveBeenCalledWith([input]);
+    expect(response).toEqual({ id: 11, ok: true, text: "[ES] Check out #AI trends this year" });
+  });
+
+  it("strips a long trailing run of repeated periods left over from the padding-token artifact", async () => {
+    const garbageSuffix = ".".repeat(80);
+    const translator = vi
+      .fn()
+      .mockResolvedValue([{ translation_text: `Hola mundo${garbageSuffix}` }]);
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 12, text: "Hello world", language: "es" });
+
+    expect(response).toEqual({ id: 12, ok: true, text: "Hola mundo" });
+  });
+
+  it("does not mangle legitimate short punctuation like an ellipsis or emphasis marks", async () => {
+    const translator = vi.fn().mockResolvedValue([{ translation_text: "Espera..." }]);
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 13, text: "Wait...", language: "es" });
+
+    expect(response).toEqual({ id: 13, ok: true, text: "Espera..." });
   });
 
   it("preserves consecutive blank lines and leading/trailing blank lines exactly", async () => {

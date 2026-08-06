@@ -58,35 +58,91 @@ function loadPipeline(language: Language): ReturnType<typeof pipeline<"translati
 // blank lines (including runs of them, and leading/trailing ones) are
 // passed through untouched rather than sent to the model.
 //
-// The non-blank lines are batched into a single translator() call —
-// @huggingface/transformers's translation pipeline accepts an array of
-// strings and returns one result per input in order — instead of one
-// call per line, so an N-line post costs one model invocation, not N.
+// Each non-blank line is sent to translator() individually, in its own
+// call — NOT batched together into one translator() call with all of a
+// post's lines. This used to be batched for efficiency (one model
+// invocation per post instead of one per line), but that batching was
+// itself the cause of a real, user-reported bug: when a batch mixes
+// sequences of very different lengths (a short bullet next to a long
+// paragraph), transformers.js's generate() loop doesn't stop early for
+// the sequences that already hit their own EOS token — it keeps
+// running extra steps until the LONGEST sequence in the batch is done,
+// and the already-finished sequences get padding-token output appended
+// for those extra steps. For this Marian model's vocabulary, that
+// padding decodes as repeated "." characters, so real output showed
+// every translated line followed by 50-150+ trailing periods; an
+// unusually short line (a hashtag-only line) forced through many extra
+// steps came back completely garbled instead. This is a documented
+// transformers behavior, not a bug in this file's original logic — see
+// https://github.com/huggingface/transformers/issues/31261. A batch of
+// size 1 has no other sequence to pad against, so calling translator()
+// once per line removes the mechanism entirely.
 async function translateLines(
   translator: Awaited<ReturnType<typeof loadPipeline>>,
   text: string,
 ): Promise<string> {
   const lines = text.split("\n");
-  const nonBlankIndices: number[] = [];
-  const nonBlankLines: string[] = [];
-  lines.forEach((line, index) => {
-    if (line.trim() !== "") {
-      nonBlankIndices.push(index);
-      nonBlankLines.push(line);
-    }
-  });
+  const hasNonBlankLine = lines.some((line) => line.trim() !== "");
 
   // Empty string, or a post made entirely of blank lines: nothing to
   // send to the model at all.
-  if (nonBlankLines.length === 0) return text;
+  if (!hasNonBlankLine) return text;
 
-  const results = await translator(nonBlankLines);
-  const translatedByIndex = new Map<number, string>();
-  nonBlankIndices.forEach((lineIndex, i) => {
-    translatedByIndex.set(lineIndex, results[i].translation_text);
-  });
+  const translatedLines: string[] = [];
+  for (const line of lines) {
+    if (line.trim() === "") {
+      translatedLines.push(line);
+      continue;
+    }
 
-  return lines.map((line, index) => translatedByIndex.get(index) ?? line).join("\n");
+    // Hashtags must stay in English: LinkedIn's hashtag search/discovery
+    // is per literal tag, so "#MachineLearning" translated into another
+    // language no longer matches the English hashtag community readers
+    // search for — translating it doesn't help and, per the same batch
+    // bug above, this model also garbled hashtag-only lines badly (they
+    // are usually the shortest line in a post, so historically the most
+    // exposed to the padding artifact). Only a line made ENTIRELY of
+    // "#word" tokens is skipped untranslated; a line that merely mentions
+    // a hashtag partway through normal text is still translated below.
+    if (isHashtagOnlyLine(line)) {
+      translatedLines.push(line);
+      continue;
+    }
+
+    const [result] = await translator([line]);
+    translatedLines.push(stripTrailingPaddingArtifact(result.translation_text));
+  }
+
+  return translatedLines.join("\n");
+}
+
+// True only when EVERY whitespace-separated token on the line is a
+// "#word" hashtag — e.g. "#AIAgents #MachineLearning #LLM". A line that
+// contains normal prose with a hashtag partway through (e.g. "Check out
+// #AI trends this year") must still return false so it goes through
+// translateLines()'s normal per-line translation path above.
+function isHashtagOnlyLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed === "") return false;
+  return trimmed.split(/\s+/).every((token) => /^#\w+$/.test(token));
+}
+
+// Defensive second layer against the padding-token artifact described
+// above (see translateLines()'s comment) — translating one line at a
+// time removes the shared-batch-length mechanism that causes it, but
+// this strip stays as a safety net in case a single-line call still
+// surfaces padding output for some input. Requires 8+ consecutive
+// repeats of the SAME non-word, non-space character right at the end of
+// the string (optionally followed by trailing whitespace) — high enough
+// that it never touches legitimate short punctuation runs like an
+// actual "..." ellipsis or emphasis like "!!", but well below the
+// 50-150+ character runs seen in the real bug report. Not hardcoded to
+// "." specifically since a different model's padding token could decode
+// as a different repeated character.
+const TRAILING_PADDING_RUN = /([^\w\s])\1{7,}\s*$/;
+
+function stripTrailingPaddingArtifact(text: string): string {
+  return text.replace(TRAILING_PADDING_RUN, "").trimEnd();
 }
 
 // Exported for worker.test.ts only — never imported by translate.ts or
