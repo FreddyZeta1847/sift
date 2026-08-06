@@ -8,6 +8,7 @@
   <img src="https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js&logoColor=white" />
   <img src="https://img.shields.io/badge/typescript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
   <img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" />
+  <img src="https://img.shields.io/badge/Hugging_Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" />
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" />
 </p>
@@ -19,7 +20,7 @@ sift watches a set of RSS feeds you configure (arXiv, Hacker News, cybersecurity
 1. **Ingestion** — pulls new items from your configured RSS sources.
 2. **Curation** — an LLM ranks and filters them down to the top 3 most interesting.
 3. **Draft generation** — an LLM writes 3 LinkedIn post drafts, in a voice profile you define, plus a matching image-generation prompt for each.
-4. **Review** — you open sift's web UI, read the run's drafts, inline-edit or discard them, and mark one as posted once you've copied it to LinkedIn yourself.
+4. **Review** — you open sift's web UI, read the run's drafts, inline-edit or discard them, and mark one as posted once you've copied it to LinkedIn yourself. From the review card, you can also translate a draft into Spanish, French, German, or Italian with one click — a small flag-icon dropdown switches between the original and any translation, both stay editable, and both can be copied and posted the same way. Translation runs entirely on your own server with a small local ML model, not through your configured LLM provider, so it costs nothing and needs no extra setup.
 
 The whole run is triggered by an in-process scheduler on the day/time you configure, with a 24-hour missed-run catch-up check on server startup (so a slot missed to downtime still fires once you're back up), plus a manual "Run Now" button for whenever you don't want to wait.
 
@@ -51,7 +52,7 @@ volumes:
   - ./config:/app/config
 ```
 
-They're kept separate deliberately — `data/` is generated history (the database, run logs, cost logs), `config/` is user-authored configuration (sources, schedule, voice profile, provider settings). You can back up or reset one without touching the other.
+They're kept separate deliberately — `data/` is generated history (the database, run logs, cost logs, plus translation models downloaded on first use), `config/` is user-authored configuration (sources, schedule, voice profile, provider settings). You can back up or reset one without touching the other.
 
 To upgrade: `git pull && docker compose up -d --build` (until a registry image exists; once it does, this becomes `docker compose pull && docker compose up -d`). Either way it's safe — your history and settings live outside the container.
 
