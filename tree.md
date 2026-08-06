@@ -1,4 +1,5 @@
 .
+├── .docker-smoketest-data;C/
 ├── .impeccable/
 │   ├── config.json
 │   ├── design.json
@@ -169,6 +170,8 @@
 │   │   ├── trigger.test.ts
 │   │   └── trigger.ts
 │   └── translation/
+│       ├── actions.test.ts
+│       ├── actions.ts
 │       ├── models.test.ts
 │       ├── models.ts
 │       ├── protocol.ts
