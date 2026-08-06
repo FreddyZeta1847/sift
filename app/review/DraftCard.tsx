@@ -44,13 +44,15 @@
  * `.pending-compare`'s top border and stacked clearly under the current
  * draft so "keep new" vs. "keep original" reads unambiguously.
  *
- * `index` (the post's 1-based position within the run, passed by
- * review/page.tsx) renders as a numbered circle absolutely positioned in
- * the card's top-right corner, above the id-chip/title rows (see
- * `.draft-index-badge` in globals.css — a light tint of the accent color,
- * not the sidebar's dark active-pill fill). Both the title and status-line
- * rows reserve right-side padding so their text never runs under it.
- * `.draft-card` is `position: relative` so the badge anchors to this card.
+ * The card's top-right corner used to hold a numbered circle showing the
+ * post's 1-based position in the run (`index`, passed by review/page.tsx).
+ * That badge is gone — per follow-up user feedback the corner now holds the
+ * language dropdown's trigger instead (see the PHASE-6 TRANSLATION block
+ * below), so `index` was dropped from this component's props entirely (and
+ * from the `<DraftCard>` call in review/page.tsx) rather than left unused.
+ * Both the title and status-line rows still reserve right-side padding so
+ * their text never runs under whatever occupies that corner; `.draft-card`
+ * stays `position: relative` so the corner element anchors to this card.
  *
  * The draft textarea auto-grows to its content's `scrollHeight` (see the
  * `resizeTextarea` effect below) instead of sitting at a fixed height with
@@ -62,16 +64,59 @@
  * prompt for the post's AI-generated photo. None of this touches the
  * handlers, state, props, or the conditions that gate them below.
  *
- * PHASE-6 TRANSLATION — language tab switcher (per
+ * PHASE-6 TRANSLATION — language dropdown (per
  * TRANSLATION--on-demand-translation.md and this phase's
- * review-ui-integration substep):
+ * review-ui-integration substep; re-skinned from an earlier always-visible
+ * tab row into a compact dropdown per follow-up user feedback — only the
+ * chrome changed, the state/action logic below is untouched):
  *
  * - `activeTab` is `"en"` or a `Language` (`es`/`fr`/`de`/`it` — Portuguese
  *   was dropped, see lib/translation/models.ts's UNAVAILABLE_LANGUAGES, so
- *   there is deliberately no `pt` tab here). Exactly one tab's text is ever
- *   shown at a time — this is a switcher, not a side-by-side compare (that
- *   visual language is reserved for the pending-version regenerate compare
- *   below, which is a different feature).
+ *   there is deliberately no `pt` option here). Exactly one language's text
+ *   is ever shown at a time — this is a switcher, not a side-by-side
+ *   compare (that visual language is reserved for the pending-version
+ *   regenerate compare below, which is a different feature).
+ *
+ * - Flags are hand-drawn inline SVG (`FlagIcon` below), not emoji. Emoji
+ *   flags (🇬🇧🇪🇸🇫🇷🇩🇪🇮🇹) were the original choice, but on Windows they
+ *   don't render as flags at all — Windows' bundled emoji font has no
+ *   regional-indicator flag glyphs, so a flag emoji falls back to its
+ *   two-letter ISO code rendered as plain text ("GB", "IT"...). That's a
+ *   platform/font limitation with no CSS-level fix, and this app is meant
+ *   to run fully offline/self-hosted, so pulling in an icon library or
+ *   loading flag images from a CDN was never on the table either. Each flag
+ *   is instead a few `<rect>`/`<path>` shapes on a `viewBox="0 0 24 24"`,
+ *   sized via a `size` prop so the same markup works both in the ~20-24px
+ *   circular trigger badge and the panel's larger option rows.
+ *
+ * - The switcher itself is a `.lang-dropdown`: a trigger `<button>` showing
+ *   only the active language's flag (the caret from the original pill
+ *   trigger is still in the DOM for a11y/structure but visually hidden at
+ *   this size — see `.lang-dropdown-trigger--badge` in globals.css), and a
+ *   `.lang-dropdown-panel` that opens on click, listing all five languages
+ *   as flag + name. `isLangMenuOpen` (plain `useState`, same pattern as
+ *   every other piece of local state here) tracks whether the panel is
+ *   open; the trigger reflects it via `aria-expanded`. The panel closes on:
+ *   picking any option, pressing Escape, or a mousedown outside
+ *   `.lang-dropdown` (see the `isLangMenuOpen` effect below — its
+ *   document-level listeners are only attached while the panel is actually
+ *   open, so a page full of draft cards isn't paying for global listeners
+ *   on every closed dropdown). Panel options are plain `<button>` elements
+ *   — native tab order and Enter/Space activation are enough for this
+ *   internal tool's v1, so there's no roving-tabindex/full ARIA-menu
+ *   implementation here.
+ *
+ * - The trigger itself sits in the card's top-right corner as a circular
+ *   badge (`.lang-dropdown--corner` + `.lang-dropdown-trigger--badge` in
+ *   globals.css) — same visual family as the numbered index badge this
+ *   replaced (circular, similarly sized at 42px), just nudged further
+ *   right and further down (`top: 30px; right: 4px` vs. the old badge's
+ *   `top: 14px; right: 20px`) since a flag glyph reads better a little
+ *   further into the corner than a two-digit number did. Its footprint
+ *   from the card's right edge (`right` + width = 46px) is actually
+ *   slightly smaller than the old badge's (62px), so the title/status-line
+ *   rows' existing `paddingRight: 50px` reservation still clears it without
+ *   needing to change.
  *
  * - The single flat `text` state this component used to have is now split
  *   two ways: `englishText` (was `text`, same role) and `translationTexts`
@@ -91,16 +136,19 @@
  *   the DOM node, since a `defaultValue` prop change is a no-op once a
  *   textarea is mounted.
  *
- * - A language tab with no translation yet renders its tab label as
- *   "Translate to {Language}" instead of a blank pane — clicking it both
- *   switches `activeTab` to that language (optimistic — the user is taken
- *   straight to the result) and fires `translatePost` inside the same
- *   `useTransition` + `router.refresh()` pattern Regenerate already uses.
- *   `pendingLanguage` tracks which language is in flight so only that tab
- *   (not every untranslated tab) shows the loading label, and every
- *   untranslated tab is disabled while any translate is in flight, to rule
- *   out firing a second overlapping request for the same or another
- *   language from the same card.
+ * - A dropdown option for a language with no translation yet still reads as
+ *   its plain flag + name (same as a translated option) but carries a
+ *   small "Translate" tag on the right, so picking it clearly starts a
+ *   translation rather than switching to an empty view — same behavior as
+ *   the old "Translate to {Language}" tab label, just re-skinned. Selecting
+ *   it closes the panel, switches `activeTab` to that language (optimistic
+ *   — the user is taken straight to the result) and fires `translatePost`
+ *   inside the same `useTransition` + `router.refresh()` pattern Regenerate
+ *   already uses. `pendingLanguage` tracks which language is in flight so
+ *   only that option's tag flips to "Translating…" (not every untranslated
+ *   option), and every untranslated option is disabled while any translate
+ *   is in flight, to rule out firing a second overlapping request for the
+ *   same or another language from the same card.
  *
  * - The loading label is a single honest string —
  *   "Translating (first use may take longer — downloading model)…" —
@@ -183,7 +231,72 @@ const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
 const TRANSLATING_LABEL =
   "Translating (first use may take longer — downloading model)…";
 
-export function DraftCard({ post, index }: { post: PostWithPending; index: number }) {
+// Hand-drawn inline SVG flags, one per `TabKey` — see this file's header
+// for why these are shapes instead of flag emoji. Each flag is built the
+// same way: an opaque base `<rect>` covering the full 24x24 viewBox, then
+// one or two narrower `<rect>`s drawn on top so the bands/stripes stack up
+// in the right order and proportions (e.g. Spain's middle yellow band is
+// drawn 12/24 tall — half the flag — to read as "thicker" than the two red
+// bands it splits). `size` defaults to a value that reads fine inside a
+// panel option row; the corner trigger badge passes a smaller size.
+function FlagIcon({ language, size = 20 }: { language: TabKey; size?: number }) {
+  const common = { width: size, height: size, viewBox: "0 0 24 24", "aria-hidden": true } as const;
+  switch (language) {
+    case "es":
+      // Spain: red / yellow (thicker middle) / red, stacked horizontally.
+      return (
+        <svg {...common}>
+          <rect width="24" height="24" fill="#AA151B" />
+          <rect y="6" width="24" height="12" fill="#F1BF00" />
+        </svg>
+      );
+    case "fr":
+      // France: blue / white / red, stacked vertically left to right.
+      return (
+        <svg {...common}>
+          <rect width="24" height="24" fill="#ED2939" />
+          <rect width="16" height="24" fill="#FFFFFF" />
+          <rect width="8" height="24" fill="#002395" />
+        </svg>
+      );
+    case "de":
+      // Germany: black / red / gold, stacked horizontally top to bottom.
+      return (
+        <svg {...common}>
+          <rect width="24" height="24" fill="#FFCE00" />
+          <rect width="24" height="16" fill="#DD0000" />
+          <rect width="24" height="8" fill="#000000" />
+        </svg>
+      );
+    case "it":
+      // Italy: green / white / red, stacked vertically left to right.
+      return (
+        <svg {...common}>
+          <rect width="24" height="24" fill="#CE2B37" />
+          <rect width="16" height="24" fill="#FFFFFF" />
+          <rect width="8" height="24" fill="#009246" />
+        </svg>
+      );
+    case "en":
+    default:
+      // UK/English: a simplified Union Jack — navy field, a white diagonal
+      // cross, a red diagonal cross, a white cross, a red cross, each pair
+      // drawn thick-then-thin so the thinner color reads as sitting on top
+      // of the thicker one. Not pixel-accurate (the real flag's diagonals
+      // are off-center and unevenly clipped), but recognizable at ~20px.
+      return (
+        <svg {...common}>
+          <rect width="24" height="24" fill="#00247D" />
+          <path d="M0 0 L24 24 M24 0 L0 24" stroke="#FFFFFF" strokeWidth="4.5" />
+          <path d="M0 0 L24 24 M24 0 L0 24" stroke="#CF142B" strokeWidth="2.2" />
+          <path d="M12 0 V24 M0 12 H24" stroke="#FFFFFF" strokeWidth="7.5" />
+          <path d="M12 0 V24 M0 12 H24" stroke="#CF142B" strokeWidth="4.5" />
+        </svg>
+      );
+  }
+}
+
+export function DraftCard({ post }: { post: PostWithPending }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("en");
   const [englishText, setEnglishText] = useState(post.editedText ?? post.originalText);
@@ -196,7 +309,9 @@ export function DraftCard({ post, index }: { post: PostWithPending; index: numbe
   const [isRegenerating, startTransition] = useTransition();
   const [isTranslating, startTranslateTransition] = useTransition();
   const [pendingLanguage, setPendingLanguage] = useState<SupportedLanguage | null>(null);
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const langMenuRef = useRef<HTMLDivElement>(null);
 
   const activeText = activeTab === "en" ? englishText : translationTexts[activeTab] ?? "";
   const activeTranslation = activeTab !== "en" ? post.translations.find((t) => t.language === activeTab) : undefined;
@@ -250,6 +365,28 @@ export function DraftCard({ post, index }: { post: PostWithPending; index: numbe
       return changed ? next : prev;
     });
   }, [post.translations]);
+
+  // Standard dropdown dismissal for `.lang-dropdown`: closes the panel on
+  // Escape or on a mousedown outside it. Listeners are only attached while
+  // `isLangMenuOpen` is true, so a page of many draft cards isn't carrying
+  // global document listeners for every card's closed dropdown at once.
+  useEffect(() => {
+    if (!isLangMenuOpen) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (langMenuRef.current && !langMenuRef.current.contains(e.target as Node)) {
+        setIsLangMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsLangMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isLangMenuOpen]);
 
   const handleTextChange = (value: string) => {
     if (activeTab === "en") {
@@ -349,9 +486,74 @@ export function DraftCard({ post, index }: { post: PostWithPending; index: numbe
 
   return (
     <article className={muted ? "card draft-card muted" : "card draft-card"}>
-      <span className="draft-index-badge" aria-hidden="true">
-        {index}
-      </span>
+      <div className="lang-dropdown lang-dropdown--corner" ref={langMenuRef}>
+        <button
+          type="button"
+          className="lang-dropdown-trigger lang-dropdown-trigger--badge"
+          aria-expanded={isLangMenuOpen}
+          aria-label={`Language: ${activeTab === "en" ? "English" : LANGUAGE_LABELS[activeTab]}. Click to change language.`}
+          onClick={() => setIsLangMenuOpen((open) => !open)}
+        >
+          <FlagIcon language={activeTab} size={22} />
+          <svg
+            className="lang-dropdown-caret"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        {isLangMenuOpen && (
+          <div className="lang-dropdown-panel">
+            <button
+              type="button"
+              className={activeTab === "en" ? "lang-dropdown-option lang-dropdown-option--active" : "lang-dropdown-option"}
+              onClick={() => {
+                setIsLangMenuOpen(false);
+                setActiveTab("en");
+              }}
+            >
+              <FlagIcon language="en" />
+              English
+            </button>
+            {LANGUAGES.map((lang) => {
+              const hasTranslation = lang in translationTexts;
+              const isPendingThisLang = isTranslating && pendingLanguage === lang;
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  className={activeTab === lang ? "lang-dropdown-option lang-dropdown-option--active" : "lang-dropdown-option"}
+                  onClick={() => {
+                    setIsLangMenuOpen(false);
+                    if (hasTranslation) {
+                      setActiveTab(lang);
+                    } else {
+                      handleTranslate(lang);
+                    }
+                  }}
+                  disabled={!hasTranslation && isTranslating}
+                >
+                  <FlagIcon language={lang} />
+                  {LANGUAGE_LABELS[lang]}
+                  {!hasTranslation && (
+                    <span className="lang-dropdown-translate-tag">
+                      {isPendingThisLang ? "Translating…" : "Translate"}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
       {post.title && <p className="draft-title" style={{ paddingRight: "50px" }}>{post.title}</p>}
       <p
         className="status-line"
@@ -380,35 +582,6 @@ export function DraftCard({ post, index }: { post: PostWithPending; index: numbe
           <span className="badge">content-safety flag</span>
         </div>
       )}
-
-      <div className="lang-tabs" role="tablist" aria-label="Language">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "en"}
-          className={activeTab === "en" ? "lang-tab lang-tab--active" : "lang-tab"}
-          onClick={() => setActiveTab("en")}
-        >
-          English
-        </button>
-        {LANGUAGES.map((lang) => {
-          const hasTranslation = lang in translationTexts;
-          const isPendingThisLang = isTranslating && pendingLanguage === lang;
-          return (
-            <button
-              key={lang}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === lang}
-              className={activeTab === lang ? "lang-tab lang-tab--active" : "lang-tab"}
-              onClick={() => (hasTranslation ? setActiveTab(lang) : handleTranslate(lang))}
-              disabled={!hasTranslation && isTranslating}
-            >
-              {hasTranslation ? LANGUAGE_LABELS[lang] : isPendingThisLang ? "Translating…" : `Translate to ${LANGUAGE_LABELS[lang]}`}
-            </button>
-          );
-        })}
-      </div>
 
       {activeTranslation?.outdated && (
         <div style={{ marginBottom: "var(--space-sm)" }}>

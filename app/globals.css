@@ -301,37 +301,131 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 
 .empty-state { color: var(--muted); }
 
-/* DraftCard.tsx's language tab switcher (PHASE-6 TRANSLATION) — English
-   plus one pill per language, one text shown at a time (never side by
-   side; that visual language is reserved for the pending-version compare
-   below it). Compact pills sized to sit inside a card, unlike
-   `.admin-tabs`'s larger routed nav pills which this deliberately does not
-   reuse (that bar is a router styled as tabs; this is an in-card view
-   switcher over local state — see CONFIG-UI--admin-page.md vs.
-   TRANSLATION--on-demand-translation.md). An untranslated tab's label is
-   "Translate to {Language}" rather than a blank pane — see DraftCard.tsx's
-   header for the click-to-translate flow this implies. */
-.lang-tabs {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* DraftCard.tsx's language dropdown (PHASE-6 TRANSLATION) — a compact
+   trigger button showing only the active language's flag + a caret, and a
+   panel (opened via local `isLangMenuOpen` state) listing all languages as
+   flag + name. Re-skinned from an earlier always-visible tab row per
+   follow-up user feedback: this reads better in a card-dense review list,
+   since only the active flag occupies space until the user wants to
+   switch. `.lang-dropdown` is `position: relative` so `.lang-dropdown-panel`
+   (absolute) anchors directly under the trigger. Unlike `.admin-tabs`'s
+   larger routed nav pills, this is an in-card view switcher over local
+   state, not a router styled as tabs (see CONFIG-UI--admin-page.md vs.
+   TRANSLATION--on-demand-translation.md). An untranslated option keeps its
+   plain flag + name but carries a small "Translate" tag instead of a blank
+   pane — see DraftCard.tsx's header for the click-to-translate flow this
+   implies.
+
+   `.lang-dropdown--corner` is a second follow-up re-skin: the trigger used
+   to sit inline as a pill just above the textarea, but now takes over the
+   card's top-right corner — the same spot a numbered index badge (see the
+   removed `.draft-index-badge`, once DraftCard.tsx's `index` prop) used to
+   occupy before it was dropped entirely. `top`/`right` are nudged a little
+   further into the corner than the old badge's `top: 14px; right: 20px`
+   (a flag glyph reads better tucked in tighter than a two-digit number
+   did); `margin-bottom: 0` cancels the inline pill's spacing since this
+   variant is out of normal flow. `left: auto; right: 0` on the panel here
+   (instead of the base rule's `left: 0`) keeps the panel opening toward the
+   card's interior — anchoring it from `left: 0` off a trigger that's
+   already hugging the card's right edge would push most of the panel off
+   the card. */
+.lang-dropdown {
+  position: relative;
+  display: inline-block;
   margin-bottom: var(--space-sm);
 }
-.lang-tab {
+.lang-dropdown--corner {
+  position: absolute;
+  top: 30px;
+  right: 4px;
+  margin-bottom: 0;
+}
+.lang-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   border-radius: var(--radius-pill);
-  padding: 4px 12px;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  padding: 6px 12px;
+  font-size: 1rem;
+  line-height: 1;
   color: var(--ink-soft);
   background: var(--chip-bg);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard);
 }
-.lang-tab:hover:not(:disabled) { background: var(--border); }
-.lang-tab:disabled { cursor: default; opacity: 0.6; }
-.lang-tab--active { background: var(--ink); color: var(--primary-text); }
+.lang-dropdown-trigger:hover { background: var(--border); }
+.lang-dropdown-trigger[aria-expanded="true"] { background: var(--ink); color: var(--primary-text); }
+.lang-dropdown-caret { transition: transform var(--duration-fast) var(--ease-standard); }
+.lang-dropdown-trigger[aria-expanded="true"] .lang-dropdown-caret { transform: rotate(180deg); }
+
+/* Circular corner-badge variant of the trigger — same visual family as the
+   numbered index badge it replaced (circular, 42px, `--gradient-badge`
+   tint), just holding a flag instead of a number. The caret carried over
+   from the pill trigger is hidden here: there's no room for it at this
+   size, and a circular badge with a hover/expanded color shift already
+   reads as clickable without one. */
+.lang-dropdown-trigger--badge {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+  border-radius: 50%;
+  background: var(--gradient-badge);
+  color: var(--ink);
+}
+.lang-dropdown-trigger--badge:hover { background: var(--border); }
+.lang-dropdown-trigger--badge[aria-expanded="true"] { background: var(--ink); color: var(--primary-text); }
+.lang-dropdown-trigger--badge .lang-dropdown-caret { display: none; }
+.lang-dropdown--corner .lang-dropdown-panel { left: auto; right: 0; }
+
+/* Elevated above the card's own content, same z-index tier and shadow
+   token as `.tooltip-bubble` — the other place a floating, absolutely
+   positioned overlay earns a shadow per DESIGN.md's Elevation section. */
+.lang-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+}
+.lang-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+.lang-dropdown-option:hover:not(:disabled) { background: var(--chip-bg); color: var(--ink); }
+.lang-dropdown-option:disabled { cursor: default; opacity: 0.6; }
+.lang-dropdown-option--active { background: var(--ink); color: var(--primary-text); }
+.lang-dropdown-translate-tag {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--label);
+}
+.lang-dropdown-option--active .lang-dropdown-translate-tag { color: var(--chip-bg-strong); }
 
 /* Draft text — the card's "one lit thing" (DESIGN.md). Auto-grows in
    DraftCard.tsx (height set from scrollHeight) so a typical post reads in
@@ -435,26 +529,6 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   animation: fade-slide-in var(--duration-base) var(--ease-standard);
 }
 
-/* A draft card's position within its run (1, 2, 3…) — a large, light tint
-   of the accent color (see --gradient-badge) with the number itself in
-   plain ink-brown, rather than a filled dark circle with light text. */
-.draft-index-badge {
-  position: absolute;
-  top: 14px;
-  right: 20px;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--gradient-badge);
-  color: var(--ink);
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
-  font-weight: 700;
-  font-size: 1.125rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* Icon-only action buttons (copy prompt, regenerate, discard) — same ghost
    treatment as their text-button predecessors, just compact and glyph-led.
    "Copy & Mark Posted" stays a full text button; it's the card's one
@@ -474,8 +548,9 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .icon-button--danger:hover:not(:disabled) { background: var(--danger-tint); color: var(--danger); }
 .icon-button .spin-icon { animation: spin 0.9s linear infinite; }
 
-/* Positioned so .draft-index-badge (absolutely positioned) anchors to this
-   card rather than some further-out ancestor. */
+/* Positioned so .lang-dropdown--corner (absolutely positioned, see that
+   rule's comment above) anchors to this card rather than some further-out
+   ancestor. */
 .draft-card {
   position: relative;
 }

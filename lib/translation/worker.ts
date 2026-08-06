@@ -50,6 +50,45 @@ function loadPipeline(language: Language): ReturnType<typeof pipeline<"translati
   return loading;
 }
 
+// Marian/OPUS-MT models have no notion of line breaks as structure — a
+// multi-paragraph post handed to the pipeline as one flat string comes
+// back as a single collapsed blob (paragraph breaks, bullet points, and
+// a trailing hashtag line all lost). Splitting on "\n" and translating
+// each non-blank line separately preserves the original layout exactly;
+// blank lines (including runs of them, and leading/trailing ones) are
+// passed through untouched rather than sent to the model.
+//
+// The non-blank lines are batched into a single translator() call —
+// @huggingface/transformers's translation pipeline accepts an array of
+// strings and returns one result per input in order — instead of one
+// call per line, so an N-line post costs one model invocation, not N.
+async function translateLines(
+  translator: Awaited<ReturnType<typeof loadPipeline>>,
+  text: string,
+): Promise<string> {
+  const lines = text.split("\n");
+  const nonBlankIndices: number[] = [];
+  const nonBlankLines: string[] = [];
+  lines.forEach((line, index) => {
+    if (line.trim() !== "") {
+      nonBlankIndices.push(index);
+      nonBlankLines.push(line);
+    }
+  });
+
+  // Empty string, or a post made entirely of blank lines: nothing to
+  // send to the model at all.
+  if (nonBlankLines.length === 0) return text;
+
+  const results = await translator(nonBlankLines);
+  const translatedByIndex = new Map<number, string>();
+  nonBlankIndices.forEach((lineIndex, i) => {
+    translatedByIndex.set(lineIndex, results[i].translation_text);
+  });
+
+  return lines.map((line, index) => translatedByIndex.get(index) ?? line).join("\n");
+}
+
 // Exported for worker.test.ts only — never imported by translate.ts or
 // any other real caller, which only ever talks to this file through the
 // message port above.
@@ -62,8 +101,8 @@ export async function handleRequest(request: TranslateRequest): Promise<Translat
       throw new Error(`No verified model is configured for language "${request.language}"`);
     }
     const translator = await loadPipeline(request.language);
-    const [result] = await translator(request.text);
-    return { id: request.id, ok: true, text: result.translation_text };
+    const text = await translateLines(translator, request.text);
+    return { id: request.id, ok: true, text };
   } catch (err) {
     return { id: request.id, ok: false, message: err instanceof Error ? err.message : String(err) };
   }

@@ -39,7 +39,9 @@ describe("worker.ts handleRequest", () => {
 
     expect(response).toEqual({ id: 1, ok: true, text: "Hola mundo" });
     expect(pipelineMock).toHaveBeenCalledWith("translation", "Xenova/opus-mt-en-es");
-    expect(translator).toHaveBeenCalledWith("Hello world");
+    // Single-line input still goes through the batched call — as a
+    // one-element array — rather than a bare string.
+    expect(translator).toHaveBeenCalledWith(["Hello world"]);
   });
 
   it("returns ok:false with a message on a pipeline() (model download) failure — no throw escapes", async () => {
@@ -81,5 +83,55 @@ describe("worker.ts handleRequest", () => {
 
     expect(pipelineMock).toHaveBeenCalledTimes(1);
     expect(translator).toHaveBeenCalledTimes(2);
+  });
+
+  it("translates each paragraph of a multi-paragraph post and preserves the blank-line separators", async () => {
+    // Mirrors a real LinkedIn post: two paragraphs, a bullet point, and a
+    // trailing hashtag line, separated by blank lines.
+    const input = ["Paragraph one.", "", "Paragraph two.", "- Bullet point", "", "#hashtag"].join("\n");
+    const translator = vi.fn().mockImplementation((lines: string[]) =>
+      Promise.resolve(lines.map((line) => ({ translation_text: `[ES] ${line}` }))),
+    );
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 7, text: input, language: "es" });
+
+    // Only the non-blank lines are sent to the model, batched in one call.
+    expect(translator).toHaveBeenCalledTimes(1);
+    expect(translator).toHaveBeenCalledWith(["Paragraph one.", "Paragraph two.", "- Bullet point", "#hashtag"]);
+    expect(response).toEqual({
+      id: 7,
+      ok: true,
+      text: ["[ES] Paragraph one.", "", "[ES] Paragraph two.", "[ES] - Bullet point", "", "[ES] #hashtag"].join("\n"),
+    });
+  });
+
+  it("preserves consecutive blank lines and leading/trailing blank lines exactly", async () => {
+    const input = ["", "", "First.", "", "", "Second.", "", ""].join("\n");
+    const translator = vi.fn().mockImplementation((lines: string[]) =>
+      Promise.resolve(lines.map((line) => ({ translation_text: `[FR] ${line}` }))),
+    );
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 8, text: input, language: "fr" });
+
+    expect(response).toEqual({
+      id: 8,
+      ok: true,
+      text: ["", "", "[FR] First.", "", "", "[FR] Second.", "", ""].join("\n"),
+    });
+  });
+
+  it("returns an empty string without ever calling the translator on empty input", async () => {
+    const translator = vi.fn();
+    pipelineMock.mockResolvedValue(translator);
+    const { handleRequest } = await freshWorkerModule();
+
+    const response = await handleRequest({ id: 9, text: "", language: "it" });
+
+    expect(response).toEqual({ id: 9, ok: true, text: "" });
+    expect(translator).not.toHaveBeenCalled();
   });
 });

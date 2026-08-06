@@ -18,3 +18,4 @@
 - 2026-08-06 — TRANSLATION: vault corrected and recap rebuilt to match the language-list revision
 - 2026-08-06 — PHASE-6-TRANSLATION--review-ui-integration: step 2 implemented (review actions, cascade-delete integrity, UI wiring), tests verified
 - 2026-08-06 — TRANSLATION/REVIEW-WORKSPACE/STORAGE-HISTORY: a cross-feature mechanism claim found wrong during implementation, corrected across vault + recap
+- 2026-08-06 — TRANSLATION: UI/UX feedback round (switcher redesign, a formatting bug fixed, resilience issue logged)
