@@ -5,6 +5,10 @@
  * covers it yet and it's still within 24h. Never a queue — at most one
  * catch-up run per startup, for the single most recent missed slot. See
  * vault-sift/features/SCHEDULER/SCHEDULER--architecture.md.
+ *
+ * The *check* is awaited (a fast DB read); the *run* it fires is not — see
+ * the comment at the trigger site below. This function must always resolve
+ * quickly, because nothing in the app is served until it does.
  */
 import { and, gte, inArray } from "drizzle-orm";
 import { getDb } from "../db/client";
@@ -49,6 +53,19 @@ export async function checkMissedRun(): Promise<void> {
   if (existing.length > 0) return;
 
   if (Date.now() - expectedSlot.getTime() <= CATCHUP_WINDOW_MS) {
-    await triggerRun("catchup");
+    // Deliberately NOT awaited. This runs on the startup path
+    // (instrumentation.ts -> initializeScheduler -> here) and Next.js
+    // serves no request until register() resolves, so awaiting a full
+    // pipeline run here left localhost:3000 hanging for the entire run
+    // instead of rendering with a live "running" sidebar. Detaching it is
+    // the same shape startRun() already uses for the Run Now button: the
+    // pipeline_runs row exists within moments, so getInProgressRun() picks
+    // it up and the sidebar polls its currentStage exactly like a manual
+    // run. .catch() is mandatory — an unhandled rejection here would kill
+    // the server process the detached run was meant to keep alive.
+    void triggerRun("catchup").catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error(`[sift] Catch-up run failed to start: ${(err as Error).message}`);
+    });
   }
 }

@@ -1,3 +1,13 @@
+/**
+ * lib/scheduler/catchup.test.ts
+ *
+ * Covers the startup missed-run check: mostRecentExpectedSlot()'s week-walk
+ * arithmetic, and checkMissedRun()'s fire/skip decisions (no schedule,
+ * already covered, outside the 24h window). Also guards the two properties
+ * that keep the server bootable — checkMissedRun() must resolve without
+ * waiting for the catch-up run, and must not let that run's rejection
+ * escape as an unhandled promise.
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { mostRecentExpectedSlot, checkMissedRun } from "./catchup";
@@ -83,6 +93,58 @@ describe("checkMissedRun", () => {
     await checkMissedRun();
 
     expect(triggerSpy).toHaveBeenCalledWith("catchup");
+  });
+
+  it("returns without waiting for the catch-up run to finish", async () => {
+    // Regression guard: checkMissedRun() sits on the startup path
+    // (instrumentation.ts -> initializeScheduler -> here), and Next.js
+    // serves no request until register() resolves. Awaiting the run here
+    // left localhost:3000 hanging for the whole pipeline.
+    const now = new Date();
+    const recentSlot = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2h ago
+    const dayName = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][recentSlot.getUTCDay()];
+    const hh = String(recentSlot.getUTCHours()).padStart(2, "0");
+    const mm = String(recentSlot.getUTCMinutes()).padStart(2, "0");
+
+    vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
+      scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
+      voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+    });
+    let releaseRun!: () => void;
+    const stillRunning = new Promise<void>((resolve) => {
+      releaseRun = resolve;
+    });
+    const triggerSpy = vi.spyOn(triggerModule, "triggerRun").mockReturnValue(stillRunning);
+
+    await checkMissedRun();
+
+    expect(triggerSpy).toHaveBeenCalledWith("catchup");
+    releaseRun();
+    await stillRunning;
+  });
+
+  it("does not crash startup when the catch-up run rejects", async () => {
+    const now = new Date();
+    const recentSlot = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const dayName = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][recentSlot.getUTCDay()];
+    const hh = String(recentSlot.getUTCHours()).padStart(2, "0");
+    const mm = String(recentSlot.getUTCMinutes()).padStart(2, "0");
+
+    vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
+      budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
+      scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
+      voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(triggerModule, "triggerRun").mockRejectedValue(new Error("boom"));
+
+    await expect(checkMissedRun()).resolves.toBeUndefined();
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(errorSpy).toHaveBeenCalled();
   });
 
   it("does not fire when a matching scheduled/catchup run already exists at or after the expected slot", async () => {
