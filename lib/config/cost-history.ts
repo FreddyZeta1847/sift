@@ -13,10 +13,23 @@
  * call volume for a single self-hoster is small enough that this is simpler
  * and more portable than SQLite date-function quirks, and it reuses the same
  * month-range window as `getMonthlySpend`.
+ *
+ * `getCheckSpend` covers the other table: calls belonging to no pipeline run
+ * (the "Test this model" button and the startup model check). Kept as a
+ * separate figure rather than folded into the total, because "what the
+ * pipeline cost me" and "what checking my setup cost me" are different
+ * questions — but both are real money, and before this they were not shown
+ * anywhere at all.
+ *
+ * `getSpendByModel` also reports whether each pair is PRICED. An unpriced
+ * model shows $0.00 exactly like a free local one, and without that flag the
+ * page cannot tell the user which zero it is looking at.
  */
 import { and, count, gte, lt, sum } from "drizzle-orm";
 import { getDb } from "../db/client";
-import { llmCallsTable } from "../db/schema";
+import { llmCallsTable, nonPipelineLlmCallsTable } from "../db/schema";
+import { getModels } from "./models";
+import { isPriced, findModelEntry } from "../llm/pricing";
 
 function monthRange(month: string): { monthStart: Date; monthEnd: Date } {
   const monthStart = new Date(`${month}-01T00:00:00.000Z`);
@@ -71,6 +84,8 @@ export interface ModelSpend {
   model: string;
   cost: number;
   calls: number;
+  /** False = no price on record. $0.00 here means "unknown", not "free". */
+  priced: boolean;
 }
 
 export async function getSpendByModel(month: string): Promise<ModelSpend[]> {
@@ -88,7 +103,36 @@ export async function getSpendByModel(month: string): Promise<ModelSpend[]> {
     .where(and(gte(llmCallsTable.timestamp, monthStart), lt(llmCallsTable.timestamp, monthEnd)))
     .groupBy(llmCallsTable.provider, llmCallsTable.model);
 
+  const models = await getModels();
   return rows
-    .map((r) => ({ provider: r.provider, model: r.model, cost: roundToCents(Number(r.cost ?? 0)), calls: Number(r.calls) }))
+    .map((r) => ({
+      provider: r.provider,
+      model: r.model,
+      cost: roundToCents(Number(r.cost ?? 0)),
+      calls: Number(r.calls),
+      // False means "nobody has told us what this costs", which is a very
+      // different thing from a local model that is genuinely free — and the
+      // reason a whole month could read $0.00 while real money was spent.
+      priced: isPriced(findModelEntry(models, r.provider, r.model)),
+    }))
     .sort((a, b) => b.cost - a.cost);
+}
+
+export interface CheckSpend {
+  cost: number;
+  calls: number;
+}
+
+export async function getCheckSpend(month: string): Promise<CheckSpend> {
+  const { monthStart, monthEnd } = monthRange(month);
+
+  const db = getDb();
+  const [row] = await db
+    .select({ total: sum(nonPipelineLlmCallsTable.estimatedCost), calls: count(nonPipelineLlmCallsTable.id) })
+    .from(nonPipelineLlmCallsTable)
+    .where(
+      and(gte(nonPipelineLlmCallsTable.timestamp, monthStart), lt(nonPipelineLlmCallsTable.timestamp, monthEnd))
+    );
+
+  return { cost: roundToCents(Number(row?.total ?? 0)), calls: Number(row?.calls ?? 0) };
 }

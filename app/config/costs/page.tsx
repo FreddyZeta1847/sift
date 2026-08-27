@@ -7,9 +7,13 @@
  * and a per-model breakdown via `getSpendByModel` — then hands all three to
  * the interactive `CostsForm`. This page makes no LLM calls of its own; it
  * is pure config read/write plus read-only DB aggregate queries.
+ *
+ * `getCheckSpend` is the fourth query: what model checking cost this month,
+ * kept separate from pipeline spend because they answer different questions.
+ * Both are real money; neither used to be visible.
  */
 import { getSettings } from "../../../lib/config/settings";
-import { getMonthlySpend, getDailySpendForMonth, getSpendByModel } from "../../../lib/config/cost-history";
+import { getMonthlySpend, getDailySpendForMonth, getSpendByModel, getCheckSpend } from "../../../lib/config/cost-history";
 import { CostsForm } from "./CostsForm";
 
 // Reads live DB state that doesn't exist yet at build time (a fresh clone's
@@ -20,10 +24,11 @@ export const dynamic = "force-dynamic";
 export default async function CostsPage() {
   const settings = await getSettings();
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const [spend, dailySpend, spendByModel] = await Promise.all([
+  const [spend, dailySpend, spendByModel, checkSpend] = await Promise.all([
     getMonthlySpend(currentMonth),
     getDailySpendForMonth(currentMonth),
     getSpendByModel(currentMonth),
+    getCheckSpend(currentMonth),
   ]);
   return (
     <main>
@@ -34,6 +39,7 @@ export default async function CostsPage() {
         spend={spend}
         dailySpend={dailySpend}
         spendByModel={spendByModel}
+        checkSpend={checkSpend}
       />
     </main>
   );

@@ -106,10 +106,26 @@ describe("getSpendByModel", () => {
 
     const byModel = await getSpendByModel("2026-07");
 
+    // priced:false because neither pair is in the model registry — which is
+    // the whole point of the flag: without it these rows would render a
+    // confident $5.00/$0.30 for models nobody has priced.
     expect(byModel).toEqual([
-      { provider: "p2", model: "big", cost: 5, calls: 1 },
-      { provider: "p1", model: "small", cost: 0.3, calls: 2 },
+      { provider: "p2", model: "big", cost: 5, calls: 1, priced: false },
+      { provider: "p1", model: "small", cost: 0.3, calls: 2, priced: false },
     ]);
+  });
+
+  it("marks a pair as priced once it is in the model registry", async () => {
+    const db = getDb();
+    const [run] = await db.insert(pipelineRunsTable).values({ startedAt: new Date(), type: "manual" }).returning({ id: pipelineRunsTable.id });
+    await db.insert(llmCallsTable).values([
+      { timestamp: new Date("2026-07-05T12:00:00.000Z"), runId: run.id, provider: "openai", model: "gpt-4o", inputTokens: 1, outputTokens: 1, estimatedCost: 0.1 },
+    ]);
+
+    const byModel = await getSpendByModel("2026-07");
+
+    // gpt-4o under openai ships in the registry seed.
+    expect(byModel[0].priced).toBe(true);
   });
 
   it("returns an empty array for a month with no calls", async () => {

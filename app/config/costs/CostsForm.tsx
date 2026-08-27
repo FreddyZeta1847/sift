@@ -41,7 +41,7 @@
 
 import { useState } from "react";
 import { saveBudgetCap } from "./actions";
-import type { DailySpend, ModelSpend } from "../../../lib/config/cost-history";
+import type { DailySpend, ModelSpend, CheckSpend } from "../../../lib/config/cost-history";
 
 // Visual-only helper: the failure message here always follows an
 // "X failed: ..." shape (see `persistCap` below), so matching that
@@ -58,12 +58,14 @@ export function CostsForm({
   spend,
   dailySpend,
   spendByModel,
+  checkSpend,
 }: {
   budgetCapUsd: number | null;
   currentMonth: string;
   spend: number;
   dailySpend: DailySpend[];
   spendByModel: ModelSpend[];
+  checkSpend: CheckSpend;
 }) {
   const [cap, setCap] = useState<number | null>(budgetCapUsd);
   const [status, setStatus] = useState<string | null>(null);
@@ -205,12 +207,42 @@ export function CostsForm({
                     {m.provider} · {m.calls} call{m.calls === 1 ? "" : "s"}
                   </span>
                 </span>
-                <span className="data">${m.cost.toFixed(2)}</span>
+                {m.priced ? (
+                  <span className="data">${m.cost.toFixed(2)}</span>
+                ) : (
+                  /* $0.00 here would be a confident lie. This model has no
+                     price on record, so its real spend is unknown — and it is
+                     invisible to the budget cap for the same reason. Add it in
+                     Models & pricing on API Config to start counting it. */
+                  <span
+                    className="data status-line"
+                    title="No price on record for this model, so its spend can't be worked out and isn't counted against your budget cap. Add it in Models & pricing on API Config."
+                  >
+                    pricing not set
+                  </span>
+                )}
               </li>
             ))}
           </ul>
         ) : (
           <p className="empty-state">No calls recorded yet this month.</p>
+        )}
+      </section>
+
+      <section id="check-spend" className="card">
+        <h2>Model checking</h2>
+        <p className="status-line">
+          What the startup check and the &ldquo;Test this model&rdquo; button cost this month. Counted separately from
+          pipeline runs because they answer a different question — but it is the same money, and it counts against your
+          budget cap.
+        </p>
+        {checkSpend.calls > 0 ? (
+          <p>
+            <span className="data">${checkSpend.cost.toFixed(2)}</span> across {checkSpend.calls} call
+            {checkSpend.calls === 1 ? "" : "s"}
+          </p>
+        ) : (
+          <p className="empty-state">No model checks recorded yet this month.</p>
         )}
       </section>
       </div>
