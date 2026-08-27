@@ -532,8 +532,16 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 
 .lang-dropdown {
   position: relative;
-  display: inline-block;
-  margin-bottom: var(--space-sm);
+  /* inline-flex, not inline-block: an inline-block establishes a text
+     baseline, so the trigger inside it sat on that baseline with the
+     line-box's descender space hanging below — enough to throw the badge
+     off-center in a flex row that centers its items. */
+  display: inline-flex;
+  /* No bottom margin. It dates from when the trigger was a pill stacked
+     above the textarea and needed clearance. In the card's head band the
+     dropdown is centered by its flex parent, and a bottom margin on a
+     centered flex item shifts it up by half that margin — which is
+     exactly what it was doing. */
 }
 .lang-dropdown-trigger {
   display: inline-flex;

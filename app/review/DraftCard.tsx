@@ -130,16 +130,27 @@
  *
  * - The flag itself fills the entire circle edge-to-edge (per follow-up
  *   feedback: "the whole circle should be the flag, not a squared flag
- *   inside it") rather than sitting as a small icon with the badge's
- *   gradient background showing around it. `FlagIcon`'s `size` is 44 here
- *   (bigger than the 42px circle) specifically so the square SVG fully
- *   bleeds past every edge of the circle before `.lang-dropdown-trigger
- *   --badge`'s `overflow: hidden` clips it — each flag's `<rect>`/`<path>`
- *   shapes already cover their full `0 0 24 24` viewBox with no internal
- *   padding, so scaling up and clipping to a circle doesn't reveal any
- *   background at the edges. The panel's flags (next to each language's
- *   name) stay at the smaller default size — this only applies to the
- *   corner trigger, where "be the whole circle" was the actual ask.
+ *   inside it") rather than sitting as a small icon with the badge's tint
+ *   showing around it. That is now done in CSS: the SVG is absolutely
+ *   positioned to the button's own edges (`inset: 0`, see
+ *   `.lang-dropdown-trigger--badge svg` in globals.css), so the flag's
+ *   size is the badge's size by definition.
+ *
+ *   It used to be done by rendering the flag one size larger than the
+ *   button — a 44px SVG in a 42px circle — and trusting flex centering to
+ *   let it overflow evenly before `overflow: hidden` clipped it. That
+ *   held only while every box in the chain agreed, and one didn't: the
+ *   wrapper carried a leftover `margin-bottom` from when the trigger was
+ *   a pill stacked above the textarea, which in a centered flex row
+ *   shifted the whole badge half that margin off-center. Two numbers that
+ *   had to be kept in sync, plus a stale margin, produced a flag that sat
+ *   visibly high. Now there are no numbers to keep in sync.
+ *
+ *   The `size` prop below is therefore inert for the badge (CSS wins) and
+ *   is passed only so the element still has sensible intrinsic dimensions
+ *   before the stylesheet applies. The panel's flags, next to each
+ *   language's name, use the smaller default — this only ever applied to
+ *   the trigger, where "be the whole circle" was the actual ask.
  *
  * - The single flat `text` state this component used to have is now split
  *   two ways: `englishText` (was `text`, same role) and `translationTexts`
@@ -525,7 +536,7 @@ export function DraftCard({ post }: { post: PostWithPending }) {
           aria-label={`Language: ${activeTab === "en" ? "English" : LANGUAGE_LABELS[activeTab]}. Click to change language.`}
           onClick={() => setIsLangMenuOpen((open) => !open)}
         >
-          <FlagIcon language={activeTab} size={44} />
+          <FlagIcon language={activeTab} size={42} />
           <svg
             className="lang-dropdown-caret"
             width="12"
