@@ -49,3 +49,25 @@ export interface Settings {
   probeTimeoutMs: number;
   llmCallTimeoutMs: number;
 }
+
+/**
+ * One row of the model registry (config/models.json): a model this install
+ * uses, and what it costs per 1,000,000 tokens in each direction.
+ *
+ * Declared here rather than beside its file I/O in lib/config/models.ts on
+ * purpose. This module imports nothing, so a Client Component can use the
+ * type and the helper below without webpack following the import into
+ * read-config.ts and its node:fs/node:path dependencies — which is a build
+ * failure, not a warning.
+ */
+export interface ModelEntry {
+  providerId: string;
+  model: string;
+  inputPer1M: number;
+  outputPer1M: number;
+}
+
+/** The dropdown contents for one provider, in the order they were added. */
+export function modelsForProvider(models: ModelEntry[], providerId: string): ModelEntry[] {
+  return models.filter((m) => m.providerId === providerId);
+}

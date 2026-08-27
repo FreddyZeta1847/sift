@@ -27,13 +27,14 @@
  * them, so a value can be copied off a pricing page without arithmetic.
  */
 import { readConfig, writeConfig, configPath } from "./read-config";
+import type { ModelEntry } from "./types";
 
-export interface ModelEntry {
-  providerId: string;
-  model: string;
-  inputPer1M: number;
-  outputPer1M: number;
-}
+// The shape and the pure helper live in ./types (which imports nothing), so
+// Client Components can use them without dragging this file's node:fs
+// dependency into the browser bundle. Re-exported here so server-side callers
+// can keep importing everything model-related from one place.
+export type { ModelEntry } from "./types";
+export { modelsForProvider } from "./types";
 
 // Only used when config/models.json doesn't exist yet (a fresh install),
 // never merged into an existing file — the same seeding rule as
@@ -56,9 +57,4 @@ export async function getModels(): Promise<ModelEntry[]> {
 
 export async function saveModels(models: ModelEntry[]): Promise<void> {
   return writeConfig(configPath("models.json"), models);
-}
-
-/** The dropdown contents for one provider, in the order they were added. */
-export function modelsForProvider(models: ModelEntry[], providerId: string): ModelEntry[] {
-  return models.filter((m) => m.providerId === providerId);
 }

@@ -9,6 +9,7 @@
  * layer (actions.test.ts) and the probe layer (test-model-probe.test.ts).
  */
 import { getProviders } from "../../../lib/config/providers";
+import { getModels } from "../../../lib/config/models";
 import { getSettings } from "../../../lib/config/settings";
 import { ApiConfigForm } from "./ApiConfigForm";
 
@@ -17,12 +18,11 @@ import { ApiConfigForm } from "./ApiConfigForm";
 export const dynamic = "force-dynamic";
 
 export default async function ApiConfigPage() {
-  const providers = await getProviders();
-  const settings = await getSettings();
+  const [providers, settings, models] = await Promise.all([getProviders(), getSettings(), getModels()]);
   return (
     <main>
       <h1>API Config</h1>
-      <ApiConfigForm providers={providers} settings={settings} />
+      <ApiConfigForm providers={providers} settings={settings} models={models} />
     </main>
   );
 }

@@ -61,6 +61,9 @@ import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAc
 import type { Provider, Settings } from "../../../lib/config/types";
 import type { ProbeResult } from "../../../lib/config/test-model-probe";
 import { KNOWN_PROVIDERS, providerNeedsApiKey } from "../../../lib/config/known-providers";
+import { ModelSelect } from "./ModelSelect";
+import { ModelsTable } from "./ModelsTable";
+import type { ModelEntry } from "../../../lib/config/types";
 
 const EMPTY_NEW_PROVIDER = {
   id: "",
@@ -126,7 +129,15 @@ function probeTone(result: ProbeResult): string {
   return "data status-line--danger";
 }
 
-export function ApiConfigForm({ providers, settings }: { providers: Provider[]; settings: Settings }) {
+export function ApiConfigForm({
+  providers,
+  settings,
+  models,
+}: {
+  providers: Provider[];
+  settings: Settings;
+  models: ModelEntry[];
+}) {
   const router = useRouter();
 
   const [newProvider, setNewProvider] = useState(EMPTY_NEW_PROVIDER);
@@ -486,10 +497,12 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                 ))}
               </select>
             </label>
-            <label>
-              Model name
-              <input value={curationModel} onChange={(e) => setCurationModel(e.target.value)} />
-            </label>
+            <ModelSelect
+              providerId={curationProviderId}
+              models={models}
+              value={curationModel}
+              onChange={setCurationModel}
+            />
           </div>
           <div className="row-actions">
             <button onClick={handleTestCuration} disabled={isCurationProbing || !curationProviderId || !curationModel}>
@@ -520,10 +533,12 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
                 ))}
               </select>
             </label>
-            <label>
-              Model name
-              <input value={draftingModel} onChange={(e) => setDraftingModel(e.target.value)} />
-            </label>
+            <ModelSelect
+              providerId={draftingProviderId}
+              models={models}
+              value={draftingModel}
+              onChange={setDraftingModel}
+            />
           </div>
           <div className="row-actions">
             <button onClick={handleTestDrafting} disabled={isDraftingProbing || !draftingProviderId || !draftingModel}>
@@ -557,6 +572,12 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
         )}
         </div>
       </section>
+
+      {/* Below the assignment on purpose: it is what the dropdowns above read
+          from, so the reading order matches the order you notice you need it
+          ("no models listed for this provider yet" -> the table is right
+          there). */}
+      <ModelsTable providers={providers} models={models} />
     </div>
   );
 }

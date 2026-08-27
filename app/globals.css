@@ -1365,3 +1365,38 @@ h3:first-child { margin-top: 0; }
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ---------------------------------------------------------------------
+ * Models & pricing table (API Config). A real <table> rather than the
+ * .admin-row grid used elsewhere: these are four short, genuinely tabular
+ * columns whose headers have to stay associated with editable cells, which
+ * is exactly what a table element is for. Wrapped in .table-scroll so the
+ * numeric inputs never force the page itself to scroll sideways on a narrow
+ * window.
+ * ------------------------------------------------------------------ */
+.table-scroll { overflow-x: auto; }
+.models-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.models-table th {
+  text-align: left;
+  color: var(--label);
+  text-transform: uppercase;
+  font-size: 0.71875rem;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.models-table td {
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.models-table tr:last-child td { border-bottom: none; }
+/* Price cells are narrow on purpose — a rate per 1M tokens is a handful of
+   characters, and a full-width input would imply otherwise. */
+.models-table input[type="number"] { width: 7.5rem; }
+.models-table .row-actions { justify-content: flex-end; }

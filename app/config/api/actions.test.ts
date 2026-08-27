@@ -7,7 +7,17 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
-import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
+import {
+  addProvider,
+  updateProvider,
+  deleteProvider,
+  assignModels,
+  probeModelAction,
+  addModel,
+  updateModelPrices,
+  deleteModel,
+} from "./actions";
+import { getModels, saveModels } from "../../../lib/config/models";
 import { getProviders, saveProviders } from "../../../lib/config/providers";
 import * as providersModule from "../../../lib/config/providers";
 import { getSettings } from "../../../lib/config/settings";
@@ -29,6 +39,10 @@ describe("api config actions", () => {
     // no test in this file can reach a real provider over the network.
     vi.spyOn(modelHealthModule, "startModelHealthCheck").mockImplementation(() => {});
     vi.spyOn(modelHealthModule, "invalidateModelHealth").mockImplementation(() => {});
+    // Same reasoning as saveProviders([]) above: getModels() seeds a handful
+    // of known models on a fresh file, and these tests are about registry
+    // behaviour, not the seed.
+    await saveModels([]);
   });
 
   afterEach(() => {
@@ -132,5 +146,72 @@ describe("api config actions", () => {
   it("probeModelAction returns unreachable when the provider id doesn't exist", async () => {
     const result = await probeModelAction("missing", "m1");
     expect(result).toBe("unreachable");
+  });
+
+  describe("model registry", () => {
+    const gemini = { providerId: "google-gemini", model: "gemini-3-flash-preview", inputPer1M: 0.3, outputPer1M: 2.5 };
+
+    it("addModel appends a new provider+model row", async () => {
+      const result = await addModel(gemini);
+      expect(result.ok).toBe(true);
+      expect(await getModels()).toEqual([gemini]);
+    });
+
+    it("addModel rejects the same model twice for one provider", async () => {
+      await addModel(gemini);
+      const result = await addModel({ ...gemini, inputPer1M: 99 });
+
+      expect(result.ok).toBe(false);
+      expect(await getModels()).toHaveLength(1);
+    });
+
+    it("addModel allows the same model name under a different provider", async () => {
+      // The pair is the key precisely because one model can be resold at
+      // different prices — or served free from a local box.
+      await addModel(gemini);
+      const result = await addModel({ ...gemini, providerId: "openrouter", inputPer1M: 0.4 });
+
+      expect(result.ok).toBe(true);
+      expect(await getModels()).toHaveLength(2);
+    });
+
+    it("updateModelPrices changes only the prices, leaving the pair alone", async () => {
+      await addModel(gemini);
+      const result = await updateModelPrices(gemini.providerId, gemini.model, 1.5, 7.5);
+
+      expect(result.ok).toBe(true);
+      expect(await getModels()).toEqual([{ ...gemini, inputPer1M: 1.5, outputPer1M: 7.5 }]);
+    });
+
+    it("updateModelPrices reports a pair that is not listed", async () => {
+      const result = await updateModelPrices("nobody", "nothing", 1, 1);
+      expect(result.ok).toBe(false);
+    });
+
+    it("deleteModel removes an unassigned row", async () => {
+      await addModel(gemini);
+      const result = await deleteModel(gemini.providerId, gemini.model);
+
+      expect(result.ok).toBe(true);
+      expect(await getModels()).toEqual([]);
+    });
+
+    it("deleteModel refuses to remove a model a pipeline stage is using", async () => {
+      // Otherwise the stage keeps an assignment the dropdown can no longer
+      // offer, and the next run fails with no obvious cause.
+      await addModel(gemini);
+      await assignModels({
+        curationProviderId: gemini.providerId,
+        curationModel: gemini.model,
+        draftingProviderId: "other",
+        draftingModel: "other-model",
+      });
+
+      const result = await deleteModel(gemini.providerId, gemini.model);
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/assigned/);
+      expect(await getModels()).toHaveLength(1);
+    });
   });
 });

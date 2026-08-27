@@ -30,6 +30,21 @@
  * rather than throwing, since from the UI's perspective an unresolvable
  * provider is indistinguishable from an unreachable one.
  *
+ * The model-registry actions (`addModel`/`updateModelPrices`/`deleteModel`)
+ * follow the same read-modify-write shape over `config/models.json`. Two
+ * guards are worth naming:
+ *
+ *  - `addModel` rejects a duplicate (providerId, model) pair, since the pair
+ *    is the registry's key — a second row would shadow the first with no way
+ *    to tell which price was in force.
+ *  - `deleteModel` refuses to remove a pair a pipeline stage is currently
+ *    assigned to, mirroring `deleteProvider`'s guard: the assignment would
+ *    survive as a name the model dropdown can no longer offer.
+ *
+ * `updateModelPrices` changes only the two prices, never the pair itself —
+ * renaming a model is adding a different one, and keeping the key immutable
+ * means an edit can never silently retarget an assigned stage.
+ *
  * Note: this project's `"use server"` files must export only
  * locally-declared async functions (bare re-exports fail Next.js's
  * compiler — this was discovered during a prior task), so this file is
@@ -38,6 +53,7 @@
 "use server";
 
 import { getProviders, saveProviders } from "../../../lib/config/providers";
+import { getModels, saveModels, type ModelEntry } from "../../../lib/config/models";
 import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { probeModel, type ProbeResult } from "../../../lib/config/test-model-probe";
 import { invalidateModelHealth, startModelHealthCheck } from "../../../lib/health/model-health";
@@ -109,4 +125,45 @@ export async function probeModelAction(providerId: string, model: string): Promi
   // reported as "inconclusive" instead — see lib/config/test-model-probe.ts.
   const settings = await getSettings();
   return probeModel(provider, model, settings.probeTimeoutMs);
+}
+
+// ---------------------------------------------------------------------------
+// Model registry (config/models.json) — the list of models this install uses,
+// and what each costs. Doubles as the source for the model dropdowns.
+
+function samePair(a: { providerId: string; model: string }, b: { providerId: string; model: string }): boolean {
+  return a.providerId === b.providerId && a.model === b.model;
+}
+
+export async function addModel(entry: ModelEntry): Promise<ActionResult> {
+  const models = await getModels();
+  if (models.some((m) => samePair(m, entry))) {
+    return { ok: false, error: `${entry.model} is already listed for this provider` };
+  }
+  return safeWrite(() => saveModels([...models, entry]));
+}
+
+export async function updateModelPrices(
+  providerId: string,
+  model: string,
+  inputPer1M: number,
+  outputPer1M: number
+): Promise<ActionResult> {
+  const models = await getModels();
+  if (!models.some((m) => samePair(m, { providerId, model }))) {
+    return { ok: false, error: `${model} is not listed for this provider` };
+  }
+  const next = models.map((m) => (samePair(m, { providerId, model }) ? { ...m, inputPer1M, outputPer1M } : m));
+  return safeWrite(() => saveModels(next));
+}
+
+export async function deleteModel(providerId: string, model: string): Promise<ActionResult> {
+  const settings = await getSettings();
+  const assignedToCuration = settings.curationProviderId === providerId && settings.curationModel === model;
+  const assignedToDrafting = settings.draftingProviderId === providerId && settings.draftingModel === model;
+  if (assignedToCuration || assignedToDrafting) {
+    return { ok: false, error: `${model} is assigned to a pipeline stage — reassign that stage first` };
+  }
+  const models = await getModels();
+  return safeWrite(() => saveModels(models.filter((m) => !samePair(m, { providerId, model }))));
 }
