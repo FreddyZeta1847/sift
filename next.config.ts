@@ -14,8 +14,16 @@
  *
  *   SIFT_DIST_DIR=.next-verify npx next build
  *
- * Use it for any build whose only purpose is to check that things compile.
- * Real builds (Docker, deploy) leave it unset and use `.next` as normal.
+ * Use it for any build whose only purpose is to check that things compile,
+ * and for a throwaway `next dev` used to eyeball a page — two dev servers
+ * sharing one `.next/` collide the same way. Real builds (Docker, deploy)
+ * leave it unset and use `.next` as normal.
+ *
+ * One wart: Next.js appends `<distDir>/types/**` to tsconfig.json's
+ * `include` on every run, so a verification build leaves a stray entry (and
+ * a reformatted file) behind. Check `git status` for tsconfig.json after
+ * using this and `git checkout --` it — the entry belongs to a directory
+ * that no longer exists.
  */
 import type { NextConfig } from "next";
 
