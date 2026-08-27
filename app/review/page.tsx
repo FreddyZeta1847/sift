@@ -15,12 +15,18 @@
  * switching runs is a single navigation, no extra fetch.
  *
  * This is the app's single most important screen, so the page chrome stays
- * quiet: a `.page-head` carrying the title, a count of what's waiting, and
- * the run picker parked on the right — then nothing but the drafts. The
- * picker moved into the head because it selects what the whole page shows;
- * as a stray labelled `<select>` floating between the title and the first
- * card it read as a filter belonging to the list rather than the control
- * that chooses the list.
+ * quiet: a title, one toolbar, then nothing but the drafts.
+ *
+ * The run picker lives in that toolbar — a full-width strip whose left and
+ * right edges line up with the cards below it, carrying the picker on the
+ * left and the count of what's left to decide on the right. It has been in
+ * three places now. It began as a bare labelled `<select>` floating
+ * between the title and the first card, which read as a filter belonging
+ * to the list rather than the control that chooses the list. It was then
+ * tried on the right of the page head, opposite the h1 — but a small pill
+ * beside a large display title lines up with nothing, which is exactly
+ * what it looked like. In the toolbar it shares an edge with every card on
+ * the page, which is the alignment it was missing both times.
  *
  * Empty states go through `<EmptyState>`, which keeps the reassuring
  * second line structural rather than a convention each branch has to
@@ -92,12 +98,11 @@ export default async function ReviewPage({
 }
 
 /**
- * The page head, identical across all three branches above — title, an
- * optional line saying how much is left to decide, and the run picker.
+ * The title and toolbar, identical across all three branches above.
  *
- * The subtitle counts only undecided drafts, because that is the number
- * that tells you whether you are done. It is derived from the posts this
- * page already has in hand, so it costs no extra query.
+ * The count on the right counts only *undecided* drafts, because that is
+ * the number that tells you whether you are done. It is derived from the
+ * posts this page already has in hand, so it costs no extra query.
  */
 function ReviewHead({
   runs,
@@ -111,20 +116,23 @@ function ReviewHead({
   total?: number;
 }) {
   return (
-    <div className="page-head">
-      <div className="page-head-text">
-        <h1>Review</h1>
+    <>
+      <div className="page-head">
+        <div className="page-head-text">
+          <h1>Review</h1>
+          <p className="page-head-sub">Edit what the pipeline drafted, then copy it out.</p>
+        </div>
+      </div>
+      <div className="toolbar">
+        <RunPicker runs={runs} currentRunId={currentRunId} />
         {count !== undefined && total !== undefined && (
-          <p className="page-head-sub">
+          <span className="toolbar-note">
             {count === 0
-              ? `All ${total} draft${total === 1 ? "" : "s"} in this run are decided.`
-              : `${count} of ${total} draft${total === 1 ? "" : "s"} still to decide.`}
-          </p>
+              ? `All ${total} decided`
+              : `${count} of ${total} still to decide`}
+          </span>
         )}
       </div>
-      <div className="page-head-aside">
-        <RunPicker runs={runs} currentRunId={currentRunId} />
-      </div>
-    </div>
+    </>
   );
 }

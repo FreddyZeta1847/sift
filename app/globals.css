@@ -419,6 +419,24 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   flex-wrap: wrap;
 }
 
+/* ---------------------------------------------------------------------
+ * Toolbar — a full-width strip between a page head and the content it
+ * governs, for controls that choose what the whole page shows (Review's
+ * run picker). Its edges line up with the cards below it, which is the
+ * alignment such a control otherwise has to nothing: parked opposite an
+ * h1 in the page head, a small pill beside large display type lines up
+ * with neither the title's baseline nor anything else on the page.
+ * ------------------------------------------------------------------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg);
+}
+.toolbar-note { color: var(--muted); font-size: 0.875rem; }
+
 /* A vertical stack with one consistent gap. `--gap` overrides it. */
 .stack {
   display: flex;
@@ -506,6 +524,12 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
    flip the panel's anchor to `right: 0`, so it would open toward the
    card's interior rather than off its right edge; from the rail the base
    `left: 0` anchor is already correct, which is why nothing replaced it. */
+/* Pushed to the head band's right end, past the flexible source URL. */
+.lang-dropdown--end { margin-left: auto; }
+/* Anchored from the right so the panel opens toward the card's interior
+   rather than off its right edge. */
+.lang-dropdown--end .lang-dropdown-panel { left: auto; right: 0; }
+
 .lang-dropdown {
   position: relative;
   display: inline-block;
@@ -626,8 +650,8 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   border-color: transparent;
   padding: 0;
   min-height: 0;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 1.0625rem;
+  line-height: 1.7;
   transition: background var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
@@ -647,13 +671,6 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
    the draft text itself for "the one lit thing." Absent on posts written
    before this field existed (nullable column, no backfill) — the `{post.title
    && ...}` guard in DraftCard.tsx means those just render with no gap. */
-.draft-title {
-  font-family: var(--font-stack-display);
-  font-size: 1.0625rem;
-  font-weight: 600;
-  color: var(--ink);
-  margin: 0 0 var(--space-sm);
-}
 
 /* The AI image-generation prompt attached to a draft — visually a distinct
    sub-block (one tonal step up, per the system's flat/tonal-layering
@@ -748,75 +765,94 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .icon-button .spin-icon { animation: spin 0.9s linear infinite; }
 
 /* ---------------------------------------------------------------------
- * PostCard.tsx — the two-column shell behind /review's draft cards and
- * /posted's read-only ones. A narrow rail for identity and controls, a
- * wide column for the text. See that file's header for the reasoning.
+ * PostCard.tsx — the card behind /review's draft cards and /posted's
+ * read-only ones. Three bands divided by hairlines: what the post is,
+ * what it says, what you can do to it. See that file's header.
  * ------------------------------------------------------------------- */
 .post-card {
-  display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  gap: var(--space-lg);
   background: var(--surface);
-  border-radius: var(--radius-md);
-  padding: 20px 28px;
-  margin-bottom: var(--space-md);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  /* Cards are the page's only rhythm, so they get real air between them
+     rather than the tight stack a list of rows would want. */
+  margin-bottom: var(--space-lg);
   transition: opacity var(--duration-base) var(--ease-standard),
     border-color var(--duration-base) var(--ease-standard);
 }
 .post-card.muted { border: 1px solid var(--border); opacity: 0.6; }
 
-.post-card-rail {
+/* The head band sits on the deeper cream so the card reads as having a
+   header at all, not just a first paragraph. */
+.post-card-head {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-sm);
-  min-width: 0;
+  flex-wrap: wrap;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+  /* Rounded to match the card, rather than letting the card clip it with
+     `overflow: hidden` — that would also clip the language dropdown's
+     panel, which has to escape the card to open. */
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 10px var(--space-xl);
+  min-height: 62px;
 }
-.post-card-body { min-width: 0; }
-/* The body's first child sets the card's top edge; its own margin would
-   push the text down out of line with the rail beside it. */
+
+.post-card-body { padding: var(--space-lg) var(--space-xl); }
 .post-card-body > :first-child { margin-top: 0; }
 .post-card-body > :last-child { margin-bottom: 0; }
 
-.post-card-meta { margin-top: 0; }
-/* A status tag, a content-safety badge, an outdated-translation notice —
-   each on its own line above the draft text so none of them can be missed. */
-.post-card-flags { margin: 0 0 var(--space-sm); }
-
-/* The three icon actions sit as a row inside the vertical rail: they are
-   one group of equal-weight secondary actions, and stacking them would
-   make the rail taller than most drafts are. */
-.rail-actions {
+.post-card-foot {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
   flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+  padding: var(--space-md) var(--space-xl);
 }
-/* The card's one primary action, sized to the rail so it reads as the
-   thing you finish on. */
-.rail-primary { width: 100%; padding: 10px 12px; text-align: center; }
-/* A plain fact in the rail — a posted timestamp — rather than a control. */
-.rail-note { color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
+/* The source URL. Truncates rather than wrapping — a head band that grows
+   to three lines for one long link defeats the point of a head band. */
+.post-card-source {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  text-decoration: none;
+}
+.post-card-source:hover { color: var(--primary); text-decoration: underline; }
+
+/* Pushed to the right end of the head band, after the flexible URL. */
+.post-card-when { color: var(--muted); font-size: 0.75rem; flex-shrink: 0; }
+
+/* A status tag, a content-safety badge, an outdated-translation notice —
+   each on its own line above the draft text so none can be missed. */
+.post-card-flags { margin: 0 0 var(--space-md); }
+
+/* The post's own title. A real heading now, not body text at +1px: it is
+   the card's own h2, and it is what you scan a page of cards by. */
+.draft-title {
+  font-family: var(--font-stack-display);
+  font-size: 1.3125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 var(--space-md);
+  text-wrap: balance;
+}
 
 /* Posted's body text is read-only, so it keeps the newlines the draft
    textarea rendered natively. */
-.posted-text { white-space: pre-wrap; margin: 0; }
+.posted-text { white-space: pre-wrap; margin: 0; font-size: 1.0625rem; line-height: 1.7; }
 
 @media (max-width: 760px) {
-  /* No room for two columns — the rail lies down into a strip above the
-     body, keeping its own reading order. */
-  .post-card {
-    grid-template-columns: 1fr;
-    gap: var(--space-md);
-    padding: var(--space-md) var(--space-lg);
-  }
-  .post-card-rail {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .rail-actions { margin-top: 0; }
-  .rail-primary { width: auto; }
+  .post-card-head { padding: 10px var(--space-lg); }
+  .post-card-body { padding: var(--space-lg); }
+  .post-card-foot { padding: var(--space-md) var(--space-lg); }
 }
 
 .status-line {

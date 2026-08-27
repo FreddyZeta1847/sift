@@ -33,25 +33,29 @@
  * lock in `regeneratePost` only prevents two regenerate/pipeline runs from
  * overlapping, it doesn't block edits/discard/copy on other cards.
  *
- * LAYOUT — a two-column card (see app/PostCard.tsx, shared with /posted).
- * The narrow left rail carries what the post *is* and what you can *do* to
- * it: the `#id` chip, the language badge, and all four action buttons
- * stacked. The right column carries only what the post *says*: title,
- * source URL, the draft text, the image prompt. The draft text is the one
- * thing on this page anyone actually reads, so nothing crosses it.
+ * LAYOUT — one column, three bands (see app/PostCard.tsx, shared with
+ * /posted): a head carrying the `#id` chip, the source URL and the
+ * language badge; a body carrying the title and the draft text; a footer
+ * carrying the actions. Two hairlines separate them.
  *
- * That replaces a single-column card where a row of buttons cut across the
- * bottom of the reading column and the language badge floated absolutely
- * in the top-right corner. The corner badge is why both the title and the
- * status line used to carry a hardcoded `paddingRight: "66px"` (the
- * badge's footprint from the card's right edge) — moving it into the rail
- * removes the overlap, so those two magic numbers are gone with it. The
- * corner itself was inherited from a numbered index badge (`index`, once
- * passed by review/page.tsx) that was dropped earlier still.
+ * The bands replace an undivided card where the id chip, the title, the
+ * draft text and the action row all sat at the same level with only
+ * margins between them — nothing marked where the metadata stopped and
+ * the writing began. The language badge used to float absolutely in the
+ * top-right corner, which is why both the title and the status line
+ * carried a hardcoded `paddingRight: "66px"` reserving its footprint; in
+ * the head band it is simply the last item in a flex row, so those two
+ * magic numbers are gone. The corner itself was inherited from a numbered
+ * index badge (`index`, once passed by review/page.tsx), dropped earlier.
+ *
+ * A two-column variant with the metadata and actions in a left rail was
+ * tried and rejected: it put the actions far from the text they act on
+ * and left the rail mostly empty beside a short draft. See PostCard.tsx.
  *
  * "Copy & Mark Posted" is the card's one primary action and stays a full
- * text button; "Copy prompt", "Regenerate" and "Discard" are icon-only
- * ghost buttons (see `.icon-button` in globals.css) — same actions, same
+ * text button, alone on the right of the footer; "Copy prompt",
+ * "Regenerate" and "Discard" are icon-only ghost buttons (see
+ * `.icon-button` in globals.css) grouped on the left — same actions, same
  * order, more compact chrome. The content-safety badge sits above the
  * draft text, on its own line, so it can't be missed. The pending-version
  * compare stays visually separated by `.pending-compare`'s top border and
@@ -116,12 +120,13 @@
  *   implementation here.
  *
  * - The trigger is a circular badge (`.lang-dropdown-trigger--badge` in
- *   globals.css), 42px, holding a flag. It now sits in the card's left
- *   rail; it used to be absolutely positioned in the card's top-right
- *   corner via a `.lang-dropdown--corner` modifier, which existed only to
- *   flip the panel's anchor so it opened toward the card's interior
- *   instead of off its right edge. In the rail the base `left: 0` anchor
- *   is already the correct one, so that modifier is gone.
+ *   globals.css), 42px, holding a flag. It sits at the right end of the
+ *   card's head band. It used to be absolutely positioned in the card's
+ *   top-right corner via a `.lang-dropdown--corner` modifier, which
+ *   existed only to flip the panel's anchor so it opened toward the
+ *   card's interior rather than off its right edge. It still needs that,
+ *   so the modifier survives — but as one line on the panel rather than a
+ *   whole positioned variant.
  *
  * - The flag itself fills the entire circle edge-to-edge (per follow-up
  *   feedback: "the whole circle should be the flag, not a squared flag
@@ -505,11 +510,14 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   const muted = post.posted || post.discarded;
   const flagged = isFlagged(activeText);
 
-  const rail = (
+  const head = (
     <>
       <span className="data id-chip">#{post.id}</span>
+      <a className="data post-card-source" href={post.url} target="_blank" rel="noopener noreferrer">
+        {post.url}
+      </a>
 
-      <div className="lang-dropdown" ref={langMenuRef}>
+      <div className="lang-dropdown lang-dropdown--end" ref={langMenuRef}>
         <button
           type="button"
           className="lang-dropdown-trigger lang-dropdown-trigger--badge"
@@ -578,9 +586,14 @@ export function DraftCard({ post }: { post: PostWithPending }) {
         )}
       </div>
 
-      {/* Same four actions in the same order as the old bottom bar, stacked
-          instead of laid across the foot of the reading column. */}
-      <div className="rail-actions">
+    </>
+  );
+
+  const footer = (
+    <>
+      {/* Secondary actions grouped left, the one primary action alone on
+          the right — the footer's whole job is to make that split legible. */}
+      <div className="inline-row">
         <span className="tooltip-target">
           <button className="icon-button" onClick={handleCopyPrompt} aria-label="Copy image prompt" title="Copy image prompt">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -629,20 +642,18 @@ export function DraftCard({ post }: { post: PostWithPending }) {
         </span>
       </div>
 
-      <button className="primary rail-primary" onClick={handleCopyAndPost} disabled={muted} title="Copy text, mark as posted">
-        Copy &amp; Mark Posted
-      </button>
+      <span className="tooltip-target">
+        <button className="primary" onClick={handleCopyAndPost} disabled={muted} title="Copy text, mark as posted">
+          Copy &amp; Mark Posted
+        </button>
+        <span className="tooltip-bubble">Copy text, mark as posted</span>
+      </span>
     </>
   );
 
   return (
-    <PostCard rail={rail} muted={muted}>
-      {post.title && <p className="draft-title">{post.title}</p>}
-      <p className="status-line inline-row post-card-meta">
-        <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
-          {post.url}
-        </a>
-      </p>
+    <PostCard head={head} footer={footer} muted={muted}>
+      {post.title && <h2 className="draft-title">{post.title}</h2>}
 
       <StatusMessage message={status} />
 

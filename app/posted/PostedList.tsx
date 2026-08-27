@@ -69,22 +69,20 @@ export function PostedList({
           {rows.map((post) => (
             <PostCard
               key={post.id}
-              rail={
+              head={
                 <>
                   <span className="data id-chip">#{post.id}</span>
+                  <a className="data post-card-source" href={post.url} target="_blank" rel="noopener noreferrer">
+                    {post.url}
+                  </a>
+                  {post.sourceName && <span className="tag">{post.sourceName}</span>}
                   {post.postedAt && (
-                    <span className="data rail-note">Posted {formatPostedAt(post.postedAt)}</span>
+                    <span className="data post-card-when">Posted {formatPostedAt(post.postedAt)}</span>
                   )}
                 </>
               }
             >
-              {post.title && <p className="draft-title">{post.title}</p>}
-              <p className="status-line inline-row post-card-meta">
-                <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
-                  {post.url}
-                </a>
-                {post.sourceName && <span className="data">{post.sourceName}</span>}
-              </p>
+              {post.title && <h2 className="draft-title">{post.title}</h2>}
               <p className="measure posted-text">{post.editedText ?? post.originalText}</p>
             </PostCard>
           ))}
