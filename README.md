@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">
-    <img src="assets/photos/logo.jpeg" alt="" height="44" />
+    <img src="assets/photos/logo.png" alt="" height="80" align="middle" />
     &nbsp;sift
   </h1>
   <p align="center"><b>RSS in, LinkedIn drafts out.</b></p>
