@@ -126,7 +126,10 @@ function ReviewHead({
       <div className="toolbar">
         <RunPicker runs={runs} currentRunId={currentRunId} />
         {count !== undefined && total !== undefined && (
-          <span className="toolbar-note">
+          /* Clearing a run is the thing this page exists for, so the moment
+             it happens is worth marking rather than leaving as one more
+             grey line. */
+          <span className={count === 0 ? "toolbar-note cell-yes" : "toolbar-note"}>
             {count === 0
               ? `All ${total} decided`
               : `${count} of ${total} still to decide`}

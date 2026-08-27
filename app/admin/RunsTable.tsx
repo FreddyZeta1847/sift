@@ -24,12 +24,16 @@ const COLUMNS: AdminColumn<RunRow>[] = [
   {
     label: "Status",
     width: "minmax(0,1fr)",
-    render: (r) => (
-      <>
-        {r.status ?? "incomplete"}
-        {r.abortReason ? ` (${r.abortReason})` : ""}
-      </>
-    ),
+    // Three genuinely different outcomes that all rendered as the same
+    // plain text. A finished run is the good one and gets the green dot;
+    // an aborted one is a real failure; "incomplete" is neither — it is a
+    // run that never reported back, so it stays muted rather than red.
+    render: (r) => {
+      const status = r.status ?? "incomplete";
+      const text = `${status}${r.abortReason ? ` (${r.abortReason})` : ""}`;
+      if (status === "success") return <span className="cell-yes">{text}</span>;
+      return <span className={status === "aborted" ? "cell-bad" : "cell-no"}>{text}</span>;
+    },
   },
   { label: "Started", width: "minmax(0,1fr)", render: (r) => <LocalTime value={r.startedAt} className="data" /> },
   { label: "Finished", width: "minmax(0,1fr)", render: (r) => <LocalTime value={r.finishedAt} className="data" /> },

@@ -437,6 +437,48 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 }
 .toolbar-note { color: var(--muted); font-size: 0.875rem; }
 
+/* ---------------------------------------------------------------------
+ * Green — the system's second signal colour, and the narrowest.
+ *
+ * Terracotta means "this is active, or you can act on it". Green means
+ * something quieter and rarer: "this finished, and it finished well." A
+ * run that succeeded, a candidate that got chosen, a post that went out,
+ * a model that answered correctly, a settings toggle that is on.
+ *
+ * That distinction is the whole reason to have it, so it is never used
+ * decoratively — a green dot on something merely present would drain the
+ * meaning out of every other green on the page. Nothing neutral, and
+ * nothing bad, is green. "Discarded" is a perfectly fine outcome and is
+ * deliberately not green either: it is a decision, not an achievement.
+ * ------------------------------------------------------------------- */
+
+/* A boolean cell that came out well. The dot carries the colour so the
+   word stays readable at a small size and for a colour-blind reader the
+   text is still just "yes". */
+.cell-yes {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--success-deep);
+  font-weight: 500;
+  min-width: 0;
+}
+.cell-yes::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+/* Its counterpart: true but not good, or simply false. Muted, never red —
+   an unchosen candidate is not an error. */
+.cell-no { color: var(--muted); }
+.cell-bad { color: var(--danger); }
+
+/* The success flavour of the neutral chip — a post that went out. */
+.tag--success { background: var(--success-bg); color: var(--success-deep); }
+
 /* A vertical stack with one consistent gap. `--gap` overrides it. */
 .stack {
   display: flex;
@@ -1114,6 +1156,25 @@ h3:first-child { margin-top: 0; }
 /* A labeled sub-group inside a section (model-assignment stage, voice
    profile's example-posts/interests clusters). */
 .stage-block + .stage-block { margin-top: var(--space-lg); }
+
+/* Two comparable stages side by side have to LOOK comparable, and they
+   did not: ModelSelect emits a variable-height note under its dropdown
+   ("No models listed for this provider yet…", "This model isn't in your
+   list…"), so whichever stage had one pushed its Test button a line lower
+   than the other's. Two buttons doing the same job on different lines
+   reads as an accident, because it was one.
+
+   Grid rows already stretch their items to equal height, so making each
+   block a column and pinning its action row to the bottom lines the two
+   buttons up whatever appears above them. */
+.panel-grid > .stage-block {
+  display: flex;
+  flex-direction: column;
+}
+.panel-grid > .stage-block > .row-actions {
+  margin-top: auto;
+  padding-top: var(--space-md);
+}
 
 /* Model assignment's two stages (Curation/Drafting) are directly
    comparable, so on a wide config page they sit side by side instead of

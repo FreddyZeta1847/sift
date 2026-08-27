@@ -46,7 +46,7 @@ export function PostedList({
         <div className="page-head-text">
           <h1>Posted</h1>
           {total > 0 && (
-            <p className="page-head-sub">
+            <p className="page-head-sub cell-yes">
               {total} post{total === 1 ? "" : "s"} published so far.
             </p>
           )}

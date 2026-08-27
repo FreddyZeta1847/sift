@@ -14,7 +14,7 @@
  */
 "use client";
 
-import { AdminTable, type AdminColumn } from "../AdminTable";
+import { AdminTable, YesNo, type AdminColumn } from "../AdminTable";
 import { deletePostAction } from "../actions";
 import type { FilterField, FilterValues } from "../../FilterBar";
 import type { PostRowWithSource } from "../../../lib/admin/queries";
@@ -24,8 +24,8 @@ const COLUMNS: AdminColumn<PostRowWithSource>[] = [
   { label: "Title", width: "minmax(0,1fr)", render: (p) => p.title ?? "(untitled)" },
   { label: "Run", width: "64px", render: (p) => <span className="data">#{p.runId}</span> },
   { label: "Source", width: "minmax(0,140px)", render: (p) => p.sourceName ?? "—" },
-  { label: "Posted", width: "72px", render: (p) => (p.posted ? "yes" : "no") },
-  { label: "Discarded", width: "86px", render: (p) => (p.discarded ? "yes" : "no") },
+  { label: "Posted", width: "72px", render: (p) => <YesNo value={p.posted} /> },
+  { label: "Discarded", width: "86px", render: (p) => <YesNo value={p.discarded} good={false} /> },
 ];
 
 const FILTERS: FilterField[] = [

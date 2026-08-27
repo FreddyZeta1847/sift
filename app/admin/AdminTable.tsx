@@ -211,3 +211,18 @@ export function AdminTable<T>({
     </section>
   );
 }
+
+/**
+ * A boolean cell. "yes" is rendered green with a dot when it is the good
+ * outcome — a candidate that got chosen, a post that went out — and plain
+ * muted otherwise. "no" is always muted, never red: an unchosen candidate
+ * is not an error.
+ *
+ * `good={false}` covers a true that isn't an achievement. A discarded post
+ * is a decision you made on purpose, so it stays neutral rather than
+ * borrowing either colour.
+ */
+export function YesNo({ value, good = true }: { value: boolean; good?: boolean }) {
+  if (!value) return <span className="cell-no">no</span>;
+  return <span className={good ? "cell-yes" : "cell-no"}>yes</span>;
+}

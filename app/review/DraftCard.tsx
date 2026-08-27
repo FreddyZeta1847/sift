@@ -670,7 +670,12 @@ export function DraftCard({ post }: { post: PostWithPending }) {
 
       {muted && (
         <p className="post-card-flags">
-          <span className="tag">{post.discarded ? "Discarded" : "Posted"}</span>
+          {/* Posted earns the green chip; discarded stays neutral. Both are
+              fine outcomes, but only one of them is the one you were
+              working towards. */}
+          <span className={post.discarded ? "tag" : "tag tag--success"}>
+            {post.discarded ? "Discarded" : "Posted"}
+          </span>
         </p>
       )}
 
