@@ -1545,63 +1545,81 @@ h3:first-child { margin-top: 0; }
   border: 0;
 }
 
-/* Costs' daily-spend chart — a single-series bar chart, so per the dataviz
-   skill's accessibility pass it needs no legend (the section title already
-   names the series). Bars carry terracotta like every other active element
-   in the system (DESIGN.md's Warm Consistency Rule); this comment used to
-   justify the color with two names from the deleted "Study Lamp" palette.
-   Bars use `transform: scaleY()` off a fixed-height track rather than
-   animating `height` — same layout-thrash reasoning as
-   `.budget-bar-fill`. */
-.bar-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 140px;
-  padding-top: var(--space-md);
-  border-bottom: 1px solid var(--border);
+/* ---------------------------------------------------------------------
+ * Costs' daily-spend chart (DailySpendChart.tsx) — a single-series line.
+ *
+ * Replaces a bar chart. Spend day-by-day is a quantity changing over time
+ * and the question is whether it is trending; bars made a reader trace
+ * their own tops to answer that. One series, so no legend — the panel
+ * title names what is plotted.
+ *
+ * Everything here is deliberately recessive except the line itself: a
+ * hairline grid one shade off the surface, mono ticks in muted ink, and
+ * terracotta reserved for the data.
+ * ------------------------------------------------------------------- */
+.line-chart { position: relative; margin-top: var(--space-sm); }
+.line-chart-svg { display: block; width: 100%; height: auto; }
+
+/* Solid, never dashed: a dashed grid reads as a threshold or a projection
+   when it is neither. */
+.line-chart-grid { stroke: var(--border); stroke-width: 1; }
+
+.line-chart-tick {
+  font-family: var(--font-data, "IBM Plex Mono"), ui-monospace, monospace;
+  font-size: 11px;
+  fill: var(--muted);
 }
-.bar-chart-col {
-  flex: 1;
-  min-width: 3px;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-  position: relative;
+
+/* A flat, very light wash — enough to read the area under the curve as
+   magnitude, far short of the saturated block the marks rules rule out.
+   Flat rather than a gradient, per DESIGN.md §6. */
+.line-chart-area { fill: var(--primary); opacity: 0.09; }
+
+.line-chart-line { stroke: var(--primary); stroke-width: 2; }
+
+.line-chart-point { fill: var(--primary); }
+
+.line-chart-peak-label {
+  font-family: var(--font-data, "IBM Plex Mono"), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--ink-soft);
 }
-.bar-chart-col:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.bar-chart-bar {
-  width: 100%;
-  height: 100%;
-  background: var(--primary);
-  border-radius: 3px 3px 0 0;
-  transform-origin: bottom;
-  transition: transform var(--duration-base) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard);
+
+.line-chart-crosshair { stroke: var(--border-dashed); stroke-width: 1; }
+
+/* A surface ring rather than a border, so the marker reads as sitting
+   above the line instead of being outlined. */
+.line-chart-marker {
+  fill: var(--primary);
+  stroke: var(--surface);
+  stroke-width: 2;
 }
-.bar-chart-col:hover .bar-chart-bar { background: var(--primary-deep); }
-.bar-chart-tooltip {
+
+/* The hit area is the whole column, not the 2px line — a pointer should
+   never have to land on the mark itself. */
+.line-chart-hit { cursor: crosshair; }
+.line-chart-hit:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.line-chart-tooltip {
   position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--surface-raised);
-  color: var(--ink);
-  font-size: 0.75rem;
-  white-space: nowrap;
-  padding: 4px 8px;
+  top: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-float);
-  opacity: 0;
+  background: var(--ink);
+  color: var(--primary-text);
+  font-size: 0.8125rem;
+  white-space: nowrap;
   pointer-events: none;
-  transition: opacity var(--duration-fast) var(--ease-standard);
-  z-index: 5;
+  box-shadow: var(--shadow-float);
 }
-.bar-chart-col:hover .bar-chart-tooltip,
-.bar-chart-col:focus-visible .bar-chart-tooltip { opacity: 1; }
+.line-chart-tooltip-day { color: var(--chip-bg-strong); }
 
 /* Generalized hover-tooltip recipe (same visual language as
-   .bar-chart-tooltip above) for any element that needs a fast, styled
+   .line-chart-tooltip above) for any element that needs a fast, styled
    hover label instead of the browser's native `title` delay — e.g. the
    DraftCard action buttons in app/review/DraftCard.tsx. Wrap the trigger
    element in .tooltip-target and place a .tooltip-bubble inside it with

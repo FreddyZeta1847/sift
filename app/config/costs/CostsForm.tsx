@@ -1,10 +1,19 @@
 /**
  * Interactive form for the Costs page (`/config/costs`).
  *
+ * THREE ROWS, IN THE ORDER THE QUESTIONS ARRIVE
+ *   1. This month, and the cap it is measured against — side by side,
+ *      because neither number means much without the other. They used to
+ *      sit in that order reversed, so the page opened with a form field
+ *      rather than with the figure the page exists to show.
+ *   2. Daily spend, full width — a shape needs room to be a shape.
+ *   3. By model and Model checking, side by side — both are breakdowns of
+ *      the total above, and both are short.
+ *
  * Client Component. The budget cap field follows the exact same
  * optimistic-update-with-rollback pattern established (and reviewer-fixed)
  * for retention in `app/config/settings/SettingsForm.tsx`: local `useState`
- * seeded from `budgetCapUsd`, paired with an "unlimited" checkbox (checked
+ * seeded from `budgetCapUsd`, paired with an "unlimited" switch (checked
  * means `null`); every change captures the pre-update value and calls
  * `saveBudgetCap` immediately, reverting local state back to the captured
  * previous value if the action reports `!result.ok` so a failed save never
@@ -16,41 +25,32 @@
  * saving the cap doesn't change the spend total. (A `router.refresh()` isn't
  * needed here for that reason, unlike the other config pages' forms.)
  *
- * Visual pass only: "This month" gets a `.budget-bar` under the spend
- * figure, filled to `capRatio` (already computed below for the figure's own
- * success/danger tone) so the cap-vs-spend relationship is legible at a
- * glance instead of requiring the reader to compare two numbers themselves
- * — this page has very little else on it, and the bar earns its place per
- * PRODUCT.md's "trust through transparency" without reaching for a card
- * (see DESIGN.md's Card-Is-Not-Default Rule). Hidden when `cap` is null —
- * "unlimited" has nothing to fill a bar against.
+ * "This month" carries a `.budget-bar` under the spend figure, filled to
+ * `capRatio` (already computed below for the figure's own success/danger
+ * tone) so the cap-vs-spend relationship is legible at a glance instead of
+ * requiring the reader to compare two numbers themselves. Hidden when `cap`
+ * is null — "unlimited" has nothing to fill a bar against.
  *
- * `dailySpend`/`spendByModel` back two additional read-only sections (no
- * new mutations): a per-day bar chart and a per-model breakdown. Per the
- * dataviz skill's form heuristic, day-by-day magnitude is a bar chart
- * (single series — Harbor Cobalt fill, no legend needed, the section title
- * names it); per-model spend is usually only 1-2 rows for a single
- * self-hoster's config, so it's a plain breakdown list rather than a second
- * chart (a categorical chart earns its keep at more categories than this
- * ever realistically has). The chart trims `dailySpend` to days that have
- * actually happened (today's UTC date and earlier) — the query always
- * returns a full month of buckets, and showing empty bars for future days
- * would misrepresent "no data yet" as "zero spend."
+ * `dailySpend` is drawn as a line rather than the bars it used to be: the
+ * question you bring to spend-over-time is whether it is trending up, and
+ * bars make a reader trace their own tops to answer that. See
+ * DailySpendChart.tsx. `spendByModel` stays a plain breakdown list — for a
+ * single self-hoster it is usually one or two rows, and a categorical chart
+ * earns its keep at more categories than this realistically has.
+ *
+ * The chart trims `dailySpend` to days that have actually happened (today's
+ * UTC date and earlier): the query always returns a full month of buckets,
+ * and plotting the future at zero would misrepresent "no data yet" as
+ * "nothing spent".
  */
 "use client";
 
 import { useState } from "react";
 import { saveBudgetCap } from "./actions";
+import { StatusMessage } from "../../StatusMessage";
+import { EmptyState } from "../../EmptyState";
+import { DailySpendChart } from "./DailySpendChart";
 import type { DailySpend, ModelSpend, CheckSpend } from "../../../lib/config/cost-history";
-
-// Visual-only helper: the failure message here always follows an
-// "X failed: ..." shape (see `persistCap` below), so matching that
-// substring is enough to apply the danger tint without adding any new
-// state — the plain success sentence falls through to the default,
-// quieter `.status-line` tone.
-function statusTone(message: string): string {
-  return /failed/i.test(message) ? "status-line status-line--danger" : "status-line";
-}
 
 export function CostsForm({
   budgetCapUsd,
@@ -68,7 +68,9 @@ export function CostsForm({
   checkSpend: CheckSpend;
 }) {
   const [cap, setCap] = useState<number | null>(budgetCapUsd);
-  const [status, setStatus] = useState<string | null>(null);
+  // Carries its own tone rather than having it inferred from the wording:
+  // this component knows whether the save worked.
+  const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
 
   const isCurrentMonth = currentMonth === new Date().toISOString().slice(0, 7);
   const todayUtcDate = new Date().getUTCDate();
@@ -79,10 +81,10 @@ export function CostsForm({
     const result = await saveBudgetCap(value);
     if (!result.ok) {
       setCap(previous);
-      setStatus(`Save failed: ${result.error}`);
+      setStatus({ text: `Save failed: ${result.error}`, ok: false });
       return;
     }
-    setStatus("Budget cap saved.");
+    setStatus({ text: "Budget cap saved.", ok: true });
   };
 
   const handleCapChange = (value: number | null) => {
@@ -101,77 +103,68 @@ export function CostsForm({
 
   return (
     <div className="config-page">
-      <div className="stage-grid">
-      <section id="budget-cap" className="card">
-        <h2>Budget cap</h2>
-        <div className="field-row">
-          <label>
-            Monthly budget cap (USD)
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={cap ?? ""}
-              disabled={cap === null}
-              onChange={(e) => handleCapChange(e.target.value === "" ? null : Number(e.target.value))}
-            />
-          </label>
-          <label className="checkbox-label">
-            <span className="switch">
-              <input type="checkbox" checked={cap === null} onChange={(e) => handleCapChange(e.target.checked ? null : 0)} />
-              <span className="switch-track" />
-            </span>
-            Unlimited
-          </label>
-        </div>
-        {status && (
-          <p className={statusTone(status)} role="alert">
-            {status}
-          </p>
-        )}
-      </section>
-
-      <section id="this-month" className="card">
-        <h2>This month</h2>
-        <p className={`figure-lg data ${spendTone}`}>${spend.toFixed(2)}</p>
-        <p className="status-line">
-          {cap !== null ? `of $${cap.toFixed(2)} monthly cap (${currentMonth})` : `spent this month (${currentMonth})`}
-        </p>
-        {cap !== null && (
-          <div
-            className="budget-bar"
-            role="img"
-            aria-label={`${Math.round(Math.min(capRatio ?? 0, 1) * 100)}% of monthly budget cap used`}
-          >
-            <div
-              className="budget-bar-fill"
-              data-tone={spendTone === "figure-lg--danger" ? "danger" : "success"}
-              style={{ transform: `scaleX(${Math.min(capRatio ?? 0, 1)})` }}
-            />
+      <div className="panel-grid">
+        <section className="panel" id="this-month">
+          <div className="panel-head">
+            <h2>This month</h2>
           </div>
-        )}
-      </section>
+          <p className={`figure-lg data ${spendTone}`}>${spend.toFixed(2)}</p>
+          <p className="status-line">
+            {cap !== null ? `of $${cap.toFixed(2)} monthly cap (${currentMonth})` : `spent this month (${currentMonth})`}
+          </p>
+          {cap !== null && (
+            <div
+              className="budget-bar"
+              role="img"
+              aria-label={`${Math.round(Math.min(capRatio ?? 0, 1) * 100)}% of monthly budget cap used`}
+            >
+              <div
+                className="budget-bar-fill"
+                data-tone={spendTone === "figure-lg--danger" ? "danger" : "success"}
+                style={{ transform: `scaleX(${Math.min(capRatio ?? 0, 1)})` }}
+              />
+            </div>
+          )}
+        </section>
+
+        <section className="panel" id="budget-cap">
+          <div className="panel-head">
+            <h2>Budget cap</h2>
+          </div>
+          <div className="field-row">
+            <label>
+              Monthly budget cap (USD)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={cap ?? ""}
+                disabled={cap === null}
+                onChange={(e) => handleCapChange(e.target.value === "" ? null : Number(e.target.value))}
+              />
+            </label>
+            <label className="checkbox-label">
+              <span className="switch">
+                <input type="checkbox" checked={cap === null} onChange={(e) => handleCapChange(e.target.checked ? null : 0)} />
+                <span className="switch-track" />
+              </span>
+              Unlimited
+            </label>
+          </div>
+          <StatusMessage message={status?.text} tone={status?.ok ? "success" : "danger"} />
+        </section>
       </div>
 
-      <div className="stage-grid">
-      <section id="daily-spend" className="card">
-        <h2>Daily spend</h2>
+      <section className="panel" id="daily-spend">
+        <div className="panel-head">
+          <h2>Daily spend</h2>
+          {maxDayCost > 0 && <span className="panel-head-aside data">{currentMonth}</span>}
+        </div>
         {maxDayCost > 0 ? (
           <>
-            <div
-              className="bar-chart"
-              role="img"
-              aria-label={`Daily spend for ${currentMonth}. Peak day: $${maxDayCost.toFixed(2)}. See the table below for exact per-day figures.`}
-            >
-              {visibleDays.map((d) => (
-                <div className="bar-chart-col" key={d.day} tabIndex={0}>
-                  <div className="bar-chart-bar" style={{ transform: `scaleY(${maxDayCost > 0 ? d.cost / maxDayCost : 0})` }} />
-                  <span className="bar-chart-tooltip">
-                    Day {d.day}: ${d.cost.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <DailySpendChart days={visibleDays} month={currentMonth} />
+            {/* The chart's WCAG-clean twin. Every value the tooltip shows is
+                also here, so hovering is never the only way to read one. */}
             <table className="visually-hidden">
               <caption>Daily spend for {currentMonth}</caption>
               <thead>
@@ -191,60 +184,71 @@ export function CostsForm({
             </table>
           </>
         ) : (
-          <p className="empty-state">No spend recorded yet this month.</p>
+          <EmptyState hint="Spend appears here as soon as a run makes its first billed call.">
+            No spend recorded yet this month.
+          </EmptyState>
         )}
       </section>
 
-      <section id="by-model" className="card">
-        <h2>By model</h2>
-        {spendByModel.length > 0 ? (
-          <ul className="list">
-            {spendByModel.map((m) => (
-              <li key={`${m.provider}-${m.model}`} className="list-row">
-                <span className="list-row-main">
-                  <span className="list-row-title data">{m.model}</span>
-                  <span className="list-row-meta">
-                    {m.provider} · {m.calls} call{m.calls === 1 ? "" : "s"}
+      <div className="panel-grid">
+        <section className="panel" id="by-model">
+          <div className="panel-head">
+            <h2>By model</h2>
+          </div>
+          {spendByModel.length > 0 ? (
+            <div className="rows" style={{ ["--cols" as string]: "minmax(0,1fr) auto" } as React.CSSProperties}>
+              {spendByModel.map((m) => (
+                <div key={`${m.provider}-${m.model}`} className="row">
+                  <span className="row-main">
+                    <span className="row-title data">{m.model}</span>
+                    <span className="row-meta">
+                      {m.provider} · {m.calls} call{m.calls === 1 ? "" : "s"}
+                    </span>
                   </span>
-                </span>
-                {m.priced ? (
-                  <span className="data">${m.cost.toFixed(2)}</span>
-                ) : (
-                  /* $0.00 here would be a confident lie. This model has no
-                     price on record, so its real spend is unknown — and it is
-                     invisible to the budget cap for the same reason. Add it in
-                     Models & pricing on API Config to start counting it. */
-                  <span
-                    className="data status-line"
-                    title="No price on record for this model, so its spend can't be worked out and isn't counted against your budget cap. Add it in Models & pricing on API Config."
-                  >
-                    pricing not set
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="empty-state">No calls recorded yet this month.</p>
-        )}
-      </section>
+                  {m.priced ? (
+                    <span className="data">${m.cost.toFixed(2)}</span>
+                  ) : (
+                    /* $0.00 here would be a confident lie. This model has no
+                       price on record, so its real spend is unknown — and it is
+                       invisible to the budget cap for the same reason. Add it in
+                       Models & pricing on API Config to start counting it. */
+                    <span
+                      className="data status-line"
+                      title="No price on record for this model, so its spend can't be worked out and isn't counted against your budget cap. Add it in Models & pricing on API Config."
+                    >
+                      pricing not set
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState hint="Every pipeline call is recorded here, grouped by the model that made it.">
+              No calls recorded yet this month.
+            </EmptyState>
+          )}
+        </section>
 
-      <section id="check-spend" className="card">
-        <h2>Model checking</h2>
-        <p className="status-line">
-          What the startup check and the &ldquo;Test this model&rdquo; button cost this month. Counted separately from
-          pipeline runs because they answer a different question — but it is the same money, and it counts against your
-          budget cap.
-        </p>
-        {checkSpend.calls > 0 ? (
-          <p>
-            <span className="data">${checkSpend.cost.toFixed(2)}</span> across {checkSpend.calls} call
-            {checkSpend.calls === 1 ? "" : "s"}
+        <section className="panel" id="check-spend">
+          <div className="panel-head">
+            <h2>Model checking</h2>
+          </div>
+          <p className="panel-intro">
+            What the startup check and the &ldquo;Test this model&rdquo; button cost this month. Counted separately from
+            pipeline runs because they answer a different question — but it is the same money, and it counts against your
+            budget cap.
           </p>
-        ) : (
-          <p className="empty-state">No model checks recorded yet this month.</p>
-        )}
-      </section>
+          {checkSpend.calls > 0 ? (
+            <p>
+              <span className="data">${checkSpend.cost.toFixed(2)}</span> across {checkSpend.calls} call
+              {checkSpend.calls === 1 ? "" : "s"}
+            </p>
+          ) : (
+            <EmptyState hint="Nothing has been spent checking models — either checking is off, or no check has run yet.">
+              No model checks recorded yet this month.
+            </EmptyState>
+          )}
+        </section>
       </div>
     </div>
   );

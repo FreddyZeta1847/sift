@@ -32,7 +32,12 @@ export default async function CostsPage() {
   ]);
   return (
     <main>
-      <h1>Costs</h1>
+      <div className="page-head">
+        <div className="page-head-text">
+          <h1>Costs</h1>
+          <p className="page-head-sub">What this month has cost, and what is spending it.</p>
+        </div>
+      </div>
       <CostsForm
         budgetCapUsd={settings.budgetCapUsd}
         currentMonth={currentMonth}
