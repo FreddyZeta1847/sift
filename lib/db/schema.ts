@@ -3,7 +3,7 @@
  * "recorded history" half of the config/history split (see
  * lib/config/* for the JSON-authored counterpart). Tables: pipeline
  * runs, the source identity registry, candidates, posts, LLM calls,
- * and post translations.
+ * non-pipeline LLM calls, and post translations.
  */
 import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
 
@@ -76,6 +76,26 @@ export const llmCallsTable = sqliteTable("llm_calls", {
   runId: integer("run_id")
     .notNull()
     .references(() => pipelineRunsTable.id),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  estimatedCost: real("estimated_cost").notNull(),
+});
+
+// LLM calls that belong to no pipeline run: the "Test this model" button and
+// the startup health check. They cannot live in llm_calls, whose run_id is
+// NOT NULL with a foreign key to pipeline_runs — putting them there would
+// mean inventing a fake run, which would then pollute the sidebar's
+// "last run finished" and the Costs dashboard with runs that never happened.
+//
+// They are still real money, and before this table they were spent with no
+// record anywhere. `origin` keeps them separable so the Costs page can show
+// what checking cost without mixing it into what the pipeline cost.
+export const nonPipelineLlmCallsTable = sqliteTable("non_pipeline_llm_calls", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  origin: text("origin", { enum: ["probe", "health-check"] }).notNull(),
   provider: text("provider").notNull(),
   model: text("model").notNull(),
   inputTokens: integer("input_tokens").notNull(),

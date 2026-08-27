@@ -27,6 +27,8 @@
 │   │   │   ├── actions.test.ts
 │   │   │   ├── actions.ts
 │   │   │   ├── ApiConfigForm.tsx
+│   │   │   ├── ModelSelect.tsx
+│   │   │   ├── ModelsTable.tsx
 │   │   │   └── page.tsx
 │   │   ├── costs/
 │   │   │   ├── actions.test.ts
@@ -36,8 +38,15 @@
 │   │   └── settings/
 │   │       ├── actions.test.ts
 │   │       ├── actions.ts
+│   │       ├── model-check-actions.test.ts
 │   │       ├── page.tsx
 │   │       └── SettingsForm.tsx
+│   ├── health/
+│   │   ├── actions.test.ts
+│   │   ├── actions.ts
+│   │   ├── ModelCheckGate.tsx
+│   │   ├── ModelHealthBanner.tsx
+│   │   └── ModelHealthProvider.tsx
 │   ├── posted/
 │   │   ├── page.tsx
 │   │   └── PostedList.tsx
@@ -70,6 +79,7 @@
 │   │   ├── 0004_snapshot.json
 │   │   ├── 0005_snapshot.json
 │   │   ├── 0006_snapshot.json
+│   │   ├── 0007_snapshot.json
 │   │   └── _journal.json
 │   ├── 0000_equal_gladiator.sql
 │   ├── 0001_bumpy_wendell_rand.sql
@@ -77,7 +87,8 @@
 │   ├── 0003_add_post_title.sql
 │   ├── 0004_add-sources-table.sql
 │   ├── 0005_add-current-stage.sql
-│   └── 0006_youthful_wallow.sql
+│   ├── 0006_youthful_wallow.sql
+│   └── 0007_motionless_roxanne_simpson.sql
 ├── lib/
 │   ├── admin/
 │   │   ├── delete.test.ts
@@ -92,7 +103,9 @@
 │   ├── config/
 │   │   ├── cost-history.test.ts
 │   │   ├── cost-history.ts
+│   │   ├── known-providers.test.ts
 │   │   ├── known-providers.ts
+│   │   ├── models.ts
 │   │   ├── providers.test.ts
 │   │   ├── providers.ts
 │   │   ├── read-config.test.ts
@@ -131,6 +144,12 @@
 │   │   ├── safe-fetch.ts
 │   │   ├── ssrf-guard.test.ts
 │   │   └── ssrf-guard.ts
+│   ├── health/
+│   │   ├── check-models.test.ts
+│   │   ├── check-models.ts
+│   │   ├── model-health.test.ts
+│   │   ├── model-health.ts
+│   │   └── types.ts
 │   ├── ingestion/
 │   │   ├── fetch.test.ts
 │   │   ├── fetch.ts
@@ -144,6 +163,8 @@
 │   │   ├── cost-safety.ts
 │   │   ├── json-repair.test.ts
 │   │   ├── json-repair.ts
+│   │   ├── non-pipeline-calls.test.ts
+│   │   ├── non-pipeline-calls.ts
 │   │   ├── pricing.test.ts
 │   │   ├── pricing.ts
 │   │   ├── provider.test.ts

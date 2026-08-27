@@ -24,6 +24,7 @@ import { getSettings } from "../../../lib/config/settings";
 import * as settingsModule from "../../../lib/config/settings";
 import * as probeModule from "../../../lib/config/test-model-probe";
 import * as modelHealthModule from "../../../lib/health/model-health";
+import * as nonPipelineModule from "../../../lib/llm/non-pipeline-calls";
 
 const testConfigDir = "data/test-config-api-actions";
 
@@ -43,6 +44,9 @@ describe("api config actions", () => {
     // of known models on a fresh file, and these tests are about registry
     // behaviour, not the seed.
     await saveModels([]);
+    // A probe now records what it spent. These tests have no database, and
+    // the recording is best-effort anyway, so stub it out.
+    vi.spyOn(nonPipelineModule, "tryLogNonPipelineCall").mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -132,7 +136,9 @@ describe("api config actions", () => {
   it("probeModelAction looks up the provider by id and delegates to probeModel with the user's budget", async () => {
     const provider = { id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" as const };
     await saveProviders([provider]);
-    const spy = vi.spyOn(probeModule, "probeModel").mockResolvedValue("pass");
+    const spy = vi
+      .spyOn(probeModule, "probeModelWithUsage")
+      .mockResolvedValue({ result: "pass", inputTokens: 12, outputTokens: 4 });
 
     const result = await probeModelAction("p1", "m1");
 
@@ -141,6 +147,41 @@ describe("api config actions", () => {
     // user setting now, not a constant chosen inside the probe.
     const settings = await getSettings();
     expect(spy).toHaveBeenCalledWith(provider, "m1", settings.probeTimeoutMs);
+  });
+
+  it("probeModelAction records what the probe spent", async () => {
+    // Test-button calls used to cost real money and leave no trace anywhere.
+    const provider = { id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" as const };
+    await saveProviders([provider]);
+    vi.spyOn(probeModule, "probeModelWithUsage").mockResolvedValue({
+      result: "pass",
+      inputTokens: 12,
+      outputTokens: 4,
+    });
+
+    await probeModelAction("p1", "m1");
+
+    expect(nonPipelineModule.tryLogNonPipelineCall).toHaveBeenCalledWith({
+      origin: "probe",
+      provider: "p1",
+      model: "m1",
+      inputTokens: 12,
+      outputTokens: 4,
+    });
+  });
+
+  it("probeModelAction records nothing when no tokens were spent", async () => {
+    const provider = { id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" as const };
+    await saveProviders([provider]);
+    vi.spyOn(probeModule, "probeModelWithUsage").mockResolvedValue({
+      result: "inconclusive",
+      inputTokens: 0,
+      outputTokens: 0,
+    });
+
+    await probeModelAction("p1", "m1");
+
+    expect(nonPipelineModule.tryLogNonPipelineCall).not.toHaveBeenCalled();
   });
 
   it("probeModelAction returns unreachable when the provider id doesn't exist", async () => {

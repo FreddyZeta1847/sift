@@ -22,7 +22,7 @@ describe("runMigrations", () => {
     if (existsSync(`${testDbPath}-shm`)) rmSync(`${testDbPath}-shm`);
   });
 
-  it("creates all 6 tables against a fresh database", () => {
+  it("creates all 7 tables against a fresh database", () => {
     process.env.SIFT_DB_PATH = testDbPath;
     runMigrations();
 
@@ -36,6 +36,7 @@ describe("runMigrations", () => {
       "__drizzle_migrations",
       "candidates",
       "llm_calls",
+      "non_pipeline_llm_calls",
       "pipeline_runs",
       "post_translations",
       "posts",

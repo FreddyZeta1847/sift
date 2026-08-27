@@ -55,7 +55,8 @@
 import { getProviders, saveProviders } from "../../../lib/config/providers";
 import { getModels, saveModels, type ModelEntry } from "../../../lib/config/models";
 import { getSettings, saveSettings } from "../../../lib/config/settings";
-import { probeModel, type ProbeResult } from "../../../lib/config/test-model-probe";
+import { probeModelWithUsage, type ProbeResult } from "../../../lib/config/test-model-probe";
+import { tryLogNonPipelineCall } from "../../../lib/llm/non-pipeline-calls";
 import { invalidateModelHealth, startModelHealthCheck } from "../../../lib/health/model-health";
 import { safeWrite } from "../../../lib/config/safe-write";
 import type { Provider } from "../../../lib/config/types";
@@ -124,7 +125,20 @@ export async function probeModelAction(providerId: string, model: string): Promi
   // the provider gave up; running past this budget means WE gave up, and is
   // reported as "inconclusive" instead — see lib/config/test-model-probe.ts.
   const settings = await getSettings();
-  return probeModel(provider, model, settings.probeTimeoutMs);
+  const outcome = await probeModelWithUsage(provider, model, settings.probeTimeoutMs);
+
+  // A probe is a real, billable call. It went unrecorded until now, which is
+  // how spend became invisible in the first place.
+  if (outcome.inputTokens > 0 || outcome.outputTokens > 0) {
+    await tryLogNonPipelineCall({
+      origin: "probe",
+      provider: provider.id,
+      model,
+      inputTokens: outcome.inputTokens,
+      outputTokens: outcome.outputTokens,
+    });
+  }
+  return outcome.result;
 }
 
 // ---------------------------------------------------------------------------

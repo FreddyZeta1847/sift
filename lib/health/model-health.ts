@@ -116,11 +116,31 @@ async function run(deps: HealthDeps): Promise<void> {
   }
 
   try {
-    store().state = settledFrom(await deps.check());
+    const result = await deps.check();
+    store().state = settledFrom(result);
+    await recordSpend(result);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(`[sift] Model health check failed: ${(err as Error).message}`);
     store().state = settledFrom(inconclusiveResult("The model check could not be completed."));
+  }
+}
+
+// Best-effort and after the state is already published: the verdict is what
+// the user is waiting for, and a bookkeeping failure must not delay or
+// invalidate it.
+async function recordSpend(result: HealthCheckResult): Promise<void> {
+  const spent = result.usage.filter((u) => u.inputTokens > 0 || u.outputTokens > 0);
+  if (spent.length === 0) return;
+  const { tryLogNonPipelineCall } = await import("../llm/non-pipeline-calls");
+  for (const u of spent) {
+    await tryLogNonPipelineCall({
+      origin: "health-check",
+      provider: u.providerId,
+      model: u.model,
+      inputTokens: u.inputTokens,
+      outputTokens: u.outputTokens,
+    });
   }
 }
 

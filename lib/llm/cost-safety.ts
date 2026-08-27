@@ -17,6 +17,7 @@ import { llmCallsTable } from "../db/schema";
 import { getSettings } from "../config/settings";
 import { getModels } from "../config/models";
 import { costOf, findModelEntry } from "./pricing";
+import { nonPipelineSpendSince } from "./non-pipeline-calls";
 
 export class BudgetCapAbort extends Error {
   constructor() {
@@ -45,8 +46,11 @@ export async function assertBudgetAvailable(
     .from(llmCallsTable)
     .where(gte(llmCallsTable.timestamp, startOfCurrentUtcMonth()));
 
+  // Both tables. Counting only pipeline spend would let model checks and
+  // Test-button probes accumulate past the cap unseen — the same invisibility
+  // this whole change set exists to remove.
   const entry = findModelEntry(await getModels(), providerId, model);
-  const monthTotal = Number(total ?? 0);
+  const monthTotal = Number(total ?? 0) + (await nonPipelineSpendSince(startOfCurrentUtcMonth()));
   const upperBound = monthTotal + costOf(entry, promptTokens, "input") + costOf(entry, maxOutputTokens, "output");
 
   if (upperBound > settings.budgetCapUsd) {
