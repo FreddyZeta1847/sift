@@ -33,26 +33,35 @@
  * lock in `regeneratePost` only prevents two regenerate/pipeline runs from
  * overlapping, it doesn't block edits/discard/copy on other cards.
  *
- * Visual pass only (see DESIGN.md): the draft text is this card's "one lit
- * thing" — read at body typography, capped to a ~70ch measure, everything
- * else (badge, prompt, buttons) recedes around it. "Copy & Mark Posted" is
- * the card's one primary action and stays a full text button; "Copy
- * prompt", "Regenerate", and "Discard" are icon-only ghost buttons (see
- * `.icon-button` in globals.css) — same actions, more compact chrome. The
- * content-safety badge sits at the top of the card, on its own line, so it
- * can't be missed. The pending-version compare is visually separated by
- * `.pending-compare`'s top border and stacked clearly under the current
- * draft so "keep new" vs. "keep original" reads unambiguously.
+ * LAYOUT — a two-column card (see app/PostCard.tsx, shared with /posted).
+ * The narrow left rail carries what the post *is* and what you can *do* to
+ * it: the `#id` chip, the language badge, and all four action buttons
+ * stacked. The right column carries only what the post *says*: title,
+ * source URL, the draft text, the image prompt. The draft text is the one
+ * thing on this page anyone actually reads, so nothing crosses it.
  *
- * The card's top-right corner used to hold a numbered circle showing the
- * post's 1-based position in the run (`index`, passed by review/page.tsx).
- * That badge is gone — per follow-up user feedback the corner now holds the
- * language dropdown's trigger instead (see the PHASE-6 TRANSLATION block
- * below), so `index` was dropped from this component's props entirely (and
- * from the `<DraftCard>` call in review/page.tsx) rather than left unused.
- * Both the title and status-line rows still reserve right-side padding so
- * their text never runs under whatever occupies that corner; `.draft-card`
- * stays `position: relative` so the corner element anchors to this card.
+ * That replaces a single-column card where a row of buttons cut across the
+ * bottom of the reading column and the language badge floated absolutely
+ * in the top-right corner. The corner badge is why both the title and the
+ * status line used to carry a hardcoded `paddingRight: "66px"` (the
+ * badge's footprint from the card's right edge) — moving it into the rail
+ * removes the overlap, so those two magic numbers are gone with it. The
+ * corner itself was inherited from a numbered index badge (`index`, once
+ * passed by review/page.tsx) that was dropped earlier still.
+ *
+ * "Copy & Mark Posted" is the card's one primary action and stays a full
+ * text button; "Copy prompt", "Regenerate" and "Discard" are icon-only
+ * ghost buttons (see `.icon-button` in globals.css) — same actions, same
+ * order, more compact chrome. The content-safety badge sits above the
+ * draft text, on its own line, so it can't be missed. The pending-version
+ * compare stays visually separated by `.pending-compare`'s top border and
+ * stacked under the current draft, so "keep new" vs. "keep original" reads
+ * unambiguously.
+ *
+ * The image prompt is folded behind a `Disclosure` rather than sitting
+ * open under every draft. It is a prompt for a photo you generate
+ * elsewhere — needed once per post, at the end, and never while reading.
+ * The text and its dashed block are unchanged; only its default state is.
  *
  * The draft textarea auto-grows to its content's `scrollHeight` (see the
  * `resizeTextarea` effect below) instead of sitting at a fixed height with
@@ -106,15 +115,13 @@
  *   internal tool's v1, so there's no roving-tabindex/full ARIA-menu
  *   implementation here.
  *
- * - The trigger itself sits in the card's top-right corner as a circular
- *   badge (`.lang-dropdown--corner` + `.lang-dropdown-trigger--badge` in
- *   globals.css) — same visual family as the numbered index badge this
- *   replaced (circular, 42px). Position (`top: 18px; right: 16px`) was
- *   nudged after live UI feedback — up and left from an earlier attempt
- *   that sat too low and too tight into the corner. Its footprint from the
- *   card's right edge (`right` + width = 58px) is why the title/status-line
- *   rows' `paddingRight` was bumped to `66px` — the old `50px` reservation
- *   no longer cleared it once the badge moved left.
+ * - The trigger is a circular badge (`.lang-dropdown-trigger--badge` in
+ *   globals.css), 42px, holding a flag. It now sits in the card's left
+ *   rail; it used to be absolutely positioned in the card's top-right
+ *   corner via a `.lang-dropdown--corner` modifier, which existed only to
+ *   flip the panel's anchor so it opened toward the card's interior
+ *   instead of off its right edge. In the rail the base `left: 0` anchor
+ *   is already the correct one, so that modifier is gone.
  *
  * - The flag itself fills the entire circle edge-to-edge (per follow-up
  *   feedback: "the whole circle should be the flag, not a squared flag
@@ -192,9 +199,9 @@
  *   flag — see lib/translation/actions.ts's header for why a human editing
  *   a translation doesn't make it stale.
  *
- * - The "may be outdated" notice reuses `.tag` (not `.badge` — that fill is
- *   reserved for the content-safety flag's accent treatment per DESIGN.md's
- *   One Lit Thing Rule) and reads directly off the active tab's
+ * - The "may be outdated" notice reuses `.tag`, not `.badge`. Terracotta
+ *   means "act on this" (DESIGN.md's Warm Consistency Rule) and this
+ *   notice is informational, so it stays neutral. It reads off the active tab's
  *   `TranslationRow.outdated` column. This is informational only: per the
  *   locked "mark stale, don't auto-retranslate" decision, nothing here
  *   triggers a fresh translate just because the flag is set.
@@ -219,6 +226,9 @@ import {
   saveTranslationEdit,
 } from "./actions";
 import { isFlagged } from "../../lib/safety/leakage-linter";
+import { PostCard } from "../PostCard";
+import { Disclosure } from "../Disclosure";
+import { StatusMessage } from "../StatusMessage";
 import type { PostWithPending } from "../../lib/review/queries";
 import type { Language } from "../../lib/translation/models";
 
@@ -495,9 +505,11 @@ export function DraftCard({ post }: { post: PostWithPending }) {
   const muted = post.posted || post.discarded;
   const flagged = isFlagged(activeText);
 
-  return (
-    <article className={muted ? "card draft-card muted" : "card draft-card"}>
-      <div className="lang-dropdown lang-dropdown--corner" ref={langMenuRef}>
+  const rail = (
+    <>
+      <span className="data id-chip">#{post.id}</span>
+
+      <div className="lang-dropdown" ref={langMenuRef}>
         <button
           type="button"
           className="lang-dropdown-trigger lang-dropdown-trigger--badge"
@@ -565,43 +577,95 @@ export function DraftCard({ post }: { post: PostWithPending }) {
           </div>
         )}
       </div>
-      {post.title && <p className="draft-title" style={{ paddingRight: "66px" }}>{post.title}</p>}
-      <p
-        className="status-line"
-        style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap", marginTop: 0, paddingRight: "66px" }}
-      >
-        <span className="data id-chip">#{post.id}</span>
+
+      {/* Same four actions in the same order as the old bottom bar, stacked
+          instead of laid across the foot of the reading column. */}
+      <div className="rail-actions">
+        <span className="tooltip-target">
+          <button className="icon-button" onClick={handleCopyPrompt} aria-label="Copy image prompt" title="Copy image prompt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
+          <span className="tooltip-bubble">Copy image prompt</span>
+        </span>
+        <span className="tooltip-target">
+          <button
+            className="icon-button"
+            onClick={handleRegenerate}
+            disabled={muted || isRegenerating || !!post.pendingVersion}
+            aria-label={isRegenerating ? "Regenerating…" : "Regenerate"}
+            title={isRegenerating ? "Regenerating…" : "Regenerate"}
+          >
+            <svg
+              className={isRegenerating ? "spin-icon" : undefined}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
+          <span className="tooltip-bubble">{isRegenerating ? "Regenerating…" : "Regenerate"}</span>
+        </span>
+        <span className="tooltip-target">
+          <button className="icon-button icon-button--danger" onClick={handleDiscard} disabled={muted} aria-label="Discard" title="Discard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </button>
+          <span className="tooltip-bubble">Discard</span>
+        </span>
+      </div>
+
+      <button className="primary rail-primary" onClick={handleCopyAndPost} disabled={muted} title="Copy text, mark as posted">
+        Copy &amp; Mark Posted
+      </button>
+    </>
+  );
+
+  return (
+    <PostCard rail={rail} muted={muted}>
+      {post.title && <p className="draft-title">{post.title}</p>}
+      <p className="status-line inline-row post-card-meta">
         <a className="data" href={post.url} target="_blank" rel="noopener noreferrer">
           {post.url}
         </a>
       </p>
 
-      {status && (
-        <p role="alert" style={{ marginTop: 0, marginBottom: "var(--space-sm)", fontWeight: 500 }}>
-          {status}
+      <StatusMessage message={status} />
+
+      {muted && (
+        <p className="post-card-flags">
+          <span className="tag">{post.discarded ? "Discarded" : "Posted"}</span>
         </p>
       )}
 
-      {muted && (
-        <span className="tag" style={{ marginBottom: "var(--space-sm)", display: "inline-block" }}>
-          {post.discarded ? "Discarded" : "Posted"}
-        </span>
-      )}
-
       {flagged && (
-        <div style={{ marginBottom: "var(--space-sm)" }}>
+        <p className="post-card-flags">
           <span className="badge">content-safety flag</span>
-        </div>
+        </p>
       )}
 
       {activeTranslation?.outdated && (
-        <div style={{ marginBottom: "var(--space-sm)" }}>
+        <p className="post-card-flags">
           <span className="tag">May be outdated — the English text changed since this was translated.</span>
-        </div>
+        </p>
       )}
 
       {activeTab === "en" || activeTab in translationTexts ? (
-        <div style={{ maxWidth: "70ch" }}>
+        <div className="measure">
           <textarea
             key={activeTab}
             ref={textareaRef}
@@ -612,101 +676,30 @@ export function DraftCard({ post }: { post: PostWithPending }) {
           />
         </div>
       ) : (
-        <p className="status-line" style={{ maxWidth: "70ch" }}>
+        <p className="status-line measure">
           {isTranslating && pendingLanguage === activeTab ? TRANSLATING_LABEL : `Translate to ${LANGUAGE_LABELS[activeTab]}`}
         </p>
       )}
 
-      <div className="image-prompt" style={{ maxWidth: "70ch" }}>
-        <span className="image-prompt-label">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="m21 15-5-5L5 21" />
-          </svg>
-          Image prompt
-        </span>
-        <p className="image-prompt-text">{post.imagePrompt}</p>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          gap: "var(--space-sm)",
-          marginTop: "var(--space-md)",
-        }}
-      >
-        <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-          <span className="tooltip-target">
-            <button className="icon-button" onClick={handleCopyPrompt} aria-label="Copy image prompt" title="Copy image prompt">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
-            <span className="tooltip-bubble">Copy image prompt</span>
-          </span>
-          <span className="tooltip-target">
-            <button
-              className="icon-button"
-              onClick={handleRegenerate}
-              disabled={muted || isRegenerating || !!post.pendingVersion}
-              aria-label={isRegenerating ? "Regenerating…" : "Regenerate"}
-              title={isRegenerating ? "Regenerating…" : "Regenerate"}
-            >
-              <svg
-                className={isRegenerating ? "spin-icon" : undefined}
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="23 4 23 10 17 10" />
-                <polyline points="1 20 1 14 7 14" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>
-            </button>
-            <span className="tooltip-bubble">{isRegenerating ? "Regenerating…" : "Regenerate"}</span>
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-          <span className="tooltip-target">
-            <button className="icon-button icon-button--danger" onClick={handleDiscard} disabled={muted} aria-label="Discard" title="Discard">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                <line x1="10" y1="11" x2="10" y2="17" />
-                <line x1="14" y1="11" x2="14" y2="17" />
-              </svg>
-            </button>
-            <span className="tooltip-bubble">Discard</span>
-          </span>
-          <span className="tooltip-target">
-            <button className="primary" onClick={handleCopyAndPost} disabled={muted} aria-label="Copy & Mark Posted" title="Copy & Mark Posted">
-              Copy &amp; Mark Posted
-            </button>
-            <span className="tooltip-bubble">Copy text, mark as posted</span>
-          </span>
-        </div>
+      <div className="measure">
+        <Disclosure label="Image prompt">
+          <div className="image-prompt">
+            <p className="image-prompt-text">{post.imagePrompt}</p>
+          </div>
+        </Disclosure>
       </div>
 
       {post.pendingVersion && (
         <div className="pending-compare">
           <p className="status-line" style={{ marginTop: 0 }}>New version:</p>
           {post.pendingVersion.title && <p className="draft-title">{post.pendingVersion.title}</p>}
-          <p style={{ maxWidth: "70ch" }}>{post.pendingVersion.originalText}</p>
-          <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+          <p className="measure">{post.pendingVersion.originalText}</p>
+          <div className="inline-row">
             <button onClick={() => handleKeep(post.pendingVersion!.id, post.id)}>Keep this one</button>
             <button onClick={() => handleKeep(post.id, post.pendingVersion!.id)}>Keep original</button>
           </div>
         </div>
       )}
-    </article>
+    </PostCard>
   );
 }

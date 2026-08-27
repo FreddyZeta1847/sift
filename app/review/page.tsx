@@ -14,16 +14,21 @@
  * than dead-ending the page. It's fed the full recent-run list up front so
  * switching runs is a single navigation, no extra fetch.
  *
- * Visual pass only (see DESIGN.md): this is the "Study Lamp" system's
- * single most important screen, so the page chrome stays quiet — a
- * display-weight title, a muted status line, then the drafts themselves
- * as cards (the one place in the app cards are earned per the
- * Card-Is-Not-Default rule). Empty states keep using the shared
- * `.empty-state` class but get a short, reassuring sub-line and some
- * breathing room so an empty run doesn't read as a broken page.
+ * This is the app's single most important screen, so the page chrome stays
+ * quiet: a `.page-head` carrying the title, a count of what's waiting, and
+ * the run picker parked on the right — then nothing but the drafts. The
+ * picker moved into the head because it selects what the whole page shows;
+ * as a stray labelled `<select>` floating between the title and the first
+ * card it read as a filter belonging to the list rather than the control
+ * that chooses the list.
+ *
+ * Empty states go through `<EmptyState>`, which keeps the reassuring
+ * second line structural rather than a convention each branch has to
+ * remember — an empty run should never read as a broken page.
  */
 import { redirect } from "next/navigation";
 import { resolveRunIdForDate, getPostsForRun, getRecentRuns } from "../../lib/review/queries";
+import { EmptyState } from "../EmptyState";
 import { DraftCard } from "./DraftCard";
 import { RunPicker } from "./RunPicker";
 
@@ -53,14 +58,10 @@ export default async function ReviewPage({
   if (!runId) {
     return (
       <main>
-        <h1>Review</h1>
-        <RunPicker runs={recentRuns} currentRunId={null} />
-        <div style={{ paddingTop: "var(--space-md)" }}>
-          <p className="empty-state">No pipeline run found for {resolvedDate}.</p>
-          <p className="empty-state" style={{ marginTop: "var(--space-xs)" }}>
-            Try a different date, or pick an older run above.
-          </p>
-        </div>
+        <ReviewHead runs={recentRuns} currentRunId={null} />
+        <EmptyState hint="Try a different date, or pick an older run above.">
+          No pipeline run found for {resolvedDate}.
+        </EmptyState>
       </main>
     );
   }
@@ -70,25 +71,60 @@ export default async function ReviewPage({
   if (posts.length === 0) {
     return (
       <main>
-        <h1>Review</h1>
-        <RunPicker runs={recentRuns} currentRunId={runId} />
-        <div style={{ paddingTop: "var(--space-md)" }}>
-          <p className="empty-state">This run produced no posts.</p>
-          <p className="empty-state" style={{ marginTop: "var(--space-xs)" }}>
-            Nothing needed review this time — pick another run above, or check back once the next run has completed.
-          </p>
-        </div>
+        <ReviewHead runs={recentRuns} currentRunId={runId} />
+        <EmptyState hint="Nothing needed review this time — pick another run above, or check back once the next run has completed.">
+          This run produced no posts.
+        </EmptyState>
       </main>
     );
   }
 
+  const undecided = posts.filter((p) => !p.posted && !p.discarded).length;
+
   return (
     <main>
-      <h1>Review</h1>
-      <RunPicker runs={recentRuns} currentRunId={runId} />
+      <ReviewHead runs={recentRuns} currentRunId={runId} count={undecided} total={posts.length} />
       {posts.map((post) => (
         <DraftCard key={post.id} post={post} />
       ))}
     </main>
+  );
+}
+
+/**
+ * The page head, identical across all three branches above — title, an
+ * optional line saying how much is left to decide, and the run picker.
+ *
+ * The subtitle counts only undecided drafts, because that is the number
+ * that tells you whether you are done. It is derived from the posts this
+ * page already has in hand, so it costs no extra query.
+ */
+function ReviewHead({
+  runs,
+  currentRunId,
+  count,
+  total,
+}: {
+  runs: Awaited<ReturnType<typeof getRecentRuns>>;
+  currentRunId: number | null;
+  count?: number;
+  total?: number;
+}) {
+  return (
+    <div className="page-head">
+      <div className="page-head-text">
+        <h1>Review</h1>
+        {count !== undefined && total !== undefined && (
+          <p className="page-head-sub">
+            {count === 0
+              ? `All ${total} draft${total === 1 ? "" : "s"} in this run are decided.`
+              : `${count} of ${total} draft${total === 1 ? "" : "s"} still to decide.`}
+          </p>
+        )}
+      </div>
+      <div className="page-head-aside">
+        <RunPicker runs={runs} currentRunId={currentRunId} />
+      </div>
+    </div>
   );
 }

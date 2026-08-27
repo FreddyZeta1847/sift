@@ -22,7 +22,6 @@
   --ink: #43301F;
   --ink-soft: #6E4E28;
   --muted: #8A7256;
-  --muted-soft: #A08A66;
   --label: #A0713C;
   --primary: #C0532B;
   --primary-deep: #A8431F;
@@ -30,9 +29,14 @@
   /* Organic uses one warm hue for everything — no separate "structural
      primary" vs. "personal accent" split, so accent aliases to primary. */
   --accent: var(--primary);
-  --accent-deep: var(--primary-deep);
   --accent-text: var(--primary-text);
   --primary-glow: rgba(192, 83, 43, 0.20);
+  /* A flat tint of primary, for surfaces that need to read as "accented"
+     without carrying the full terracotta fill (the draft card's language
+     badge). Replaces a former --gradient-badge: DESIGN.md §6 forbids
+     gradients, and at these two opacities the gradient was invisible
+     anyway. */
+  --primary-tint: rgba(192, 83, 43, 0.22);
   --success: #5A7D46;
   --success-deep: #4A6A38;
   --success-bg: #DCE5CD;
@@ -53,23 +57,22 @@
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
-  --space-xxl: 48px;
+
+  /* Type — the display stack was retyped inline in six rules before this
+     token existed. Body/data stay inline because they are one var each. */
+  --font-stack-display: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
 
   /* Motion — see DESIGN.md §4 */
   --ease-standard: cubic-bezier(0.25, 1, 0.5, 1);
   --duration-fast: 150ms;
   --duration-base: 220ms;
 
-  /* Elevation — see DESIGN.md §4 */
-  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* Elevation — see DESIGN.md §4. The float shadow is warm brown at low
+     opacity, not black: it was inherited at rgba(0,0,0,0.35) from the old
+     near-black "Study Lamp" system, where a hard black edge read as depth.
+     On cream sitting on sand it read as grime. */
+  --shadow-float: 0 8px 24px rgba(67, 48, 31, 0.14);
   --shadow-cta: 0 6px 16px rgba(160, 63, 30, 0.28);
-
-  /* The "this is the open/selected thing" signal on the sidebar's active
-     nav pill — a solid dark fill. */
-  --gradient-active: linear-gradient(135deg, var(--ink-soft), var(--ink));
-  /* A draft card's position badge: a light tint of the accent color rather
-     than the sidebar's dark fill — the number itself stays ink-brown. */
-  --gradient-badge: linear-gradient(135deg, rgba(192, 83, 43, 0.16), rgba(192, 83, 43, 0.34));
 }
 
 * { box-sizing: border-box; }
@@ -106,7 +109,7 @@ main:has(.config-page) {
 }
 
 h1 {
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-family: var(--font-stack-display);
   font-size: clamp(1.75rem, 3vw, 2.5rem);
   font-weight: 700;
   line-height: 1.15;
@@ -116,7 +119,7 @@ h1 {
 }
 
 h2 {
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-family: var(--font-stack-display);
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.3;
@@ -139,10 +142,13 @@ label {
   margin-bottom: var(--space-xs);
 }
 
+/* Fields sit on `surface-sunken` — one step lighter than the card around
+   them — so a field reads as a well cut into the card rather than another
+   card stacked on it (DESIGN.md §5). */
 input:not([type="checkbox"]),
 select,
 textarea {
-  background: var(--surface);
+  background: var(--surface-sunken);
   color: var(--ink);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -261,13 +267,18 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   }
 }
 
-/* Card — reserved for genuinely discrete, comparable content (draft
-   posts in Review). Do not reach for this on Settings/API/Costs
-   sections — see DESIGN.md's Card-Is-Not-Default Rule. */
+/* Card — the default container for any genuinely discrete block: a draft
+   post, a config section, a table wrapper (DESIGN.md's Cards-Are-Default
+   Rule). The narrow exceptions that stay un-carded are the sidebar's nav
+   pills and an in-progress add/edit mini-form.
+
+   This comment used to cite a "Card-Is-Not-Default" rule, which the
+   Organic system reversed — the stylesheet was simply never re-commented
+   when DESIGN.md was. */
 .card {
   background: var(--surface);
   border-radius: var(--radius-md);
-  padding: var(--space-md) var(--space-lg);
+  padding: 20px 28px;
   margin-bottom: var(--space-md);
   transition: opacity var(--duration-base) var(--ease-standard),
     border-color var(--duration-base) var(--ease-standard);
@@ -286,9 +297,9 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 }
 
 /* Neutral categorization chip — a source's category, a provider's kind.
-   Deliberately not `.badge`: that fill is reserved for the accent color
-   per DESIGN.md's One Lit Thing Rule, and a tag on every list row would
-   blow that budget instantly. */
+   Deliberately not `.badge`: terracotta means "active or actionable" and a
+   category label is neither, so a tag on every list row would drain the
+   signal out of the color (DESIGN.md's Warm Consistency Rule). */
 .tag {
   display: inline-block;
   background: var(--surface-raised);
@@ -299,7 +310,179 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   font-weight: 500;
 }
 
+/* Empty state — a headline plus a reassuring second line saying what to do
+   about it. The pair used to be hand-copied into six files; see
+   app/EmptyState.tsx, which is now the only thing that emits this markup. */
 .empty-state { color: var(--muted); }
+.empty-state-hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: var(--space-xs) 0 0;
+}
+/* Breathing room above, so an empty list reads as "nothing here yet"
+   rather than as a page that failed to load its content. */
+.empty-state-block { padding-top: var(--space-md); }
+.empty-state-block .empty-state { margin: 0; }
+
+/* ---------------------------------------------------------------------
+ * Structure: two patterns every page is built from.
+ *
+ * `.page-head` opens a page — the h1, an optional one-line subtitle, and
+ * an optional action or control parked on the right (Review's run picker
+ * lives there). Before this, an h1 was followed by whatever each page felt
+ * like, and page-level controls floated with no anchor.
+ *
+ * `.panel` is a card with a titled head. It replaces four competing ways a
+ * section used to announce itself and place its action: `.section-header` +
+ * `.section-action`, a bare `h2`, `.section-actions` at the bottom, and the
+ * `.config-page > section + section` border-top rhythm.
+ * ------------------------------------------------------------------- */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-xl);
+}
+.page-head > h1 { margin-bottom: 0; }
+.page-head-text { min-width: 0; }
+.page-head-sub {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  margin: var(--space-xs) 0 0;
+}
+/* Whatever sits on the right of a page head — a control, a button, a
+   count. Aligned to the baseline of the title rather than its box. */
+.page-head-aside {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 20px 28px;
+}
+/* The rhythm between panels, and between a panel and whatever follows it. */
+.panel + .panel,
+.panel-grid + .panel,
+.panel + .panel-grid,
+.panel-grid + .panel-grid { margin-top: var(--space-xl); }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.panel-head > h2 { margin: 0; }
+.panel-head-aside {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+/* A sentence under the panel title explaining what the panel is for —
+   distinct from `.status-line`, which reports what just happened. */
+.panel-intro {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: calc(-1 * var(--space-sm)) 0 var(--space-md);
+}
+/* Two comparable panels side by side (Model assignment's two stages,
+   Schedule next to Retention) — collapses to stacked below the floor. */
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-xl);
+}
+
+/* ---------------------------------------------------------------------
+ * Utilities — each of these existed as an inline style object repeated
+ * across several files before it was given a name here.
+ * ------------------------------------------------------------------- */
+
+/* The reading measure for post text. Was a hardcoded `70ch` in six places
+   (five inline, one on `main`). */
+.measure { max-width: 70ch; }
+
+/* A horizontal run of small things — chips, a link, a timestamp — that
+   wraps rather than overflows. */
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* A vertical stack with one consistent gap. `--gap` overrides it. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap, var(--space-md));
+}
+
+/* ---------------------------------------------------------------------
+ * Rows — the one table/list language, replacing three that did the same
+ * job (`.admin-row` grids, `.provider-row` grids, `.list-row` flex rows).
+ *
+ * Column widths come from a `--cols` custom property set on `.rows`, not
+ * from an inline `gridTemplateColumns` on every single row. That is what
+ * lets the mobile rule below reach them at all: the four Admin tables had
+ * no mobile collapse for exactly this reason — a media query cannot
+ * override an inline style.
+ * ------------------------------------------------------------------- */
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: grid;
+  grid-template-columns: var(--cols, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.row:last-child { border-bottom: none; }
+.row > span,
+.row > a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row--head {
+  color: var(--label);
+  text-transform: uppercase;
+  font-size: 0.71875rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  padding: 0 0 var(--space-xs);
+  border-bottom: 1px solid var(--border);
+}
+/* A row's title/meta pair when it isn't a real column grid — a provider,
+   a model, a source. */
+.row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.row-title { color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.row-meta { color: var(--muted); font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; }
+
+/* Row actions stay out of the way until the row is pointed at. Revealed on
+   keyboard focus too, and always visible on touch, where there is no
+   hover to reveal them with. */
+.row-hover-actions { opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
+.row:hover .row-hover-actions,
+.row:focus-within .row-hover-actions { opacity: 1; }
+@media (hover: none) {
+  .row-hover-actions { opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  .row:not(.row--head) { grid-template-columns: 1fr; gap: 2px; }
+  .row--head { display: none; }
+  .row-hover-actions { opacity: 1; }
+}
 
 /* DraftCard.tsx's language dropdown (PHASE-6 TRANSLATION) — a compact
    trigger button showing only the active language's flag + a caret, and a
@@ -316,29 +499,17 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
    pane — see DraftCard.tsx's header for the click-to-translate flow this
    implies.
 
-   `.lang-dropdown--corner` is a second follow-up re-skin: the trigger used
-   to sit inline as a pill just above the textarea, but now takes over the
-   card's top-right corner — the same spot a numbered index badge (see the
-   removed `.draft-index-badge`, once DraftCard.tsx's `index` prop) used to
-   occupy before it was dropped entirely. `top`/`right` are nudged a little
-   further into the corner than the old badge's `top: 14px; right: 20px`
-   (a flag glyph reads better tucked in tighter than a two-digit number
-   did); `margin-bottom: 0` cancels the inline pill's spacing since this
-   variant is out of normal flow. `left: auto; right: 0` on the panel here
-   (instead of the base rule's `left: 0`) keeps the panel opening toward the
-   card's interior — anchoring it from `left: 0` off a trigger that's
-   already hugging the card's right edge would push most of the panel off
-   the card. */
+   The trigger has moved twice. It began as an inline pill above the
+   textarea, then took over the card's top-right corner as an absolutely
+   positioned badge (a `--corner` modifier, now gone), and now sits in the
+   card's left rail in normal flow. The corner variant existed mainly to
+   flip the panel's anchor to `right: 0`, so it would open toward the
+   card's interior rather than off its right edge; from the rail the base
+   `left: 0` anchor is already correct, which is why nothing replaced it. */
 .lang-dropdown {
   position: relative;
   display: inline-block;
   margin-bottom: var(--space-sm);
-}
-.lang-dropdown--corner {
-  position: absolute;
-  top: 18px;
-  right: 16px;
-  margin-bottom: 0;
 }
 .lang-dropdown-trigger {
   display: inline-flex;
@@ -360,9 +531,9 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .lang-dropdown-caret { transition: transform var(--duration-fast) var(--ease-standard); }
 .lang-dropdown-trigger[aria-expanded="true"] .lang-dropdown-caret { transform: rotate(180deg); }
 
-/* Circular corner-badge variant of the trigger — same visual family as the
-   numbered index badge it replaced (circular, 42px, `--gradient-badge`
-   tint), just holding a flag instead of a number. The caret carried over
+/* Circular badge variant of the trigger — same visual family as the
+   numbered index badge it replaced (circular, 42px, `--primary-tint`),
+   just holding a flag instead of a number. The caret carried over
    from the pill trigger is hidden here: there's no room for it at this
    size, and a circular badge with a hover/expanded color shift already
    reads as clickable without one. */
@@ -374,7 +545,7 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   gap: 0;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--gradient-badge);
+  background: var(--primary-tint);
   color: var(--ink);
 }
 /* The flag SVG is rendered larger than the 42px circle it sits in (see
@@ -389,7 +560,6 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .lang-dropdown-trigger--badge:hover { background: var(--border); }
 .lang-dropdown-trigger--badge[aria-expanded="true"] { background: var(--ink); color: var(--primary-text); }
 .lang-dropdown-trigger--badge .lang-dropdown-caret { display: none; }
-.lang-dropdown--corner .lang-dropdown-panel { left: auto; right: 0; }
 
 /* Elevated above the card's own content, same z-index tier and shadow
    token as `.tooltip-bubble` — the other place a floating, absolutely
@@ -440,6 +610,11 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 /* Draft text — the card's "one lit thing" (DESIGN.md). Auto-grows in
    DraftCard.tsx (height set from scrollHeight) so a typical post reads in
    full without an inner scrollbar. */
+/* The draft text. It is the one thing on this page anyone reads, so it
+   sits directly on the card with no box drawn around it — a bordered,
+   sunken field says "form input", and this is a document. It is still a
+   real editable textarea; the border and background only appear on focus,
+   which is the moment the distinction actually matters. */
 .draft-textarea {
   /* Height is set imperatively from scrollHeight in DraftCard.tsx and left
      untransitioned on purpose — animating a text-reflowing element's height
@@ -447,8 +622,23 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
      resizes instantly like Notion/Linear's auto-grow fields do. */
   resize: none;
   overflow: hidden;
-  transition: border-color var(--duration-fast) var(--ease-standard),
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+  min-height: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  transition: background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
+}
+.draft-textarea:hover:not(:focus) { background: var(--surface-sunken); }
+.draft-textarea:focus {
+  background: var(--surface-sunken);
+  border-color: var(--primary);
+  /* Padding would shift the text sideways the moment it gains focus, so
+     the focus surface is pushed outward with a spread shadow instead. */
+  box-shadow: 0 0 0 10px var(--surface-sunken), 0 0 0 12px var(--primary-glow);
 }
 
 /* A drafted post's internal title (RunPicker-adjacent identifier, not
@@ -458,7 +648,7 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
    before this field existed (nullable column, no backfill) — the `{post.title
    && ...}` guard in DraftCard.tsx means those just render with no gap. */
 .draft-title {
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-family: var(--font-stack-display);
   font-size: 1.0625rem;
   font-weight: 600;
   color: var(--ink);
@@ -518,7 +708,6 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   font-size: 0.875rem;
   color: var(--ink-soft);
   font-weight: 500;
-  margin-bottom: var(--space-lg);
 }
 .run-picker {
   width: auto;
@@ -558,11 +747,76 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .icon-button--danger:hover:not(:disabled) { background: var(--danger-tint); color: var(--danger); }
 .icon-button .spin-icon { animation: spin 0.9s linear infinite; }
 
-/* Positioned so .lang-dropdown--corner (absolutely positioned, see that
-   rule's comment above) anchors to this card rather than some further-out
-   ancestor. */
-.draft-card {
-  position: relative;
+/* ---------------------------------------------------------------------
+ * PostCard.tsx — the two-column shell behind /review's draft cards and
+ * /posted's read-only ones. A narrow rail for identity and controls, a
+ * wide column for the text. See that file's header for the reasoning.
+ * ------------------------------------------------------------------- */
+.post-card {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: var(--space-lg);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 20px 28px;
+  margin-bottom: var(--space-md);
+  transition: opacity var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
+}
+.post-card.muted { border: 1px solid var(--border); opacity: 0.6; }
+
+.post-card-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.post-card-body { min-width: 0; }
+/* The body's first child sets the card's top edge; its own margin would
+   push the text down out of line with the rail beside it. */
+.post-card-body > :first-child { margin-top: 0; }
+.post-card-body > :last-child { margin-bottom: 0; }
+
+.post-card-meta { margin-top: 0; }
+/* A status tag, a content-safety badge, an outdated-translation notice —
+   each on its own line above the draft text so none of them can be missed. */
+.post-card-flags { margin: 0 0 var(--space-sm); }
+
+/* The three icon actions sit as a row inside the vertical rail: they are
+   one group of equal-weight secondary actions, and stacking them would
+   make the rail taller than most drafts are. */
+.rail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+/* The card's one primary action, sized to the rail so it reads as the
+   thing you finish on. */
+.rail-primary { width: 100%; padding: 10px 12px; text-align: center; }
+/* A plain fact in the rail — a posted timestamp — rather than a control. */
+.rail-note { color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
+/* Posted's body text is read-only, so it keeps the newlines the draft
+   textarea rendered natively. */
+.posted-text { white-space: pre-wrap; margin: 0; }
+
+@media (max-width: 760px) {
+  /* No room for two columns — the rail lies down into a strip above the
+     body, keeping its own reading order. */
+  .post-card {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+  }
+  .post-card-rail {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .rail-actions { margin-top: 0; }
+  .rail-primary { width: auto; }
 }
 
 .status-line {
@@ -622,13 +876,13 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-family: var(--font-stack-display);
   font-weight: 700;
   font-size: 22px;
   flex-shrink: 0;
 }
 .sidebar-brand-name {
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-family: var(--font-stack-display);
   font-weight: 700;
   font-size: 24px;
   line-height: 1;
@@ -709,7 +963,7 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
     color var(--duration-fast) var(--ease-standard);
 }
 .sidebar-nav-item:hover { background: var(--surface-raised); }
-.sidebar-nav-item.active { background: var(--gradient-active); color: var(--primary-text); }
+.sidebar-nav-item.active { background: var(--ink); color: var(--primary-text); }
 .sidebar-nav-dot {
   width: 9px;
   height: 9px;
@@ -759,12 +1013,16 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .toast--success { background: var(--success-bg); color: var(--success-deep); }
 
 /* ---------------------------------------------------------------------
- * Config surface (Settings / API Config / Costs) — per DESIGN.md's
- * Card-Is-Not-Default Rule these pages never use `.card`; structure comes
- * from headline + spacing rhythm plus a handful of row/list/toggle
- * patterns instead. Scoped under `.config-page` (the root element each
- * config form returns) so nothing here leaks onto the Review Workspace,
- * which still earns real cards for its draft posts.
+ * Config surface (Settings / API Config / Costs) — the field, toggle and
+ * chip patterns these dense forms need. Scoped under `.config-page` (the
+ * root element each config form returns), which is also what
+ * `main:has(.config-page)` keys the wider 1000px measure off.
+ *
+ * Structure itself comes from `.panel` now, not from the headline +
+ * border-top rhythm this block used to carry: DESIGN.md reversed the old
+ * Card-Is-Not-Default rule and these pages get real cards like everything
+ * else. The `.config-page > section + section` rule below is what remains
+ * of the old rhythm and retires with the last page to migrate.
  * ------------------------------------------------------------------- */
 
 /* h2 already resets its own top margin when it's a section's first child,
@@ -896,8 +1154,8 @@ h3:first-child { margin-top: 0; }
   white-space: nowrap;
 }
 .key-missing-icon { flex-shrink: 0; display: flex; color: var(--danger); }
-/* Each provider, individually, is genuinely a discrete comparable unit —
-   the Organic system's Card-Is-Not-Default retirement applies here first. */
+/* Each provider, individually, is a discrete comparable unit, so it earns
+   a card of its own (DESIGN.md's Cards-Are-Default Rule). */
 .provider-row--card {
   background: var(--surface);
   border-radius: var(--radius-md);
@@ -923,7 +1181,7 @@ h3:first-child { margin-top: 0; }
 }
 
 /* Admin's tab switcher (AdminNav.tsx) — real routes styled as pill tabs,
-   not the in-page anchor-nav look .config-nav uses elsewhere (see
+   borrowing the sidebar's filled-pill active state (see
    CONFIG-UI--admin-page.md: visually a tab bar, structurally a router). */
 .admin-tabs {
   display: flex;
@@ -1195,7 +1453,7 @@ h3:first-child { margin-top: 0; }
    reading as an afterthought paragraph. */
 .figure-lg {
   display: block;
-  font-family: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  font-family: var(--font-stack-display);
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -1224,11 +1482,12 @@ h3:first-child { margin-top: 0; }
 
 /* Costs' daily-spend chart — a single-series bar chart, so per the dataviz
    skill's accessibility pass it needs no legend (the section title already
-   names the series); Harbor Cobalt carries magnitude since this is a
-   structural data readout, not a personal/voice moment (Ember stays
-   reserved for those per DESIGN.md's One Lit Thing Rule). Bars use
-   `transform: scaleY()` off a fixed-height track rather than animating
-   `height` — same layout-thrash reasoning as `.budget-bar-fill`. */
+   names the series). Bars carry terracotta like every other active element
+   in the system (DESIGN.md's Warm Consistency Rule); this comment used to
+   justify the color with two names from the deleted "Study Lamp" palette.
+   Bars use `transform: scaleY()` off a fixed-height track rather than
+   animating `height` — same layout-thrash reasoning as
+   `.budget-bar-fill`. */
 .bar-chart {
   display: flex;
   align-items: flex-end;
@@ -1597,3 +1856,120 @@ h3:first-child { margin-top: 0; }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ---------------------------------------------------------------------
+ * ConfirmDialog.tsx — the destructive-action confirmation, rendered
+ * through Modal.tsx so there is exactly one overlay in the app rather
+ * than a styled one for forms and the browser's own `window.confirm()`
+ * for deletes.
+ * ------------------------------------------------------------------- */
+.confirm-message {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* ---------------------------------------------------------------------
+ * FilterBar.tsx — the Admin tables' collapsible filters. The toggle and
+ * the active-filter chips form one line above the table; the fields
+ * themselves expand below it.
+ * ------------------------------------------------------------------- */
+.filter-bar { margin-bottom: var(--space-md); }
+
+.filter-bar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.filter-toggle:hover:not(:disabled) { background: var(--border); border-color: transparent; }
+/* Open is a state, not an action, so it borrows the pill language the
+   sidebar and admin tabs use for "you are here" rather than terracotta. */
+.filter-toggle.is-open { background: var(--ink); color: var(--primary-text); }
+
+/* The count of filters in force. Terracotta because it is the one thing
+   here that means "something is actively changing what you see". */
+.filter-count {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 1px 8px;
+}
+
+.filter-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+/* Each active filter, removable by clicking it. The whole chip is the
+   button rather than a small × inside it — a 12px hit target on a row of
+   chips is a miss waiting to happen. */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  background: var(--chip-bg-strong);
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.filter-chip:hover:not(:disabled) { background: var(--border-dashed); border-color: transparent; }
+.filter-chip span { opacity: 0.65; font-size: 1rem; line-height: 1; }
+
+.filter-clear {
+  padding: 5px 10px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.filter-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+  animation: fade-slide-in var(--duration-base) var(--ease-standard);
+}
+.filter-fields label { margin-bottom: 0; }
+.filter-fields input,
+.filter-fields select { max-width: none; }
+
+/* ---------------------------------------------------------------------
+ * A disclosure — one line you can click to reveal something secondary
+ * that used to sit open permanently (a draft's image prompt, a settings
+ * panel's explanatory paragraphs). The text is never removed, only
+ * folded; the caret rotates to say which state it is in.
+ * ------------------------------------------------------------------- */
+.disclosure-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 10px 6px 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.disclosure-toggle:hover:not(:disabled) { color: var(--ink-soft); background: transparent; border-color: transparent; }
+.disclosure-caret {
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.disclosure-toggle[aria-expanded="true"] .disclosure-caret { transform: rotate(90deg); }
+.disclosure-panel { animation: fade-slide-in var(--duration-base) var(--ease-standard); }
