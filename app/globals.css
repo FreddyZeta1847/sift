@@ -1035,23 +1035,6 @@ h3:first-child { margin-top: 0; }
 /* Collapsed "Add ___" affordance (providers, sources, anything list-shaped)
    — a bare "+" until clicked, instead of the full add-form taking up space
    by default. */
-.add-toggle {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: var(--space-md);
-  /* A filled CTA, not another ghost icon-button — this is the only way to
-     add an item now that the form starts collapsed, so it needs to read
-     as a clear affordance rather than blend into the row above it. */
-  background: var(--primary);
-  color: var(--primary-text);
-  box-shadow: var(--shadow-cta);
-}
-.add-toggle:hover:not(:disabled) { background: var(--primary-deep); color: var(--primary-text); }
 
 /* A small "how do I know this?" hint next to a field label — native title
    tooltip on hover/focus, same convention as the icon-buttons' title
@@ -1366,40 +1349,7 @@ h3:first-child { margin-top: 0; }
   to { transform: rotate(360deg); }
 }
 
-/* ---------------------------------------------------------------------
- * Models & pricing table (API Config). A real <table> rather than the
- * .admin-row grid used elsewhere: these are four short, genuinely tabular
- * columns whose headers have to stay associated with editable cells, which
- * is exactly what a table element is for. Wrapped in .table-scroll so the
- * numeric inputs never force the page itself to scroll sideways on a narrow
- * window.
- * ------------------------------------------------------------------ */
-.table-scroll { overflow-x: auto; }
-.models-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.models-table th {
-  text-align: left;
-  color: var(--label);
-  text-transform: uppercase;
-  font-size: 0.71875rem;
-  letter-spacing: 0.04em;
-  font-weight: 500;
-  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-.models-table td {
-  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-.models-table tr:last-child td { border-bottom: none; }
-/* Price cells are narrow on purpose — a rate per 1M tokens is a handful of
-   characters, and a full-width input would imply otherwise. */
-.models-table input[type="number"] { width: 7.5rem; }
-.models-table .row-actions { justify-content: flex-end; }
+
 
 /* A label that reads left-to-right instead of stacking, for the one control
    in Settings that is a plain on/off checkbox. Every other field here puts
@@ -1520,4 +1470,122 @@ h3:first-child { margin-top: 0; }
   cursor: progress;
   text-decoration: underline dotted currentColor;
   text-underline-offset: 3px;
+}
+
+
+/* ---------------------------------------------------------------------
+ * Section header: heading on the left, its one action on the right.
+ *
+ * Replaces a round "+" pill that floated below each list. A symbol under a
+ * list has to be interpreted; a labelled button beside the heading says what
+ * it does and sits in the same place in all three sections (providers,
+ * models, sources), so it is always where you expect it.
+ * ------------------------------------------------------------------ */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.section-header > h2 { margin-bottom: 0; }
+.section-action {
+  flex-shrink: 0;
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 9px 16px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.section-action:hover:not(:disabled) { background: var(--primary-deep); }
+
+/* ---------------------------------------------------------------------
+ * Modal: the one overlay card for every add/edit form.
+ *
+ * Shares the health gate's backdrop treatment on purpose — one overlay
+ * language, not two that nearly match. z-index 40 puts it above the gate
+ * (30), the health banner (25) and the toast (20): whatever the user just
+ * deliberately opened should win over anything that appeared on its own.
+ * ------------------------------------------------------------------ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(3px);
+  animation: modal-in 0.14s ease-out;
+}
+.modal-card {
+  width: 100%;
+  max-width: 34rem;
+  /* Tall forms scroll inside the card rather than growing past the viewport
+     and taking the footer buttons off-screen with them. */
+  max-height: calc(100vh - 2 * var(--space-lg));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  padding: var(--space-lg);
+}
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.modal-title { margin: 0; }
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0 4px;
+}
+.modal-close:hover { color: var(--ink); }
+.modal-description {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: var(--space-sm) 0 0;
+}
+.modal-body {
+  overflow-y: auto;
+  margin-top: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+/* Two short fields that belong together (ID/Label, the two prices) share a
+   row on a wide card and stack on a narrow one. */
+.modal-field-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-md);
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+@keyframes modal-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

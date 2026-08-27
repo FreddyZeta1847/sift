@@ -15,7 +15,8 @@
  * scope — disabling via the toggle is the only way to remove a source from
  * active use. The add-source form starts collapsed behind a bare "+"
  * button (`showAddSource`), same pattern as ApiConfigForm's add-provider
- * toggle (`.add-toggle`) — submitting or cancelling collapses it back.
+ * "+ Add source" button in the section header, which opens an overlay card
+ * (app/Modal.tsx) rather than unfolding a form inside the list.
  *
  * Retention day-counts and curation's posts-per-run render as range
  * sliders (`.range-field`) with a live numeric readout instead of plain
@@ -68,6 +69,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Modal } from "../../Modal";
 import {
   toggleSource,
   addSource,
@@ -324,7 +326,12 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   return (
     <div className="config-page">
       <section id="sources" className="card">
-        <h2>Sources</h2>
+        <div className="section-header">
+          <h2>Sources</h2>
+          <button className="section-action" onClick={() => setShowAddSource(true)}>
+            + Add source
+          </button>
+        </div>
         {sourceGroups.map(([category, group]) => (
           <div className="stage-block" key={category}>
             <h3>
@@ -352,22 +359,36 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           </div>
         ))}
 
-        {!showAddSource ? (
-          <button
-            type="button"
-            className="icon-button add-toggle"
-            onClick={() => setShowAddSource(true)}
-            aria-label="Add source"
-            title="Add source"
+        {addSourceStatus && (
+          <p className={statusTone(addSourceStatus)} role="alert">
+            {addSourceStatus}
+          </p>
+        )}
+
+        {showAddSource && (
+          <Modal
+            title="Add a source"
+            description="An RSS or Atom feed. Category is free text — it only groups the list above."
+            onClose={handleCancelAddSource}
+            footer={
+              <>
+                <button type="button" onClick={handleCancelAddSource}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="add-source-form"
+                  className="primary"
+                  disabled={!newSource.name || !newSource.url || !newSource.category}
+                >
+                  Add source
+                </button>
+              </>
+            }
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
-        ) : (
-          <>
-            <form className="add-form row-fields" onSubmit={handleAddSource}>
+            {/* Submit lives in the modal footer, outside this element, wired
+                back by form="" so Enter still submits. */}
+            <form id="add-source-form" className="modal-form" onSubmit={handleAddSource}>
               <label>
                 Name
                 <input
@@ -380,6 +401,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
                 URL
                 <input
                   value={newSource.url}
+                  placeholder="https://example.com/feed.xml"
                   onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
                   required
                 />
@@ -392,17 +414,8 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
                   required
                 />
               </label>
-              <div className="row-actions">
-                <button type="submit" className="primary">Add source</button>
-                <button type="button" className="secondary" onClick={handleCancelAddSource}>Cancel</button>
-              </div>
             </form>
-            {addSourceStatus && (
-              <p className={statusTone(addSourceStatus)} role="alert">
-                {addSourceStatus}
-              </p>
-            )}
-          </>
+          </Modal>
         )}
       </section>
 

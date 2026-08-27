@@ -46,9 +46,11 @@
  * just the seeded `suggestedId`. There's no reason to force-remove a
  * default a user isn't using, they can just leave its key blank.
  *
- * The add-provider form starts collapsed behind a bare "+" button
- * (`showAddForm`) rather than always taking up page space; submitting or
- * cancelling collapses it back. The Kind field (both add and edit forms)
+ * Adding a provider opens an overlay card (app/Modal.tsx) from the
+ * "+ Add provider" button in the section header, rather than unfolding a
+ * form inside the page. `showAddForm` is now simply whether that card is
+ * open. The API key field is NOT required: a local provider (Ollama) has no
+ * key to give, and demanding one made it impossible to add. The Kind field (both add and edit forms)
  * carries an inline info icon whose `title` explains the `anthropic` vs.
  * `openai-compatible` distinction (`KIND_HINT`) — the same guidance given
  * in the README, surfaced right where the decision is made.
@@ -62,6 +64,7 @@ import type { Provider, Settings } from "../../../lib/config/types";
 import type { ProbeResult } from "../../../lib/config/test-model-probe";
 import { KNOWN_PROVIDERS, providerNeedsApiKey } from "../../../lib/config/known-providers";
 import { useModelHealth } from "../../health/ModelHealthProvider";
+import { Modal } from "../../Modal";
 import { ModelSelect } from "./ModelSelect";
 import { ModelsTable } from "./ModelsTable";
 import type { ModelEntry } from "../../../lib/config/types";
@@ -254,7 +257,12 @@ export function ApiConfigForm({
   return (
     <div className="config-page">
       <section id="providers">
-        <h2>Providers</h2>
+        <div className="section-header">
+          <h2>Providers</h2>
+          <button className="section-action" onClick={() => setShowAddForm(true)}>
+            + Add provider
+          </button>
+        </div>
         <div className="provider-table">
           <div className="provider-row provider-row--head">
             <span>Label</span>
@@ -390,21 +398,33 @@ export function ApiConfigForm({
           </p>
         )}
 
-        {!showAddForm ? (
-          <button
-            type="button"
-            className="icon-button add-toggle"
-            onClick={() => setShowAddForm(true)}
-            aria-label="Add provider"
-            title="Add provider"
+        {addStatus && (
+          <p className={statusTone(addStatus)} role="alert">
+            {addStatus}
+          </p>
+        )}
+
+        {showAddForm && (
+          <Modal
+            title="Add a provider"
+            description="Pick a known service to fill the endpoint in for you, or type the details yourself."
+            onClose={handleCancelAdd}
+            footer={
+              <>
+                <button type="button" onClick={handleCancelAdd}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="add-provider-form"
+                  className="primary"
+                  disabled={!newProvider.id || !newProvider.label || !newProvider.baseUrl}
+                >
+                  Add provider
+                </button>
+              </>
+            }
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
-        ) : (
-          <>
             <label className="quick-add-provider">
               Quick add a known provider
               <select value="" onChange={(e) => handleQuickAdd(e.target.value)}>
@@ -417,23 +437,29 @@ export function ApiConfigForm({
               </select>
             </label>
 
-            <form className="add-form row-fields" onSubmit={handleAddProvider}>
-              <label>
-                ID
-                <input
-                  value={newProvider.id}
-                  onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Label
-                <input
-                  value={newProvider.label}
-                  onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
-                  required
-                />
-              </label>
+            {/* The submit button lives in the modal footer, outside this
+                element, so it is wired back by the form="" attribute — that
+                keeps Enter-to-submit working without nesting the footer
+                inside the form. */}
+            <form id="add-provider-form" className="modal-form" onSubmit={handleAddProvider}>
+              <div className="modal-field-pair">
+                <label>
+                  ID
+                  <input
+                    value={newProvider.id}
+                    onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
+                    required
+                  />
+                </label>
+                <label>
+                  Label
+                  <input
+                    value={newProvider.label}
+                    onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
+                    required
+                  />
+                </label>
+              </div>
               <label>
                 Base URL
                 <input
@@ -448,7 +474,6 @@ export function ApiConfigForm({
                   type="password"
                   value={newProvider.apiKey}
                   onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
-                  required
                 />
               </label>
               <label>
@@ -468,17 +493,8 @@ export function ApiConfigForm({
                   <option value="anthropic">anthropic</option>
                 </select>
               </label>
-              <div className="row-actions">
-                <button type="submit" className="primary">Add provider</button>
-                <button type="button" className="secondary" onClick={handleCancelAdd}>Cancel</button>
-              </div>
             </form>
-            {addStatus && (
-              <p className={statusTone(addStatus)} role="alert">
-                {addStatus}
-              </p>
-            )}
-          </>
+          </Modal>
         )}
       </section>
 

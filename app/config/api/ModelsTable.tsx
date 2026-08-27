@@ -1,8 +1,8 @@
 /**
- * The "Models & pricing" table on the API Config page (`/config/api`).
+ * The "Models & pricing" section on the API Config page (`/config/api`).
  *
  * One row per provider+model pair you actually use, with what it costs per
- * million tokens in each direction. The table is the single source for two
+ * million tokens in each direction. The list is the single source for two
  * things at once: the options the model dropdowns offer, and the rates the
  * Costs page and the monthly budget cap work from.
  *
@@ -13,21 +13,26 @@
  * A row priced 0/0 means genuinely free (a local model). A model with NO row
  * is a different thing entirely: unknown, not free. Its calls are recorded at
  * $0 because nobody has said otherwise, and they are invisible to the budget
- * cap — which is exactly the silent hole this table exists to close, so the
+ * cap — which is exactly the silent hole this list exists to close, so the
  * empty state says so out loud rather than looking merely unfinished.
  *
- * Interaction follows the provider list above it: local state for the
- * in-progress add form, `router.refresh()` after every successful mutation so
- * the server re-reads config/models.json, and a `<p role="alert">` for status.
+ * Presented as `.list-row`s rather than a <table>: every other list in the
+ * app (providers just above this, sources, the Costs breakdown) uses that
+ * pattern, and the one table read as though it came from a different product.
+ * Adding and editing both happen in an overlay card, so no input ever sits
+ * inside the list itself.
  */
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addModel, updateModelPrices, deleteModel } from "./actions";
+import { Modal } from "../../Modal";
 import type { ModelEntry, Provider } from "../../../lib/config/types";
 
-const EMPTY_ROW = { providerId: "", model: "", inputPer1M: "", outputPer1M: "" };
+const EMPTY_DRAFT = { providerId: "", model: "", inputPer1M: "", outputPer1M: "" };
+
+type Draft = typeof EMPTY_DRAFT;
 
 interface ModelsTableProps {
   providers: Provider[];
@@ -36,78 +41,74 @@ interface ModelsTableProps {
 
 export function ModelsTable({ providers, models }: ModelsTableProps) {
   const router = useRouter();
-  const [draft, setDraft] = useState(EMPTY_ROW);
-  const [showAdd, setShowAdd] = useState(false);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  // null = closed. "add" = a new row. A ModelEntry = editing that row's prices.
+  const [editing, setEditing] = useState<"add" | ModelEntry | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [edits, setEdits] = useState<Record<string, { inputPer1M: string; outputPer1M: string }>>({});
 
   const rowKey = (m: ModelEntry) => `${m.providerId}/${m.model}`;
   const providerLabel = (id: string) => providers.find((p) => p.id === id)?.label ?? id;
 
-  const handleAdd = async () => {
-    const result = await addModel({
-      providerId: draft.providerId,
-      model: draft.model.trim(),
-      inputPer1M: Number(draft.inputPer1M) || 0,
-      outputPer1M: Number(draft.outputPer1M) || 0,
-    });
-    if (!result.ok) {
-      setStatus(`Add failed: ${result.error}`);
-      return;
-    }
-    setDraft(EMPTY_ROW);
-    setShowAdd(false);
-    setStatus("Model added.");
-    router.refresh();
+  const openAdd = () => {
+    setDraft(EMPTY_DRAFT);
+    setError(null);
+    setEditing("add");
   };
 
-  const handleSavePrices = async (m: ModelEntry) => {
-    const edit = edits[rowKey(m)];
-    if (!edit) return;
-    const result = await updateModelPrices(
-      m.providerId,
-      m.model,
-      Number(edit.inputPer1M) || 0,
-      Number(edit.outputPer1M) || 0
-    );
+  const openEdit = (m: ModelEntry) => {
+    setDraft({
+      providerId: m.providerId,
+      model: m.model,
+      inputPer1M: String(m.inputPer1M),
+      outputPer1M: String(m.outputPer1M),
+    });
+    setError(null);
+    setEditing(m);
+  };
+
+  const close = () => {
+    setEditing(null);
+    setError(null);
+  };
+
+  const isAdding = editing === "add";
+
+  const handleSubmit = async () => {
+    const inputPer1M = Number(draft.inputPer1M) || 0;
+    const outputPer1M = Number(draft.outputPer1M) || 0;
+
+    const result = isAdding
+      ? await addModel({ providerId: draft.providerId, model: draft.model.trim(), inputPer1M, outputPer1M })
+      : await updateModelPrices(draft.providerId, draft.model, inputPer1M, outputPer1M);
+
     if (!result.ok) {
-      setStatus(`Save failed: ${result.error}`);
+      // Shown inside the card: the message belongs next to the field that
+      // caused it, and closing on failure would throw away the typing.
+      setError(result.error ?? "Save failed");
       return;
     }
-    setEdits((prev) => {
-      const next = { ...prev };
-      delete next[rowKey(m)];
-      return next;
-    });
-    setStatus("Prices updated.");
+    setStatus(isAdding ? "Model added." : "Prices updated.");
+    close();
     router.refresh();
   };
 
   const handleDelete = async (m: ModelEntry) => {
     const result = await deleteModel(m.providerId, m.model);
-    if (!result.ok) {
-      setStatus(`Delete failed: ${result.error}`);
-      return;
-    }
-    setStatus("Model removed.");
-    router.refresh();
+    setStatus(result.ok ? "Model removed." : `Delete failed: ${result.error}`);
+    if (result.ok) router.refresh();
   };
 
-  const editValue = (m: ModelEntry, field: "inputPer1M" | "outputPer1M"): string =>
-    edits[rowKey(m)]?.[field] ?? String(m[field]);
-
-  const setEditValue = (m: ModelEntry, field: "inputPer1M" | "outputPer1M", value: string) =>
-    setEdits((prev) => ({
-      ...prev,
-      [rowKey(m)]: {
-        inputPer1M: field === "inputPer1M" ? value : editValue(m, "inputPer1M"),
-        outputPer1M: field === "outputPer1M" ? value : editValue(m, "outputPer1M"),
-      },
-    }));
+  const canSubmit = draft.providerId !== "" && draft.model.trim() !== "";
 
   return (
     <section id="models-pricing">
-      <h2>Models &amp; pricing</h2>
+      <div className="section-header">
+        <h2>Models &amp; pricing</h2>
+        <button className="section-action" onClick={openAdd}>
+          + Add model
+        </button>
+      </div>
       <p className="status-line">
         The models you use, and what they cost per 1M tokens. This list fills the model dropdowns above and is what the
         Costs page and your budget cap work from. A local model costs 0; a model that isn&apos;t listed at all is
@@ -116,81 +117,80 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
 
       <div className="card">
         {models.length === 0 ? (
-          <p className="status-line">No models listed yet.</p>
+          <p className="empty-state">No models listed yet.</p>
         ) : (
-          <div className="table-scroll">
-            <table className="models-table">
-              <thead>
-                <tr>
-                  <th>Provider</th>
-                  <th>Model</th>
-                  <th>$ / 1M in</th>
-                  <th>$ / 1M out</th>
-                  <th aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {models.map((m) => {
-                  const dirty = edits[rowKey(m)] !== undefined;
-                  return (
-                    <tr key={rowKey(m)}>
-                      <td>{providerLabel(m.providerId)}</td>
-                      <td className="data">{m.model}</td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editValue(m, "inputPer1M")}
-                          onChange={(e) => setEditValue(m, "inputPer1M", e.target.value)}
-                          aria-label={`Input price per 1M tokens for ${m.model}`}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editValue(m, "outputPer1M")}
-                          onChange={(e) => setEditValue(m, "outputPer1M", e.target.value)}
-                          aria-label={`Output price per 1M tokens for ${m.model}`}
-                        />
-                      </td>
-                      <td className="row-actions">
-                        {dirty && <button onClick={() => handleSavePrices(m)}>Save</button>}
-                        <button onClick={() => handleDelete(m)}>Remove</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ul className="list">
+            {models.map((m) => (
+              <li key={rowKey(m)} className="list-row">
+                <span className="list-row-main">
+                  <span className="list-row-title data">{m.model}</span>
+                  <span className="list-row-meta">
+                    {providerLabel(m.providerId)} · in ${m.inputPer1M} / 1M · out ${m.outputPer1M} / 1M
+                  </span>
+                </span>
+                <span className="row-actions">
+                  <button onClick={() => openEdit(m)}>Edit</button>
+                  <button onClick={() => handleDelete(m)}>Remove</button>
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
 
-        {showAdd ? (
-          <div className="row-fields">
+        {status && (
+          <p role="alert" className={/failed/i.test(status) ? "status-line status-line--danger" : "status-line"}>
+            {status}
+          </p>
+        )}
+      </div>
+
+      {editing !== null && (
+        <Modal
+          title={isAdding ? "Add a model" : `Edit prices for ${draft.model}`}
+          description={
+            isAdding
+              ? "Pick the provider you reach it through, then the exact model name that provider expects."
+              : "Prices only. Renaming a model would silently retarget any pipeline stage using it, so the pair itself can't be changed here."
+          }
+          onClose={close}
+          footer={
+            <>
+              <button onClick={close}>Cancel</button>
+              <button className="primary" onClick={handleSubmit} disabled={!canSubmit}>
+                {isAdding ? "Add model" : "Save prices"}
+              </button>
+            </>
+          }
+        >
+          <label>
+            Provider
+            <select
+              value={draft.providerId}
+              disabled={!isAdding}
+              onChange={(e) => setDraft({ ...draft, providerId: e.target.value })}
+            >
+              <option value="">— select provider —</option>
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Model
+            <input
+              value={draft.model}
+              disabled={!isAdding}
+              placeholder="e.g. gemini-3-flash-preview"
+              onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+            />
+          </label>
+
+          <div className="modal-field-pair">
             <label>
-              Provider
-              <select value={draft.providerId} onChange={(e) => setDraft({ ...draft, providerId: e.target.value })}>
-                <option value="">— select provider —</option>
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Model
-              <input
-                value={draft.model}
-                placeholder="e.g. gemini-3-flash-preview"
-                onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-              />
-            </label>
-            <label>
-              $ / 1M in
+              $ per 1M input
               <input
                 type="number"
                 min="0"
@@ -200,7 +200,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
               />
             </label>
             <label>
-              $ / 1M out
+              $ per 1M output
               <input
                 type="number"
                 min="0"
@@ -209,28 +209,17 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
                 onChange={(e) => setDraft({ ...draft, outputPer1M: e.target.value })}
               />
             </label>
-            <div className="row-actions">
-              <button onClick={handleAdd} disabled={!draft.providerId || !draft.model.trim()}>
-                Add model
-              </button>
-              <button
-                onClick={() => {
-                  setDraft(EMPTY_ROW);
-                  setShowAdd(false);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
           </div>
-        ) : (
-          <div className="section-actions row-actions">
-            <button onClick={() => setShowAdd(true)}>+ Add model</button>
-          </div>
-        )}
 
-        {status && <p role="alert" className={/failed/i.test(status) ? "status-line status-line--danger" : "status-line"}>{status}</p>}
-      </div>
+          <p className="status-line">Leave both at 0 for a local model — that records it as genuinely free.</p>
+
+          {error && (
+            <p role="alert" className="status-line status-line--danger">
+              {error}
+            </p>
+          )}
+        </Modal>
+      )}
     </section>
   );
 }

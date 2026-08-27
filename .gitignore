@@ -23,3 +23,6 @@ data/
 next-env.d.ts
 graphify-out/
 .claude/
+
+# Throwaway output dir for verification builds (see next.config.ts)
+.next-verify/
