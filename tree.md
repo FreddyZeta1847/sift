@@ -18,6 +18,7 @@
 │   │   ├── actions.test.ts
 │   │   ├── actions.ts
 │   │   ├── AdminNav.tsx
+│   │   ├── AdminTable.tsx
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
 │   │   └── RunsTable.tsx
@@ -34,6 +35,7 @@
 │   │   │   ├── actions.test.ts
 │   │   │   ├── actions.ts
 │   │   │   ├── CostsForm.tsx
+│   │   │   ├── DailySpendChart.tsx
 │   │   │   └── page.tsx
 │   │   └── settings/
 │   │       ├── actions.test.ts
@@ -56,12 +58,23 @@
 │   │   ├── DraftCard.tsx
 │   │   ├── page.tsx
 │   │   └── RunPicker.tsx
+│   ├── ConfirmDialog.tsx
+│   ├── Disclosure.tsx
+│   ├── EmptyState.tsx
+│   ├── FilterBar.tsx
 │   ├── globals.css
 │   ├── icon.svg
 │   ├── layout.tsx
+│   ├── LocalTime.tsx
 │   ├── Modal.tsx
 │   ├── Nav.tsx
-│   └── page.tsx
+│   ├── page.tsx
+│   ├── PostCard.tsx
+│   └── StatusMessage.tsx
+├── assets/
+│   └── photos/
+│       ├── logo.jpeg
+│       └── screenshot.png
 ├── bin/
 │   └── sift-server.js
 ├── docs/
@@ -222,6 +235,8 @@
 ├── CLAUDE.md
 ├── CONTRIBUTING.md
 ├── DESIGN.md
+├── diag-curate.ts
+├── diag-qwen.ts
 ├── docker-compose.yml
 ├── Dockerfile
 ├── drizzle.config.ts

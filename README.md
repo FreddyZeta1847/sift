@@ -1,5 +1,8 @@
 <p align="center">
-  <h1 align="center">sift</h1>
+  <h1 align="center">
+    <img src="assets/photos/logo.jpeg" alt="" height="44" />
+    &nbsp;sift
+  </h1>
   <p align="center"><b>RSS in, LinkedIn drafts out.</b></p>
   <p align="center">A self-hosted pipeline that turns your RSS feeds into ready-to-review LinkedIn post drafts, in your own voice, on autopilot — you always review and post manually, sift never publishes for you.</p>
 </p>
@@ -12,6 +15,12 @@
   <img src="https://img.shields.io/badge/Hugging_Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" />
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" />
+</p>
+
+---
+
+<p align="center">
+  <img src="assets/photos/screenshot.png" alt="The sift review workspace: a run's drafts as editable cards, with the pipeline-run picker above them." width="900" />
 </p>
 
 ## What it does
