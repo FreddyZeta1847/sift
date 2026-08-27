@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/version-1.1.0-C0532B?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js&logoColor=white" />
   <img src="https://img.shields.io/badge/typescript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
   <img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" />
@@ -26,7 +27,11 @@ The whole run is triggered by an in-process scheduler on the day/time you config
 
 A separate 3-page settings app (API Config, Settings, Costs) lets you assign an LLM provider/model per pipeline stage, manage RSS sources, set the schedule and voice profile, configure post-retention, and cap total LLM spend with a running cost history. Everything — candidate dedup, the post archive, per-call cost logging, and a full run log — is persisted to SQLite via Drizzle ORM.
 
-sift is LLM-provider-agnostic: it supports Anthropic's API directly and any OpenAI-compatible endpoint via a configurable `baseUrl`, so you aren't locked into one vendor.
+sift is LLM-provider-agnostic: it supports Anthropic's API directly and any OpenAI-compatible endpoint via a configurable `baseUrl`, so you aren't locked into one vendor. That includes models running on your own machine via **Ollama** or **LM Studio**, which need no API key and cost nothing.
+
+**You know your models work before you use them.** On startup sift checks the models assigned to curation and drafting and reports what it found. The app stays usable while it runs — only "Run Now" and the model tests wait, and only until the check answers. It draws a distinction most tools don't: a provider that was given its full time allowance and never answered is a **timeout** and is shown in red, while a model that simply hadn't replied before sift stopped waiting is **inconclusive** and shown in grey. A slow model is not a broken one, and calling it broken sends you looking for a problem that isn't there. Every time limit involved is a slider in Settings, and the whole check can be switched off.
+
+**You know what it costs.** Models & pricing on the API Config page is the list of models you actually use and what each costs per million tokens — press "Fetch available models" and sift asks the provider what it offers, for local and hosted providers alike. That list is what the Costs page and your monthly budget cap work from, so a model with no price on record is labelled **"pricing not set"** rather than reported as $0.00 — an unpriced model isn't a free one, and a confident zero is worse than no number.
 
 ## Quick Start (Docker)
 
@@ -74,9 +79,10 @@ For repeated local development, `npm link` (or `npm install -g .`) once register
 ## Configuring an LLM provider
 
 The easiest path: on the **API Config** page, use the **"Quick add a known provider"** dropdown
-above the add-provider form — pick Anthropic, OpenAI, Google Gemini, NVIDIA NIM, OpenRouter, or
-DeepSeek, and it pre-fills the Base URL and Kind for you. Paste an API key, pick a model, and
-assign it to the Curation/Drafting stages.
+above the add-provider form — pick Anthropic, OpenAI, Google Gemini, NVIDIA NIM, OpenRouter,
+DeepSeek, Ollama or LM Studio, and it pre-fills the Base URL and Kind for you. Paste an API key
+(local providers need none), add the models you use, and assign them to the Curation/Drafting
+stages.
 
 For anything else (or to understand what the quick-add is actually doing), add a provider
 manually (ID, Label, Base URL, API key, Kind). Two provider "Kind" values exist, and the
@@ -98,6 +104,8 @@ difference matters:
 | NVIDIA NIM | `openai-compatible` | `https://integrate.api.nvidia.com/v1` | [build.nvidia.com](https://build.nvidia.com) | Free tier, but a shared endpoint — latency/reliability varies noticeably by model |
 | OpenRouter | `openai-compatible` | `https://openrouter.ai/api/v1` | [openrouter.ai/keys](https://openrouter.ai/keys) | Aggregates many underlying models behind one key |
 | DeepSeek | `openai-compatible` | `https://api.deepseek.com` | [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) | |
+| Ollama | `openai-compatible` | `http://localhost:11434/v1` | *(none needed)* | Runs on your own machine. From Docker, use `http://host.docker.internal:11434/v1` |
+| LM Studio | `openai-compatible` | `http://localhost:1234/v1` | *(none needed)* | Same as above; default port is 1234 |
 
 **A real gotcha worth knowing before you pick a model**: many current models are "reasoning"
 models that spend a chunk of their output-token budget on hidden reasoning before writing any
@@ -108,16 +116,24 @@ truncated or empty, it's very often this, not a broken key or endpoint — the f
 report a failure if the model itself can't produce usable output in the available budget.
 
 **Model names aren't listed here on purpose** — every provider adds and retires models over time,
-so a hardcoded list here would go stale. Check the provider's own docs or dashboard for current
-model ids, then use the **"Test this model"** button on the API Config page before assigning it to
-a pipeline stage — it makes one real call and tells you immediately whether the id/key/endpoint
-actually work together, rather than finding out during a real run.
+so a hardcoded list here would go stale. You don't need one: in **Models & pricing** on the API
+Config page, pick a provider and press **"Fetch available models"**, and sift asks that provider
+what it currently offers. This works for every provider above, local and hosted alike. You can
+still type a name by hand if you prefer.
+
+Then use **"Test this model"** before assigning it to a pipeline stage — it makes one real call
+and tells you whether the id/key/endpoint actually work together, rather than finding out during
+a real run.
 
 ## Security — no built-in authentication
 
 **sift has no login system.** This is a deliberate design choice for a single self-hoster running a local instance, not an oversight. Anyone who can reach the app — a VPS, a NAS with a forwarded port, a reverse-proxied subdomain — can open the Config UI and view or replace your API keys with zero barrier.
 
 **Only run sift on a trusted local network.** If you expose it beyond that, put your own authentication or reverse-proxy in front of it first. See [`SECURITY.md`](./SECURITY.md) for the vulnerability-reporting process.
+
+## Changelog
+
+Version history and what changed in each release: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## Contributing
 

@@ -59,6 +59,7 @@
 │   ├── globals.css
 │   ├── icon.svg
 │   ├── layout.tsx
+│   ├── Modal.tsx
 │   ├── Nav.tsx
 │   └── page.tsx
 ├── bin/
@@ -163,6 +164,8 @@
 │   │   ├── cost-safety.ts
 │   │   ├── json-repair.test.ts
 │   │   ├── json-repair.ts
+│   │   ├── list-models.test.ts
+│   │   ├── list-models.ts
 │   │   ├── non-pipeline-calls.test.ts
 │   │   ├── non-pipeline-calls.ts
 │   │   ├── pricing.test.ts
@@ -215,6 +218,7 @@
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
+├── CHANGELOG.md
 ├── CLAUDE.md
 ├── CONTRIBUTING.md
 ├── DESIGN.md
