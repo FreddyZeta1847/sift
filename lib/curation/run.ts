@@ -170,7 +170,7 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
     provider,
     settings.curationModel,
     [{ role: "user", content: promptText }],
-    { maxOutputTokens: MAX_OUTPUT_TOKENS }
+    { maxOutputTokens: MAX_OUTPUT_TOKENS, timeoutMs: settings.llmCallTimeoutMs }
   );
 
   await logLlmCall({

@@ -12,6 +12,15 @@
  * a restart, a redeploy) is definitely dead by the time a new process is
  * booting, so it's marked aborted here rather than left to look
  * permanently "running" to the sidebar's getInProgressRun() forever.
+ *
+ * The model health check comes last, because it is the only step here that
+ * is NOT a prerequisite for serving requests — everything above it must have
+ * finished before the first page renders correctly; this one only has to have
+ * started. Note it is called, never awaited: Next.js serves nothing until
+ * this function resolves, so putting network calls to an LLM provider on that
+ * path would hand a slow provider the power to keep the whole app offline.
+ * startModelHealthCheck() returns void precisely so that mistake is not
+ * expressible here. See ~/.claude/issues/013.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
@@ -27,5 +36,8 @@ export async function register() {
 
     const { initializeScheduler } = await import("./lib/scheduler/init");
     await initializeScheduler();
+
+    const { startModelHealthCheck } = await import("./lib/health/model-health");
+    startModelHealthCheck();
   }
 }

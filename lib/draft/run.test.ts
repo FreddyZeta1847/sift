@@ -36,7 +36,7 @@ describe("runDraftGenerator", () => {
     vi.spyOn(settingsModule, "getSettings").mockResolvedValue({
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null, scheduleDays: [], scheduleTime: "09:00", voiceProfile: { toneNotes: "casual", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "gpt-4o-mini", draftingProviderId: "p1", draftingModel: "gpt-4o-mini",
-      curationTopN: 3,
+      curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([
       { id: "p1", label: "Test", baseUrl: "https://x.test", apiKey: "k", kind: "openai-compatible" },

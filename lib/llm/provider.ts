@@ -70,6 +70,13 @@ export interface LlmMessage {
 
 export interface LlmCallOptions {
   maxOutputTokens: number;
+  // How long the PROVIDER is given to answer this one call. Optional so the
+  // constant above stays the default for any caller that doesn't care, but
+  // the pipeline stages pass the user's configured value (Settings ->
+  // llmCallTimeoutMs): the right allowance depends entirely on which model
+  // is running, and 180s of silence is a long time to wait three times over
+  // before a run gives up.
+  timeoutMs?: number;
 }
 
 export interface LlmCallResult {
@@ -91,8 +98,9 @@ async function callOpenAICompatibleOnce(
   messages: LlmMessage[],
   options: LlmCallOptions
 ): Promise<LlmCallResult> {
+  const timeoutMs = options.timeoutMs ?? LLM_TIMEOUT_MS;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -110,7 +118,7 @@ async function callOpenAICompatibleOnce(
     });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      const timeoutErr = new Error(`LLM call failed: ${provider.baseUrl} timed out after ${LLM_TIMEOUT_MS}ms`);
+      const timeoutErr = new Error(`LLM call failed: ${provider.baseUrl} timed out after ${timeoutMs}ms`);
       timeoutErr.name = "TransientLlmError";
       (timeoutErr as Error & LlmTimeoutMark).llmTimeout = true;
       throw timeoutErr;
@@ -172,7 +180,7 @@ async function callAnthropic(
   messages: LlmMessage[],
   options: LlmCallOptions
 ): Promise<LlmCallResult> {
-  const client = new Anthropic({ apiKey: provider.apiKey, timeout: LLM_TIMEOUT_MS });
+  const client = new Anthropic({ apiKey: provider.apiKey, timeout: options.timeoutMs ?? LLM_TIMEOUT_MS });
   const system = messages.find((m) => m.role === "system")?.content;
   const userMessages = messages
     .filter((m) => m.role === "user")

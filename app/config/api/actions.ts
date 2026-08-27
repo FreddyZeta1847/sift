@@ -40,6 +40,7 @@
 import { getProviders, saveProviders } from "../../../lib/config/providers";
 import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { probeModel, type ProbeResult } from "../../../lib/config/test-model-probe";
+import { invalidateModelHealth, startModelHealthCheck } from "../../../lib/health/model-health";
 import { safeWrite } from "../../../lib/config/safe-write";
 import type { Provider } from "../../../lib/config/types";
 
@@ -78,7 +79,22 @@ export async function assignModels(assignment: {
   draftingModel: string;
 }): Promise<ActionResult> {
   const settings = await getSettings();
-  return safeWrite(() => saveSettings({ ...settings, ...assignment }));
+  const written = await safeWrite(() => saveSettings({ ...settings, ...assignment }));
+
+  // Whatever the startup check concluded is now about models that are no
+  // longer assigned, so it is thrown away and re-run against the new pair.
+  // Only on a successful write: if the save failed, the old assignment (and
+  // therefore the old verdict) is still the truth.
+  //
+  // Deliberately re-checked WITHOUT re-showing the startup screen or
+  // re-locking the buttons. The screen exists to explain a cold start;
+  // throwing it up again immediately after a deliberate save would interrupt
+  // the user at the exact moment they are working.
+  if (written.ok) {
+    invalidateModelHealth();
+    startModelHealthCheck();
+  }
+  return written;
 }
 
 export async function probeModelAction(providerId: string, model: string): Promise<ProbeResult> {
@@ -87,5 +103,10 @@ export async function probeModelAction(providerId: string, model: string): Promi
   if (!provider) {
     return "unreachable";
   }
-  return probeModel(provider, model);
+  // The budget is the user's, not this file's: how long a model is worth
+  // waiting for depends entirely on which model it is. A "timeout" here means
+  // the provider gave up; running past this budget means WE gave up, and is
+  // reported as "inconclusive" instead — see lib/config/test-model-probe.ts.
+  const settings = await getSettings();
+  return probeModel(provider, model, settings.probeTimeoutMs);
 }

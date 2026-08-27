@@ -11,7 +11,9 @@ import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAc
 import { getProviders, saveProviders } from "../../../lib/config/providers";
 import * as providersModule from "../../../lib/config/providers";
 import { getSettings } from "../../../lib/config/settings";
+import * as settingsModule from "../../../lib/config/settings";
 import * as probeModule from "../../../lib/config/test-model-probe";
+import * as modelHealthModule from "../../../lib/health/model-health";
 
 const testConfigDir = "data/test-config-api-actions";
 
@@ -23,6 +25,10 @@ describe("api config actions", () => {
     // lib/config/providers.ts). These tests care about CRUD behavior in
     // isolation, not the seeding default, so start from a real, empty file.
     await saveProviders([]);
+    // assignModels re-runs the model health check on success. Stubbed here so
+    // no test in this file can reach a real provider over the network.
+    vi.spyOn(modelHealthModule, "startModelHealthCheck").mockImplementation(() => {});
+    vi.spyOn(modelHealthModule, "invalidateModelHealth").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -85,7 +91,31 @@ describe("api config actions", () => {
     expect(settings.draftingModel).toBe("m2");
   });
 
-  it("probeModelAction looks up the provider by id and delegates to probeModel", async () => {
+  it("assignModels re-runs the model health check once the new pair is saved", async () => {
+    await assignModels({ curationProviderId: "p1", curationModel: "m1", draftingProviderId: "p2", draftingModel: "m2" });
+
+    expect(modelHealthModule.invalidateModelHealth).toHaveBeenCalled();
+    expect(modelHealthModule.startModelHealthCheck).toHaveBeenCalled();
+  });
+
+  it("assignModels leaves the existing health verdict alone when the write fails", async () => {
+    // A failed save means the OLD assignment is still in force, so the old
+    // verdict is still the truth — discarding it would be wrong.
+    vi.spyOn(settingsModule, "saveSettings").mockRejectedValue(new Error("disk full"));
+
+    const result = await assignModels({
+      curationProviderId: "p1",
+      curationModel: "m1",
+      draftingProviderId: "p2",
+      draftingModel: "m2",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(modelHealthModule.invalidateModelHealth).not.toHaveBeenCalled();
+    expect(modelHealthModule.startModelHealthCheck).not.toHaveBeenCalled();
+  });
+
+  it("probeModelAction looks up the provider by id and delegates to probeModel with the user's budget", async () => {
     const provider = { id: "p1", label: "Test", baseUrl: "http://x", apiKey: "k", kind: "openai-compatible" as const };
     await saveProviders([provider]);
     const spy = vi.spyOn(probeModule, "probeModel").mockResolvedValue("pass");
@@ -93,7 +123,10 @@ describe("api config actions", () => {
     const result = await probeModelAction("p1", "m1");
 
     expect(result).toBe("pass");
-    expect(spy).toHaveBeenCalledWith(provider, "m1");
+    // Third argument added deliberately: how long to wait for a model is a
+    // user setting now, not a constant chosen inside the probe.
+    const settings = await getSettings();
+    expect(spy).toHaveBeenCalledWith(provider, "m1", settings.probeTimeoutMs);
   });
 
   it("probeModelAction returns unreachable when the provider id doesn't exist", async () => {

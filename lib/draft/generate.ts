@@ -72,7 +72,7 @@ export async function generateDrafts(items: CuratedItem[], runId: number): Promi
     provider,
     settings.draftingModel,
     [{ role: "user", content: promptText }],
-    { maxOutputTokens: MAX_OUTPUT_TOKENS }
+    { maxOutputTokens: MAX_OUTPUT_TOKENS, timeoutMs: settings.llmCallTimeoutMs }
   );
 
   await logLlmCall({

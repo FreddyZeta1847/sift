@@ -15,7 +15,7 @@ describe("initializeScheduler", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: ["mon"], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const registerSpy = vi.spyOn(cronModule, "registerCronJob").mockImplementation(() => {});
     const catchupSpy = vi.spyOn(catchupModule, "checkMissedRun").mockResolvedValue(undefined);
@@ -31,7 +31,7 @@ describe("initializeScheduler", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const catchupSpy = vi.spyOn(catchupModule, "checkMissedRun").mockResolvedValue(undefined);
 

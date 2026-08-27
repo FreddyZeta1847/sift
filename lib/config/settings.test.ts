@@ -43,7 +43,7 @@ describe("saveSettings", () => {
       scheduleTime: "14:30",
       voiceProfile: { toneNotes: "casual", examplePosts: [], interests: ["ai"] },
       curationProviderId: "p1", curationModel: "m1", draftingProviderId: "p1", draftingModel: "m1",
-      curationTopN: 5,
+      curationTopN: 5, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     };
     await saveSettings(custom);
     const result = await getSettings();

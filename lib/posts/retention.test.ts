@@ -29,7 +29,7 @@ function settingsWithRetention(postsRetentionDays: number | null) {
     curationModel: null,
     draftingProviderId: null,
     draftingModel: null,
-    curationTopN: 3,
+    curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
   };
 }
 

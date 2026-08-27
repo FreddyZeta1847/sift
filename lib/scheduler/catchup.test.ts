@@ -66,7 +66,7 @@ describe("checkMissedRun", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [], scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const triggerSpy = vi.spyOn(triggerModule, "triggerRun");
 
@@ -86,7 +86,7 @@ describe("checkMissedRun", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const triggerSpy = vi.spyOn(triggerModule, "triggerRun").mockResolvedValue(undefined);
 
@@ -110,7 +110,7 @@ describe("checkMissedRun", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     let releaseRun!: () => void;
     const stillRunning = new Promise<void>((resolve) => {
@@ -136,7 +136,7 @@ describe("checkMissedRun", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(triggerModule, "triggerRun").mockRejectedValue(new Error("boom"));
@@ -158,7 +158,7 @@ describe("checkMissedRun", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const db = getDb();
     await db.insert(pipelineRunsTable).values({ startedAt: recentSlot, type: "scheduled", status: "success" });
@@ -179,7 +179,7 @@ describe("checkMissedRun", () => {
       budgetCapUsd: null, postsRetentionDays: null, candidateRetentionDays: null,
       scheduleDays: [dayName], scheduleTime: `${hh}:${mm}`,
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
-      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3,
+      curationProviderId: null, curationModel: null, draftingProviderId: null, draftingModel: null, curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     const triggerSpy = vi.spyOn(triggerModule, "triggerRun");
 

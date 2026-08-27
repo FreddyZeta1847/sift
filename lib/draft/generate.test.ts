@@ -31,7 +31,7 @@ describe("generateDrafts", () => {
       scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "m", draftingProviderId: "p1", draftingModel: "m",
-      curationTopN: 3,
+      curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([
       { id: "p1", label: "Test", baseUrl: "https://x.test", apiKey: "k", kind: "openai-compatible" },
@@ -63,7 +63,7 @@ describe("generateDrafts", () => {
       scheduleTime: "09:00",
       voiceProfile: { toneNotes: "", examplePosts: [], interests: [] },
       curationProviderId: "p1", curationModel: "m", draftingProviderId: "p1", draftingModel: "m",
-      curationTopN: 3,
+      curationTopN: 3, modelHealthCheckEnabled: true, healthCheckTimeoutMs: 30_000, probeTimeoutMs: 60_000, llmCallTimeoutMs: 180_000,
     });
     vi.spyOn(providersModule, "getProviders").mockResolvedValue([
       { id: "p1", label: "Test", baseUrl: "https://x.test", apiKey: "k", kind: "openai-compatible" },
