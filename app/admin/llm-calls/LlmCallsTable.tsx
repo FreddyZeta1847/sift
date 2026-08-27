@@ -1,26 +1,45 @@
 /**
- * LLM Calls table (Admin — `/admin/llm-calls`). Leaf rows, Delete is
- * always allowed (see lib/admin/delete.ts).
+ * LLM Calls table (Admin — `/admin/llm-calls`).
+ *
+ * Structure comes from AdminTable.tsx, shared with the other three Admin
+ * tables. Leaf rows, so Delete is always allowed (see lib/admin/delete.ts).
+ *
+ * Cost is the one figure in the app shown to four decimal places. A single
+ * call routinely costs a fraction of a cent, and rounding it to the two
+ * places the Costs page uses would print most rows as $0.00 — which reads
+ * as free rather than as small.
  */
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { AdminTable, formatAdminDate, type AdminColumn } from "../AdminTable";
 import { deleteLlmCallAction } from "../actions";
+import type { FilterField, FilterValues } from "../../FilterBar";
 import type { LlmCallRow } from "../../../lib/admin/queries";
 
-// minmax(0, 1fr) for the six variable-width columns — same reasoning as
-// RunsTable.tsx: fixed px grid tracks don't shrink, which overflowed the
-// container horizontally.
-const GRID = "56px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 64px";
+const COLUMNS: AdminColumn<LlmCallRow>[] = [
+  { label: "ID", width: "60px", render: (c) => <span className="data">#{c.id}</span> },
+  { label: "Run", width: "64px", render: (c) => <span className="data">#{c.runId}</span> },
+  { label: "Provider", width: "minmax(0,1fr)", render: (c) => c.provider },
+  { label: "Model", width: "minmax(0,1fr)", render: (c) => c.model },
+  { label: "Timestamp", width: "minmax(0,1fr)", render: (c) => <span className="data">{formatAdminDate(c.timestamp)}</span> },
+  {
+    label: "Tokens",
+    width: "minmax(0,110px)",
+    render: (c) => (
+      <span className="data">
+        {c.inputTokens}/{c.outputTokens}
+      </span>
+    ),
+  },
+  { label: "Cost", width: "minmax(0,100px)", render: (c) => <span className="data">${c.estimatedCost.toFixed(4)}</span> },
+];
 
-// Local time, not UTC — this renders in the browser, so the viewer's own
-// timezone is what they expect to see, not the UTC value the DB stores.
-function formatDate(d: Date | string): string {
-  return new Date(d).toLocaleString(undefined, {
-    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-  });
-}
+const FILTERS: FilterField[] = [
+  { key: "id", label: "ID", kind: "number" },
+  { key: "runId", label: "Run ID", kind: "number" },
+  { key: "provider", label: "Provider", kind: "text" },
+  { key: "model", label: "Model", kind: "text" },
+];
 
 export function LlmCallsTable({
   rows,
@@ -33,122 +52,27 @@ export function LlmCallsTable({
   total: number;
   page: number;
   pageSize: number;
-  filters: Record<string, string | undefined>;
+  filters: FilterValues;
 }) {
-  const router = useRouter();
-  const [deleteErrors, setDeleteErrors] = useState<Record<number, string>>({});
-
-  const pushFilters = (next: Record<string, string>) => {
-    const merged = { ...filters, ...next, page: "1" };
-    const params = new URLSearchParams(Object.entries(merged).filter(([, v]) => v) as [string, string][]);
-    router.push(`/admin/llm-calls?${params.toString()}`);
-  };
-
-  const goToPage = (p: number) => {
-    const params = new URLSearchParams(Object.entries({ ...filters, page: String(p) }).filter(([, v]) => v) as [string, string][]);
-    router.push(`/admin/llm-calls?${params.toString()}`);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm(`Delete LLM call record #${id}? This cannot be undone.`)) return;
-    const result = await deleteLlmCallAction(id);
-    if (!result.ok) {
-      setDeleteErrors((prev) => ({ ...prev, [id]: result.error ?? "Delete failed" }));
-      return;
-    }
-    setDeleteErrors((prev) => {
-      const { [id]: _removed, ...rest } = prev;
-      return rest;
-    });
-    router.refresh();
-  };
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
   return (
-    <section>
-      <h2>LLM Calls</h2>
-      <div className="row-fields admin-filters">
-        <label>
-          ID
-          <input key={filters.id ?? ""} type="number" defaultValue={filters.id ?? ""} onBlur={(e) => pushFilters({ id: e.target.value })} />
-        </label>
-        <label>
-          Run ID
-          <input
-            key={filters.runId ?? ""}
-            type="number"
-            defaultValue={filters.runId ?? ""}
-            onBlur={(e) => pushFilters({ runId: e.target.value })}
-          />
-        </label>
-        <label>
-          Provider
-          <input
-            key={filters.provider ?? ""}
-            defaultValue={filters.provider ?? ""}
-            onBlur={(e) => pushFilters({ provider: e.target.value })}
-          />
-        </label>
-        <label>
-          Model
-          <input key={filters.model ?? ""} defaultValue={filters.model ?? ""} onBlur={(e) => pushFilters({ model: e.target.value })} />
-        </label>
-      </div>
-
-      {rows.length === 0 ? (
-        <p className="empty-state">No LLM calls match these filters.</p>
-      ) : (
-        <div className="admin-table">
-          <div className="admin-row admin-row--head" style={{ gridTemplateColumns: GRID }}>
-            <span>ID</span>
-            <span>Run</span>
-            <span>Provider</span>
-            <span>Model</span>
-            <span>Timestamp</span>
-            <span>Tokens</span>
-            <span>Cost</span>
-            <span />
-          </div>
-          {rows.map((c) => (
-            <div key={c.id}>
-              <div className="admin-row" style={{ gridTemplateColumns: GRID }}>
-                <span className="data">#{c.id}</span>
-                <span className="data">#{c.runId}</span>
-                <span>{c.provider}</span>
-                <span>{c.model}</span>
-                <span className="data">{formatDate(c.timestamp)}</span>
-                <span className="data">
-                  {c.inputTokens}/{c.outputTokens}
-                </span>
-                <span className="data">${c.estimatedCost.toFixed(4)}</span>
-                <div className="row-actions">
-                  <button className="danger" onClick={() => handleDelete(c.id)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-              {deleteErrors[c.id] && (
-                <p className="status-line status-line--danger" role="alert">
-                  {deleteErrors[c.id]}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="pagination">
-        <button onClick={() => goToPage(page - 1)} disabled={page <= 1}>
-          Prev
-        </button>
-        <span className="data">
-          Page {page} of {totalPages} ({total} total)
-        </span>
-        <button onClick={() => goToPage(page + 1)} disabled={page >= totalPages}>
-          Next
-        </button>
-      </div>
-    </section>
+    <AdminTable
+      title="LLM Calls"
+      basePath="/admin/llm-calls"
+      columns={COLUMNS}
+      rows={rows}
+      rowId={(c) => c.id}
+      filterFields={FILTERS}
+      filterValues={filters}
+      page={page}
+      pageSize={pageSize}
+      total={total}
+      emptyMessage="No LLM calls match these filters."
+      emptyHint="Clear a filter above. Every pipeline run records its calls here."
+      onDelete={{
+        action: deleteLlmCallAction,
+        confirmTitle: "Delete LLM call record",
+        confirmMessage: (c) => <>Delete LLM call record #{c.id}? This cannot be undone.</>,
+      }}
+    />
   );
 }

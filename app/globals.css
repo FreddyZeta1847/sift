@@ -475,6 +475,17 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
   padding: 0 0 var(--space-xs);
   border-bottom: 1px solid var(--border);
 }
+/* An explanation attached to one row — why its delete is blocked, or why
+   one just failed. Indented under the row it belongs to rather than
+   floating between rows as an unattributed sentence. */
+.row-note {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin: 0 0 var(--space-sm);
+  padding-left: var(--space-md);
+  border-left: 2px solid var(--border);
+}
+
 /* A row's title/meta pair when it isn't a real column grid — a provider,
    a model, a source. */
 .row-main {
@@ -1231,7 +1242,7 @@ h3:first-child { margin-top: 0; }
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 .admin-tabs a {
   border-radius: var(--radius-pill);
@@ -1247,41 +1258,25 @@ h3:first-child { margin-top: 0; }
 .admin-tabs a:hover { background: var(--border); }
 .admin-tabs a.active { background: var(--ink); color: var(--primary-text); }
 
-/* Admin page's four tables — generalizes .provider-table/.provider-row's
-   grid-row visual language without a hardcoded column count baked into
-   the CSS (each table needs a different number of columns); every
-   *Table.tsx supplies its own `gridTemplateColumns` inline instead. */
-.admin-table { display: flex; flex-direction: column; }
-.admin-row {
-  display: grid;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--border);
-}
-.admin-row:last-child { border-bottom: none; }
-.admin-row > span,
-.admin-row > a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.admin-row--head {
-  color: var(--label);
-  text-transform: uppercase;
-  font-size: 0.71875rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  padding-bottom: var(--space-xs);
-}
+/* The Admin tables' own row language is gone: they use the shared
+   `.rows`/`.row` family now, with their column widths arriving as a
+   `--cols` custom property instead of a per-row inline style. That is
+   what finally gave them a mobile layout — see AdminTable.tsx.
 
-/* A card wrapping a table needs tighter top/bottom padding than the
-   generic `.card` — the table's own row padding already carries most of
-   the internal rhythm. */
-.card--table { padding: 8px var(--space-lg) var(--space-md); }
+   Removed with it: `.admin-table`, `.admin-row`, `.admin-row--head`,
+   `.admin-filters` (replaced by FilterBar.tsx) and `.card--table` (the
+   Admin layout uses `.panel`). */
 
 .pagination {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
   margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
 }
+.pagination .data { color: var(--muted); }
 
 /* Field clusters — an add/edit mini-form's inputs, laid out as a
    responsive grid rather than one input per line. */
@@ -1292,28 +1287,6 @@ h3:first-child { margin-top: 0; }
   margin-bottom: var(--space-sm);
 }
 
-/* Admin table filter bars — a modifier on .row-fields. The grid above
-   wraps to a second row once its columns can't all fit at their 160px
-   floor, which is exactly what was happening here (the ID field ending up
-   alone on its own line above the rest). Filters read much worse split
-   across two rows than slightly narrower on one, so force a single
-   nowrap row instead — fields shrink together rather than wrapping, with
-   a horizontal-scroll fallback if the viewport is genuinely too narrow. */
-.admin-filters {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-end;
-  overflow-x: auto;
-}
-.admin-filters > label {
-  flex: 1 1 0;
-  min-width: 120px;
-}
-.admin-filters input,
-.admin-filters select {
-  width: 100%;
-  max-width: none;
-}
 
 /* A tight cluster of action buttons (Edit/Delete, Save/Cancel, a probe
    button next to its result). */

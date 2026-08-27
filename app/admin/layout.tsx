@@ -17,9 +17,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <main>
       <div className="config-page">
-        <h1>Admin</h1>
+        <div className="page-head">
+          <div className="page-head-text">
+            <h1>Admin</h1>
+            <p className="page-head-sub">
+              Search, filter and delete across the four tables the pipeline writes.
+            </p>
+          </div>
+        </div>
+        {/* The tabs sit outside the panel, not on it: they switch which
+            panel you are looking at, so they belong to the page. */}
         <AdminNav />
-        <div className="card card--table">{children}</div>
+        <div className="panel">{children}</div>
       </div>
     </main>
   );
