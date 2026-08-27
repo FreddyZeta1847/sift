@@ -53,7 +53,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
   // null = closed. "add" = a new row. A ModelEntry = editing that row's prices.
   const [editing, setEditing] = useState<"add" | ModelEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null);
   // Names the selected provider says it offers. Suggestions only — the field
   // stays free text, so a provider that can't answer costs nothing.
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -122,7 +122,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
       setError(result.error ?? "Save failed");
       return;
     }
-    setStatus(isAdding ? "Model added." : "Prices updated.");
+    setStatus({ text: isAdding ? "Model added." : "Prices updated.", ok: true });
     close();
     router.refresh();
   };
@@ -130,7 +130,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
   const handleDelete = async (m: ModelEntry) => {
     const result = await deleteModel(m.providerId, m.model);
     setConfirmRemove(null);
-    setStatus(result.ok ? "Model removed." : `Delete failed: ${result.error}`);
+    setStatus(result.ok ? { text: "Model removed.", ok: true } : { text: `Delete failed: ${result.error}`, ok: false });
     if (result.ok) router.refresh();
   };
 
@@ -189,7 +189,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
         </div>
       )}
 
-      <StatusMessage message={status} />
+      <StatusMessage message={status?.text} tone={status?.ok ? "success" : "danger"} />
 
       {editing !== null && (
         <Modal

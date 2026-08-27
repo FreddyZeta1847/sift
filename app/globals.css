@@ -479,6 +479,19 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 /* The success flavour of the neutral chip — a post that went out. */
 .tag--success { background: var(--success-bg); color: var(--success-deep); }
 
+/* A standalone "this one is ready" dot, where the good state has no word
+   of its own to colour. On a provider row it is the counterpart to the red
+   missing-key icon beside it: that column used to speak only when
+   something was wrong, and say nothing at all when everything was fine. */
+.ready-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
 /* A vertical stack with one consistent gap. `--gap` overrides it. */
 .stack {
   display: flex;
@@ -1185,7 +1198,14 @@ h3:first-child { margin-top: 0; }
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--space-xl);
 }
-.stage-grid > .stage-block + .stage-block { margin-top: 0; }
+/* A grid spaces its items with `gap`, so the stacking margin above must
+   not apply inside one. This reset originally named `.stage-grid` alone
+   and was left behind when Model assignment moved to `.panel-grid` — so
+   the Drafting stage sat 24px lower than Curation despite byte-identical
+   markup. Both are named now, so a third grid container cannot quietly
+   bring it back. */
+.stage-grid > .stage-block + .stage-block,
+.panel-grid > .stage-block + .stage-block { margin-top: 0; }
 /* Costs pairs its 4 cards into two grid rows (reusing this same grid
    mechanic) — space between the rows themselves, since sections wrapped
    in cards no longer sit as .config-content's direct children for the

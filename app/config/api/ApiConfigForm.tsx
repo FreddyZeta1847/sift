@@ -35,8 +35,10 @@
  * silent no-op or overwriting an unrelated provider — ids are chosen once,
  * when the provider is added.
  *
- * Each provider row leads with a red warning icon when `apiKey` is empty,
- * and shows nothing once a key is set. Delete is hidden entirely for known
+ * Each provider row leads with its readiness: a red warning icon when
+ * `apiKey` is empty on a provider that needs one, a small green dot
+ * otherwise. It used to show the warning or nothing at all, which left
+ * "not set up" and "ready" looking identical. Delete is hidden for known
  * providers, per `isKnownProvider` — matched by id OR by baseUrl, since a
  * provider added before the known-provider seeding existed (or re-added by
  * hand) can carry a real known endpoint under a custom id. There is no
@@ -150,7 +152,10 @@ export function ApiConfigForm({
   const [editing, setEditing] = useState<"add" | Provider | null>(null);
   const [draft, setDraft] = useState<ProviderDraft>(EMPTY_PROVIDER);
   const [formError, setFormError] = useState<string | null>(null);
-  const [providerStatus, setProviderStatus] = useState<string | null>(null);
+  // Tracked with its tone rather than inferred from the wording: this
+  // component knows whether a save succeeded, so guessing from the string
+  // would be throwing away information it already has.
+  const [providerStatus, setProviderStatus] = useState<{ text: string; ok: boolean } | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState<Provider | null>(null);
 
@@ -158,7 +163,7 @@ export function ApiConfigForm({
   const [curationModel, setCurationModel] = useState(settings.curationModel ?? "");
   const [draftingProviderId, setDraftingProviderId] = useState(settings.draftingProviderId ?? "");
   const [draftingModel, setDraftingModel] = useState(settings.draftingModel ?? "");
-  const [assignStatus, setAssignStatus] = useState<string | null>(null);
+  const [assignStatus, setAssignStatus] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [curationProbeResult, setCurationProbeResult] = useState<ProbeResult | null>(null);
   const [draftingProbeResult, setDraftingProbeResult] = useState<ProbeResult | null>(null);
@@ -201,7 +206,7 @@ export function ApiConfigForm({
       setFormError(result.error ?? (isAdding ? "Add failed" : "Update failed"));
       return;
     }
-    setProviderStatus(isAdding ? "Provider added." : "Provider updated.");
+    setProviderStatus({ text: isAdding ? "Provider added." : "Provider updated.", ok: true });
     closeForm();
     router.refresh();
   };
@@ -217,17 +222,17 @@ export function ApiConfigForm({
       const { [p.id]: _removed, ...rest } = prev;
       return rest;
     });
-    setProviderStatus("Provider removed.");
+    setProviderStatus({ text: "Provider removed.", ok: true });
     router.refresh();
   };
 
   const handleSaveAssignment = async () => {
     const result = await assignModels({ curationProviderId, curationModel, draftingProviderId, draftingModel });
     if (!result.ok) {
-      setAssignStatus(`Save failed: ${result.error}`);
+      setAssignStatus({ text: `Save failed: ${result.error}`, ok: false });
       return;
     }
-    setAssignStatus("Model assignment saved.");
+    setAssignStatus({ text: "Model assignment saved.", ok: true });
     router.refresh();
   };
 
@@ -272,7 +277,7 @@ export function ApiConfigForm({
                     {/* A blank key means "not set up yet" for a hosted provider,
                         but a local one (Ollama) has no key to set — warning
                         there would be permanent and wrong. */}
-                    {!p.apiKey && providerNeedsApiKey(p) && (
+                    {!p.apiKey && providerNeedsApiKey(p) ? (
                       <span className="key-missing-icon" title="API key missing" aria-label="API key missing">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="12" cy="12" r="10" />
@@ -280,6 +285,12 @@ export function ApiConfigForm({
                           <line x1="12" y1="16" x2="12.01" y2="16" />
                         </svg>
                       </span>
+                    ) : (
+                      // The other half of the same signal. Without it the
+                      // column says "something is wrong here" or says
+                      // nothing at all, and nothing is not the same as
+                      // "this one is ready to use".
+                      <span className="ready-dot" title="Ready to use" aria-label="Ready to use" />
                     )}
                     <span className="row-title">{p.label}</span>
                   </span>
@@ -318,7 +329,7 @@ export function ApiConfigForm({
           </div>
         )}
 
-        <StatusMessage message={providerStatus} />
+        <StatusMessage message={providerStatus?.text} tone={providerStatus?.ok ? "success" : "danger"} />
       </section>
 
       <section className="panel" id="model-assignment">
@@ -414,7 +425,7 @@ export function ApiConfigForm({
         </div>
 
         <div className="panel-foot">
-          <StatusMessage message={assignStatus} />
+          <StatusMessage message={assignStatus?.text} tone={assignStatus?.ok ? "success" : "danger"} />
           <button
             className="primary"
             onClick={handleSaveAssignment}
