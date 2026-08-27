@@ -1156,84 +1156,25 @@ h3:first-child { margin-top: 0; }
 .list-row-title { color: var(--ink); }
 .list-row-meta { color: var(--muted); }
 
-/* A row swapped into its edit shape (API Config's provider edit) — stacks
-   full-width instead of the compact space-between row. */
-.list-row--edit {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-sm);
-  padding: var(--space-md) 0;
-}
 
-/* API Config's provider list, as an actual scannable table (label, base
-   URL, kind, actions) rather than one flex row per provider with its
-   meta packed into a single wrapping line. */
-.provider-table { display: flex; flex-direction: column; }
-.provider-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(180px, 2fr) auto auto;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--border);
-}
-.provider-row:last-child { border-bottom: none; }
-.provider-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.provider-row > .tag { overflow: visible; white-space: nowrap; justify-self: start; }
-/* Matches .provider-row--card's own horizontal padding below — without
-   this, the header's "Label"/"Base URL"/"Kind" text sits flush left/right
-   while the data rows below it are inset by --space-lg, throwing off the
-   alignment of every column (worst on "Kind", the narrowest one). */
-.provider-row--head {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  padding: 0 var(--space-lg) var(--space-xs);
-}
-/* The label cell now packs a key-missing warning icon (shown only when
-   there's no key yet) and the label text — override the plain-text
-   single-line-ellipsis rule above (meant for a bare text cell) since this
-   cell holds multiple child elements, not raw text. */
-.provider-row > .provider-label-cell {
+/* The providers list used its own `.provider-table`/`.provider-row` grid
+   and the models list its own `.list`/`.list-row` flex rows — two row
+   languages doing one job on a single page. Both use the shared
+   `.rows`/`.row` family now. What survives here is only what is genuinely
+   specific to a provider row: the label cell, which has to hold a warning
+   icon beside the label without letting either wrap. */
+.provider-label-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
-  overflow: visible;
-  white-space: normal;
-}
-.provider-label-cell .list-row-title {
+  gap: var(--space-sm);
   min-width: 0;
+}
+.provider-label-cell .row-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .key-missing-icon { flex-shrink: 0; display: flex; color: var(--danger); }
-/* Each provider, individually, is a discrete comparable unit, so it earns
-   a card of its own (DESIGN.md's Cards-Are-Default Rule). */
-.provider-row--card {
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  border-bottom: none;
-  padding: var(--space-md) var(--space-lg);
-  margin-bottom: var(--space-sm);
-}
-/* The edit-mode row swaps to the full-width stacked field form — spans
-   every column instead of trying to fit inside the table grid. */
-.provider-row--edit {
-  grid-template-columns: 1fr;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-md) 0;
-}
-
-@media (max-width: 640px) {
-  .provider-row:not(.provider-row--head):not(.provider-row--edit) {
-    grid-template-columns: 1fr;
-    gap: 2px;
-  }
-  .provider-row--head { display: none; }
-}
 
 /* Admin's tab switcher (AdminNav.tsx) — real routes styled as pill tabs,
    borrowing the sidebar's filled-pill active state (see
@@ -1325,6 +1266,25 @@ h3:first-child { margin-top: 0; }
 /* Wrapper for a section's single closing action (e.g. "Save model
    assignment") when it isn't already inside a <form>. */
 .section-actions { margin-top: var(--space-md); }
+
+/* A panel's closing row: the action on the right, and whatever the last
+   action reported on the left, on one line and separated by a hairline
+   from the fields it applies to. */
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+.panel-foot [role="alert"] { margin: 0; margin-right: auto; }
+
+/* An icon sitting inside a text button, before its label. Was an inline
+   style repeated on the two "Test this model" buttons. */
+.button-icon { margin-right: 6px; vertical-align: -2px; }
 
 /* A checkbox paired with a short description read as normal body text
    (e.g. "Unlimited") rather than the muted micro-caption `label` uses for
@@ -1768,11 +1728,6 @@ h3:first-child { margin-top: 0; }
   margin-bottom: var(--space-md);
 }
 .section-header > h2 { margin-bottom: 0; }
-/* The provider list insets its rows by --space-lg (see .provider-row--head),
-   so a button flush to the section edge overhangs the "Kind" column and the
-   right edge of every row below it. Match the inset and the button lines up
-   with the content it belongs to. */
-#providers .section-header { padding-right: var(--space-lg); }
 .section-action {
   flex-shrink: 0;
   background: var(--primary);

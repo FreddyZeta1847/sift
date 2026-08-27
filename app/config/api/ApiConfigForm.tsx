@@ -1,59 +1,52 @@
 /**
  * Interactive form for the API Config page (`/config/api`).
  *
- * Client Component following the same interaction pattern established by
+ * Three panels, in the order you need them: the providers you can reach,
+ * which model each pipeline stage uses, and what those models cost.
+ *
+ * Client Component following the same interaction pattern as
  * `app/review/DraftCard.tsx`: local `useState` for form fields and status
  * text, `useRouter().refresh()` after a successful mutation so the Server
  * Component re-fetches fresh `providers`/`settings` props, and a
- * `<p role="alert">{status}</p>` per section for both success and failure
- * messages. Per-stage "Test this model" probes use `useTransition` (mirroring
- * DraftCard's Regenerate button) so each button can show a pending label
- * independently while its `probeModelAction` Server Action call is in flight.
- * "Save model assignment" reuses this same provider-selected-but-blank-model
- * guard: it's disabled whenever either stage has a provider chosen with no
- * model name, preventing a silent blank-model save that would only surface
- * as a failure on the next real pipeline run.
+ * `<StatusMessage>` per panel for both success and failure. Per-stage
+ * "Test this model" probes use `useTransition` (mirroring DraftCard's
+ * Regenerate) so each button shows a pending label independently while its
+ * `probeModelAction` call is in flight. "Save model assignment" is
+ * disabled whenever either stage has a provider chosen with no model,
+ * preventing a silent blank-model save that would only surface as a
+ * failure on the next real pipeline run.
  *
- * The provider list and the two model-assignment dropdowns are rendered
- * directly from the `providers`/`settings` props rather than copied into
- * local state, so a `router.refresh()` after add/delete/update immediately
- * reflects the new provider set everywhere it's used on this page. Only the
- * add-provider mini-form and the assignment/probe fields are held in local
- * state, since those are user-in-progress input rather than a mirror of
- * server data.
+ * The provider list and the two assignment dropdowns render straight from
+ * props rather than being copied into local state, so a `router.refresh()`
+ * after add/edit/delete immediately reflects the new provider set
+ * everywhere it is used. Only in-progress input lives in local state.
  *
- * Editing an existing provider reuses this same add-provider field shape:
- * clicking the edit icon on a row sets `editingId` to that provider's id and
- * swaps the row's static text for the identical set of inputs, pre-filled
- * from the provider's current values and held in `editProvider` state. The
- * `id` input is disabled in edit mode: `updateProvider` matches the row to
- * replace by the submitted id, so letting a user retype it risks a silent
- * no-op or overwriting an unrelated provider — ids are only ever chosen in
- * the add-provider form. Since these inputs live in the `<ul>` rather than a
- * `<form>`, their `required` attributes don't enforce anything on their own,
- * so "Save" is additionally disabled whenever `label`/`baseUrl`/`apiKey` is
- * blank (mirroring the "Save model assignment" guard below). "Save" calls
- * `updateProvider` and, on success, shows "Provider updated." via
- * `editStatus`, clears `editingId`, and refreshes; "Cancel" just clears
- * `editingId` without persisting anything.
+ * ADD AND EDIT ARE THE SAME FORM, IN THE SAME PLACE
+ * Both open the overlay card (app/Modal.tsx). Editing used to work
+ * differently: clicking the pencil swapped that row's text for a grid of
+ * inputs in place, so the list jumped, four fields had to fit the width of
+ * a row, and two rows could sit half-expanded at once. Worse, those inputs
+ * lived in the list rather than a `<form>`, so their `required` attributes
+ * enforced nothing and Save needed a hand-written disabled condition to
+ * stand in for validation. In a real form the browser does that.
  *
- * Each provider row leads with a red warning icon when `apiKey` is empty
- * (nothing shown once a key is set — the row just reads clean). Edit is an
- * icon button on every row; Delete is hidden entirely for known providers,
- * per `isKnownProvider` — matched by id OR by baseUrl, since a provider
- * added before the known-provider seeding feature existed (or manually
- * re-added) can carry a real known endpoint under a custom/legacy id, not
- * just the seeded `suggestedId`. There's no reason to force-remove a
- * default a user isn't using, they can just leave its key blank.
+ * The `id` field stays disabled when editing. `updateProvider` matches the
+ * row to replace by the submitted id, so letting it be retyped risks a
+ * silent no-op or overwriting an unrelated provider — ids are chosen once,
+ * when the provider is added.
  *
- * Adding a provider opens an overlay card (app/Modal.tsx) from the
- * "+ Add provider" button in the section header, rather than unfolding a
- * form inside the page. `showAddForm` is now simply whether that card is
- * open. The API key field is NOT required: a local provider (Ollama) has no
- * key to give, and demanding one made it impossible to add. The Kind field (both add and edit forms)
- * carries an inline info icon whose `title` explains the `anthropic` vs.
- * `openai-compatible` distinction (`KIND_HINT`) — the same guidance given
- * in the README, surfaced right where the decision is made.
+ * Each provider row leads with a red warning icon when `apiKey` is empty,
+ * and shows nothing once a key is set. Delete is hidden entirely for known
+ * providers, per `isKnownProvider` — matched by id OR by baseUrl, since a
+ * provider added before the known-provider seeding existed (or re-added by
+ * hand) can carry a real known endpoint under a custom id. There is no
+ * reason to force-remove a default you aren't using; leave its key blank.
+ *
+ * The API key field is NOT required when adding: a local provider (Ollama)
+ * has no key to give, and demanding one made it impossible to add. The
+ * Kind field carries an inline info icon whose `title` explains the
+ * `anthropic` vs `openai-compatible` distinction (`KIND_HINT`) — the same
+ * guidance the README gives, surfaced where the decision is made.
  */
 "use client";
 
@@ -65,17 +58,22 @@ import type { ProbeResult } from "../../../lib/config/test-model-probe";
 import { KNOWN_PROVIDERS, providerNeedsApiKey } from "../../../lib/config/known-providers";
 import { useModelHealth } from "../../health/ModelHealthProvider";
 import { Modal } from "../../Modal";
+import { ConfirmDialog } from "../../ConfirmDialog";
+import { StatusMessage } from "../../StatusMessage";
+import { EmptyState } from "../../EmptyState";
 import { ModelSelect } from "./ModelSelect";
 import { ModelsTable } from "./ModelsTable";
 import type { ModelEntry } from "../../../lib/config/types";
 
-const EMPTY_NEW_PROVIDER = {
+const EMPTY_PROVIDER = {
   id: "",
   label: "",
   baseUrl: "",
   apiKey: "",
   kind: "openai-compatible" as Provider["kind"],
 };
+
+type ProviderDraft = typeof EMPTY_PROVIDER;
 
 const KNOWN_PROVIDER_IDS = new Set(KNOWN_PROVIDERS.map((p) => p.suggestedId));
 // A provider added before the known-provider seeding feature existed (or
@@ -93,18 +91,9 @@ const KIND_HINT =
   "openai-compatible = everything else: OpenAI itself, and any provider whose endpoint matches OpenAI's request/response shape " +
   "(Google Gemini, NVIDIA NIM, OpenRouter, DeepSeek, etc.) — use their real Base URL.";
 
-// Visual-only helper: every failure message produced in this file follows
-// an "X failed: ..." shape (see the handlers below), so matching that
-// substring is enough to apply the danger tint without adding any new
-// state — a plain success sentence falls through to the default, quieter
-// `.status-line` tone.
-function statusTone(message: string): string {
-  return /failed/i.test(message) ? "status-line status-line--danger" : "status-line";
-}
-
 // Visual-only helpers for a "test this model" probe result. "pass" is the
 // only outcome that means "safe to assign", but the failures are NOT
-// interchangeable, so they no longer all render the same red word.
+// interchangeable, so they do not all render the same red word.
 //
 // "inconclusive" in particular is deliberately muted, not `--danger`: it
 // means this test stopped waiting, not that the model is broken. Painting it
@@ -133,6 +122,16 @@ function probeTone(result: ProbeResult): string {
   return "data status-line--danger";
 }
 
+const InfoIcon = () => (
+  <span className="info-icon" title={KIND_HINT} aria-label="How to choose Kind">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  </span>
+);
+
 export function ApiConfigForm({
   providers,
   settings,
@@ -147,15 +146,13 @@ export function ApiConfigForm({
   // never disagree — see app/health/ModelHealthProvider.tsx.
   const { actionsLocked } = useModelHealth();
 
-  const [newProvider, setNewProvider] = useState(EMPTY_NEW_PROVIDER);
-  const [addStatus, setAddStatus] = useState<string | null>(null);
+  // null = no overlay. "add" = adding. A Provider = editing that one.
+  const [editing, setEditing] = useState<"add" | Provider | null>(null);
+  const [draft, setDraft] = useState<ProviderDraft>(EMPTY_PROVIDER);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [providerStatus, setProviderStatus] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
-  const [showAddForm, setShowAddForm] = useState(false);
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editProvider, setEditProvider] = useState(EMPTY_NEW_PROVIDER);
-  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
-  const [editStatus, setEditStatus] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Provider | null>(null);
 
   const [curationProviderId, setCurationProviderId] = useState(settings.curationProviderId ?? "");
   const [curationModel, setCurationModel] = useState(settings.curationModel ?? "");
@@ -168,67 +165,59 @@ export function ApiConfigForm({
   const [isCurationProbing, startCurationProbe] = useTransition();
   const [isDraftingProbing, startDraftingProbe] = useTransition();
 
+  const isAdding = editing === "add";
+
+  const openAdd = () => {
+    setDraft(EMPTY_PROVIDER);
+    setFormError(null);
+    setEditing("add");
+  };
+
+  const openEdit = (p: Provider) => {
+    setDraft({ ...p });
+    setFormError(null);
+    setEditing(p);
+  };
+
+  const closeForm = () => {
+    setEditing(null);
+    setDraft(EMPTY_PROVIDER);
+    setFormError(null);
+  };
+
   const handleQuickAdd = (suggestedId: string) => {
     if (!suggestedId) return;
     const preset = KNOWN_PROVIDERS.find((p) => p.suggestedId === suggestedId);
     if (!preset) return;
-    setNewProvider({ id: preset.suggestedId, label: preset.label, baseUrl: preset.baseUrl, apiKey: "", kind: preset.kind });
+    setDraft({ id: preset.suggestedId, label: preset.label, baseUrl: preset.baseUrl, apiKey: "", kind: preset.kind });
   };
 
-  const handleAddProvider = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await addProvider(newProvider);
+    const result = isAdding ? await addProvider(draft) : await updateProvider(draft);
     if (!result.ok) {
-      setAddStatus(`Add failed: ${result.error}`);
+      // Shown inside the card: closing on failure would throw away the
+      // typing that caused it.
+      setFormError(result.error ?? (isAdding ? "Add failed" : "Update failed"));
       return;
     }
-    setAddStatus("Provider added.");
-    setNewProvider(EMPTY_NEW_PROVIDER);
-    setShowAddForm(false);
+    setProviderStatus(isAdding ? "Provider added." : "Provider updated.");
+    closeForm();
     router.refresh();
   };
 
-  const handleCancelAdd = () => {
-    setShowAddForm(false);
-    setNewProvider(EMPTY_NEW_PROVIDER);
-    setAddStatus(null);
-  };
-
-  const handleDelete = async (id: string) => {
-    const result = await deleteProvider(id);
+  const handleDelete = async (p: Provider) => {
+    const result = await deleteProvider(p.id);
+    setConfirmDelete(null);
     if (!result.ok) {
-      setDeleteErrors((prev) => ({ ...prev, [id]: result.error ?? "Delete failed" }));
+      setDeleteErrors((prev) => ({ ...prev, [p.id]: result.error ?? "Delete failed" }));
       return;
     }
     setDeleteErrors((prev) => {
-      const { [id]: _removed, ...rest } = prev;
+      const { [p.id]: _removed, ...rest } = prev;
       return rest;
     });
-    router.refresh();
-  };
-
-  const handleStartEdit = (p: Provider) => {
-    setEditingId(p.id);
-    setEditProvider(p);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditProvider(EMPTY_NEW_PROVIDER);
-  };
-
-  const handleSaveEdit = async () => {
-    const result = await updateProvider(editProvider);
-    if (!result.ok) {
-      setEditErrors((prev) => ({ ...prev, [editProvider.id]: result.error ?? "Update failed" }));
-      return;
-    }
-    setEditErrors((prev) => {
-      const { [editProvider.id]: _removed, ...rest } = prev;
-      return rest;
-    });
-    setEditStatus("Provider updated.");
-    setEditingId(null);
+    setProviderStatus("Provider removed.");
     router.refresh();
   };
 
@@ -256,175 +245,213 @@ export function ApiConfigForm({
 
   return (
     <div className="config-page">
-      <section id="providers">
-        <div className="section-header">
+      <section className="panel" id="providers">
+        <div className="panel-head">
           <h2>Providers</h2>
-          <button className="section-action" onClick={() => setShowAddForm(true)}>
+          <button className="section-action panel-head-aside" onClick={openAdd}>
             + Add provider
           </button>
         </div>
-        <div className="provider-table">
-          <div className="provider-row provider-row--head">
-            <span>Label</span>
-            <span>Base URL</span>
-            <span>Kind</span>
-            <span />
-          </div>
-          {providers.map((p) =>
-            editingId === p.id ? (
-              <div key={p.id} className="provider-row provider-row--edit">
-                <div className="row-fields">
-                  <label>
-                    ID
-                    <input
-                      value={editProvider.id}
-                      onChange={(e) => setEditProvider({ ...editProvider, id: e.target.value })}
-                      disabled
-                      required
-                    />
-                  </label>
-                  <label>
-                    Label
-                    <input
-                      value={editProvider.label}
-                      onChange={(e) => setEditProvider({ ...editProvider, label: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Base URL
-                    <input
-                      value={editProvider.baseUrl}
-                      onChange={(e) => setEditProvider({ ...editProvider, baseUrl: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label>
-                    API key
-                    <input
-                      type="password"
-                      value={editProvider.apiKey}
-                      onChange={(e) => setEditProvider({ ...editProvider, apiKey: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Kind
-                    <span className="info-icon" title={KIND_HINT} aria-label="How to choose Kind">
+
+        {providers.length === 0 ? (
+          <EmptyState hint="Add one above — most are one click from the known-provider list.">
+            No providers configured yet.
+          </EmptyState>
+        ) : (
+          <div className="rows" style={{ ["--cols" as string]: "minmax(0,1fr) minmax(0,1.6fr) auto 84px" } as React.CSSProperties}>
+            <div className="row row--head">
+              <span>Label</span>
+              <span>Base URL</span>
+              <span>Kind</span>
+              <span />
+            </div>
+            {providers.map((p) => (
+              <div key={p.id}>
+                <div className="row">
+                  <span className="provider-label-cell">
+                    {/* A blank key means "not set up yet" for a hosted provider,
+                        but a local one (Ollama) has no key to set — warning
+                        there would be permanent and wrong. */}
+                    {!p.apiKey && providerNeedsApiKey(p) && (
+                      <span className="key-missing-icon" title="API key missing" aria-label="API key missing">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                      </span>
+                    )}
+                    <span className="row-title">{p.label}</span>
+                  </span>
+                  <span className="row-meta data">{p.baseUrl}</span>
+                  <span className="tag">{p.kind}</span>
+                  <span className="row-actions row-hover-actions">
+                    <button className="icon-button" onClick={() => openEdit(p)} aria-label="Edit provider" title="Edit provider">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
-                    </span>
-                    <select
-                      value={editProvider.kind}
-                      onChange={(e) => setEditProvider({ ...editProvider, kind: e.target.value as Provider["kind"] })}
-                    >
-                      <option value="openai-compatible">openai-compatible</option>
-                      <option value="anthropic">anthropic</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="row-actions">
-                  <button
-                    className="primary"
-                    onClick={handleSaveEdit}
-                    disabled={!editProvider.label || !editProvider.baseUrl || !editProvider.apiKey}
-                  >
-                    Save
-                  </button>
-                  <button onClick={handleCancelEdit}>Cancel</button>
-                </div>
-                {editErrors[p.id] && (
-                  <p className="status-line status-line--danger" role="alert">
-                    {editErrors[p.id]}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div key={p.id} className="provider-row provider-row--card">
-                <span className="provider-label-cell">
-                  {/* A blank key means "not set up yet" for a hosted provider,
-                      but a local one (Ollama) has no key to set — warning
-                      there would be permanent and wrong. */}
-                  {!p.apiKey && providerNeedsApiKey(p) && (
-                    <span className="key-missing-icon" title="API key missing" aria-label="API key missing">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
-                    </span>
-                  )}
-                  <span className="list-row-title">{p.label}</span>
-                </span>
-                <span className="list-row-meta data">{p.baseUrl}</span>
-                <span className="tag">{p.kind}</span>
-                <div className="row-actions">
-                  <button className="icon-button" onClick={() => handleStartEdit(p)} aria-label="Edit provider" title="Edit provider">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                    </svg>
-                  </button>
-                  {!isKnownProvider(p) && (
-                    <button
-                      className="icon-button icon-button--danger"
-                      onClick={() => handleDelete(p.id)}
-                      aria-label="Delete provider"
-                      title="Delete provider"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <line x1="10" y1="11" x2="10" y2="17" />
-                        <line x1="14" y1="11" x2="14" y2="17" />
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                       </svg>
                     </button>
-                  )}
+                    {!isKnownProvider(p) && (
+                      <button
+                        className="icon-button icon-button--danger"
+                        onClick={() => setConfirmDelete(p)}
+                        aria-label="Delete provider"
+                        title="Delete provider"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
                 </div>
                 {deleteErrors[p.id] && (
-                  <p className="status-line status-line--danger" role="alert">
+                  <p className="row-note status-line--danger" role="alert">
                     {deleteErrors[p.id]}
                   </p>
                 )}
               </div>
-            )
-          )}
+            ))}
+          </div>
+        )}
+
+        <StatusMessage message={providerStatus} />
+      </section>
+
+      <section className="panel" id="model-assignment">
+        <div className="panel-head">
+          <h2>Model assignment</h2>
         </div>
-        {editStatus && (
-          <p className={statusTone(editStatus)} role="alert">
-            {editStatus}
-          </p>
-        )}
+        <p className="panel-intro">
+          Which model each pipeline stage calls. Curation picks what is worth posting; drafting writes it.
+        </p>
 
-        {addStatus && (
-          <p className={statusTone(addStatus)} role="alert">
-            {addStatus}
-          </p>
-        )}
+        <div className="panel-grid">
+          <div className="stage-block">
+            <h3>Curation model</h3>
+            <div className="row-fields">
+              <label>
+                Provider
+                <select value={curationProviderId} onChange={(e) => setCurationProviderId(e.target.value)}>
+                  <option value="">— select provider —</option>
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ModelSelect
+                providerId={curationProviderId}
+                models={models}
+                value={curationModel}
+                onChange={setCurationModel}
+              />
+            </div>
+            <div className="row-actions">
+              <button
+                className={actionsLocked ? "is-locked" : undefined}
+                onClick={handleTestCuration}
+                disabled={isCurationProbing || actionsLocked || !curationProviderId || !curationModel}
+                title={actionsLocked ? "Testing models — available in a moment" : undefined}
+              >
+                <svg className="button-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                {isCurationProbing || actionsLocked ? "Testing…" : "Test this model"}
+              </button>
+              {curationProbeResult && (
+                <span className={probeTone(curationProbeResult)} title={PROBE_EXPLANATIONS[curationProbeResult]}>
+                  {PROBE_LABELS[curationProbeResult]}
+                </span>
+              )}
+            </div>
+          </div>
 
-        {showAddForm && (
-          <Modal
-            title="Add a provider"
-            description="Pick a known service to fill the endpoint in for you, or type the details yourself."
-            onClose={handleCancelAdd}
-            footer={
-              <>
-                <button type="button" onClick={handleCancelAdd}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  form="add-provider-form"
-                  className="primary"
-                  disabled={!newProvider.id || !newProvider.label || !newProvider.baseUrl}
-                >
-                  Add provider
-                </button>
-              </>
-            }
+          <div className="stage-block">
+            <h3>Drafting model</h3>
+            <div className="row-fields">
+              <label>
+                Provider
+                <select value={draftingProviderId} onChange={(e) => setDraftingProviderId(e.target.value)}>
+                  <option value="">— select provider —</option>
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ModelSelect
+                providerId={draftingProviderId}
+                models={models}
+                value={draftingModel}
+                onChange={setDraftingModel}
+              />
+            </div>
+            <div className="row-actions">
+              <button
+                className={actionsLocked ? "is-locked" : undefined}
+                onClick={handleTestDrafting}
+                disabled={isDraftingProbing || actionsLocked || !draftingProviderId || !draftingModel}
+                title={actionsLocked ? "Testing models — available in a moment" : undefined}
+              >
+                <svg className="button-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                {isDraftingProbing || actionsLocked ? "Testing…" : "Test this model"}
+              </button>
+              {draftingProbeResult && (
+                <span className={probeTone(draftingProbeResult)} title={PROBE_EXPLANATIONS[draftingProbeResult]}>
+                  {PROBE_LABELS[draftingProbeResult]}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="panel-foot">
+          <StatusMessage message={assignStatus} />
+          <button
+            className="primary"
+            onClick={handleSaveAssignment}
+            disabled={(!!curationProviderId && !curationModel) || (!!draftingProviderId && !draftingModel)}
           >
+            Save model assignment
+          </button>
+        </div>
+      </section>
+
+      {/* Below the assignment on purpose: it is what the dropdowns above read
+          from, so the reading order matches the order you notice you need it
+          ("no models listed for this provider yet" -> the table is right
+          there). */}
+      <ModelsTable providers={providers} models={models} />
+
+      {editing !== null && (
+        <Modal
+          title={isAdding ? "Add a provider" : `Edit ${draft.label || "provider"}`}
+          description={
+            isAdding
+              ? "Pick a known service to fill the endpoint in for you, or type the details yourself."
+              : "The id can't be changed — it is what every model and pipeline stage points at."
+          }
+          onClose={closeForm}
+          footer={
+            <>
+              <button type="button" className="secondary" onClick={closeForm}>
+                Cancel
+              </button>
+              <button type="submit" form="provider-form" className="primary">
+                {isAdding ? "Add provider" : "Save changes"}
+              </button>
+            </>
+          }
+        >
+          {isAdding && (
             <label className="quick-add-provider">
               Quick add a known provider
               <select value="" onChange={(e) => handleQuickAdd(e.target.value)}>
@@ -436,178 +463,80 @@ export function ApiConfigForm({
                 ))}
               </select>
             </label>
+          )}
 
-            {/* The submit button lives in the modal footer, outside this
-                element, so it is wired back by the form="" attribute — that
-                keeps Enter-to-submit working without nesting the footer
-                inside the form. */}
-            <form id="add-provider-form" className="modal-form" onSubmit={handleAddProvider}>
-              <div className="modal-field-pair">
-                <label>
-                  ID
-                  <input
-                    value={newProvider.id}
-                    onChange={(e) => setNewProvider({ ...newProvider, id: e.target.value })}
-                    required
-                  />
-                </label>
-                <label>
-                  Label
-                  <input
-                    value={newProvider.label}
-                    onChange={(e) => setNewProvider({ ...newProvider, label: e.target.value })}
-                    required
-                  />
-                </label>
-              </div>
+          {/* The submit button lives in the modal footer, outside this
+              element, so it is wired back by the form="" attribute — that
+              keeps Enter-to-submit working without nesting the footer
+              inside the form. Being a real <form> is also what makes the
+              `required` attributes below actually enforce anything; the
+              old inline edit row sat in a <ul>, where they did nothing. */}
+          <form id="provider-form" className="modal-form" onSubmit={handleSubmit}>
+            <div className="modal-field-pair">
               <label>
-                Base URL
+                ID
                 <input
-                  value={newProvider.baseUrl}
-                  onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
+                  value={draft.id}
+                  onChange={(e) => setDraft({ ...draft, id: e.target.value })}
+                  disabled={!isAdding}
                   required
                 />
               </label>
               <label>
-                API key
+                Label
                 <input
-                  type="password"
-                  value={newProvider.apiKey}
-                  onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+                  value={draft.label}
+                  onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                  required
                 />
               </label>
-              <label>
-                Kind
-                <span className="info-icon" title={KIND_HINT} aria-label="How to choose Kind">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </span>
-                <select
-                  value={newProvider.kind}
-                  onChange={(e) => setNewProvider({ ...newProvider, kind: e.target.value as Provider["kind"] })}
-                >
-                  <option value="openai-compatible">openai-compatible</option>
-                  <option value="anthropic">anthropic</option>
-                </select>
-              </label>
-            </form>
-          </Modal>
-        )}
-      </section>
-
-      <section id="model-assignment">
-        <h2>Model assignment</h2>
-
-        <div className="card">
-        <div className="stage-grid">
-        <div className="stage-block">
-          <h3>Curation model</h3>
-          <div className="row-fields">
+            </div>
             <label>
-              Provider
-              <select value={curationProviderId} onChange={(e) => setCurationProviderId(e.target.value)}>
-                <option value="">— select provider —</option>
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
+              Base URL
+              <input
+                value={draft.baseUrl}
+                onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
+                required
+              />
+            </label>
+            <label>
+              API key
+              <input
+                type="password"
+                value={draft.apiKey}
+                onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
+              />
+            </label>
+            <label>
+              Kind
+              <InfoIcon />
+              <select
+                value={draft.kind}
+                onChange={(e) => setDraft({ ...draft, kind: e.target.value as Provider["kind"] })}
+              >
+                <option value="openai-compatible">openai-compatible</option>
+                <option value="anthropic">anthropic</option>
               </select>
             </label>
-            <ModelSelect
-              providerId={curationProviderId}
-              models={models}
-              value={curationModel}
-              onChange={setCurationModel}
-            />
-          </div>
-          <div className="row-actions">
-            <button
-              className={actionsLocked ? "is-locked" : undefined}
-              onClick={handleTestCuration}
-              disabled={isCurationProbing || actionsLocked || !curationProviderId || !curationModel}
-              title={actionsLocked ? "Testing models — available in a moment" : undefined}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "-2px" }}>
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              {isCurationProbing || actionsLocked ? "Testing…" : "Test this model"}
-            </button>
-            {curationProbeResult && (
-              <span className={probeTone(curationProbeResult)} title={PROBE_EXPLANATIONS[curationProbeResult]}>
-                {PROBE_LABELS[curationProbeResult]}
-              </span>
-            )}
-          </div>
-        </div>
+            <StatusMessage message={formError} tone="danger" />
+          </form>
+        </Modal>
+      )}
 
-        <div className="stage-block">
-          <h3>Drafting model</h3>
-          <div className="row-fields">
-            <label>
-              Provider
-              <select value={draftingProviderId} onChange={(e) => setDraftingProviderId(e.target.value)}>
-                <option value="">— select provider —</option>
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <ModelSelect
-              providerId={draftingProviderId}
-              models={models}
-              value={draftingModel}
-              onChange={setDraftingModel}
-            />
-          </div>
-          <div className="row-actions">
-            <button
-              className={actionsLocked ? "is-locked" : undefined}
-              onClick={handleTestDrafting}
-              disabled={isDraftingProbing || actionsLocked || !draftingProviderId || !draftingModel}
-              title={actionsLocked ? "Testing models — available in a moment" : undefined}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "-2px" }}>
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              {isDraftingProbing || actionsLocked ? "Testing…" : "Test this model"}
-            </button>
-            {draftingProbeResult && (
-              <span className={probeTone(draftingProbeResult)} title={PROBE_EXPLANATIONS[draftingProbeResult]}>
-                {PROBE_LABELS[draftingProbeResult]}
-              </span>
-            )}
-          </div>
-        </div>
-        </div>
-
-        <div className="section-actions row-actions">
-          <button
-            className="primary"
-            onClick={handleSaveAssignment}
-            disabled={(!!curationProviderId && !curationModel) || (!!draftingProviderId && !draftingModel)}
-          >
-            Save model assignment
-          </button>
-        </div>
-        {assignStatus && (
-          <p className={statusTone(assignStatus)} role="alert">
-            {assignStatus}
-          </p>
-        )}
-        </div>
-      </section>
-
-      {/* Below the assignment on purpose: it is what the dropdowns above read
-          from, so the reading order matches the order you notice you need it
-          ("no models listed for this provider yet" -> the table is right
-          there). */}
-      <ModelsTable providers={providers} models={models} />
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete provider"
+          message={
+            <>
+              Delete {confirmDelete.label}? Any model priced against it, and any pipeline stage
+              assigned to it, will stop resolving. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
     </div>
   );
 }

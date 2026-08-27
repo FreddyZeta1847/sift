@@ -21,7 +21,18 @@ export default async function ApiConfigPage() {
   const [providers, settings, models] = await Promise.all([getProviders(), getSettings(), getModels()]);
   return (
     <main>
-      <h1>API Config</h1>
+      {/* The page head sits outside ApiConfigForm's `.config-page` root so
+          the form owns only its panels. `.config-page` is what
+          `main:has(.config-page)` keys the wider measure off, and it stays
+          where it is — these are dense forms, not reading prose. */}
+      <div className="page-head">
+        <div className="page-head-text">
+          <h1>API Config</h1>
+          <p className="page-head-sub">
+            Where the models come from, which one each stage uses, and what they cost.
+          </p>
+        </div>
+      </div>
       <ApiConfigForm providers={providers} settings={settings} models={models} />
     </main>
   );

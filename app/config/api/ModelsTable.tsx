@@ -16,11 +16,16 @@
  * cap — which is exactly the silent hole this list exists to close, so the
  * empty state says so out loud rather than looking merely unfinished.
  *
- * Presented as `.list-row`s rather than a <table>: every other list in the
- * app (providers just above this, sources, the Costs breakdown) uses that
- * pattern, and the one table read as though it came from a different product.
- * Adding and editing both happen in an overlay card, so no input ever sits
- * inside the list itself.
+ * Presented as rows rather than a <table>, on the same `.rows`/`.row`
+ * family the providers list above and the Admin tables use — the one real
+ * <table> here read as though it came from a different product.
+ *
+ * Adding, editing and removing all happen in an overlay card, so no input
+ * and no confirmation ever sits inside the list itself. Remove used to be
+ * the exception: it deleted immediately, with no confirmation at all,
+ * while the Admin tables asked before deleting a single log row. Same
+ * class of action, opposite treatment, decided per-list rather than by any
+ * rule — so it asks now, like everything else.
  */
 "use client";
 
@@ -28,6 +33,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addModel, updateModelPrices, deleteModel, fetchProviderModels } from "./actions";
 import { Modal } from "../../Modal";
+import { ConfirmDialog } from "../../ConfirmDialog";
+import { StatusMessage } from "../../StatusMessage";
+import { EmptyState } from "../../EmptyState";
 import type { ModelEntry, Provider } from "../../../lib/config/types";
 
 const EMPTY_DRAFT = { providerId: "", model: "", inputPer1M: "", outputPer1M: "" };
@@ -51,6 +59,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [fetchNote, setFetchNote] = useState<string | null>(null);
   const [isFetching, startFetch] = useTransition();
+  const [confirmRemove, setConfirmRemove] = useState<ModelEntry | null>(null);
 
   const rowKey = (m: ModelEntry) => `${m.providerId}/${m.model}`;
   const providerLabel = (id: string) => providers.find((p) => p.id === id)?.label ?? id;
@@ -120,6 +129,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
 
   const handleDelete = async (m: ModelEntry) => {
     const result = await deleteModel(m.providerId, m.model);
+    setConfirmRemove(null);
     setStatus(result.ok ? "Model removed." : `Delete failed: ${result.error}`);
     if (result.ok) router.refresh();
   };
@@ -127,47 +137,59 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
   const canSubmit = draft.providerId !== "" && draft.model.trim() !== "";
 
   return (
-    <section id="models-pricing">
-      <div className="section-header">
+    <section className="panel" id="models-pricing">
+      <div className="panel-head">
         <h2>Models &amp; pricing</h2>
-        <button className="section-action" onClick={openAdd}>
+        <button className="section-action panel-head-aside" onClick={openAdd}>
           + Add model
         </button>
       </div>
-      <p className="status-line">
+      <p className="panel-intro">
         The models you use, and what they cost per 1M tokens. This list fills the model dropdowns above and is what the
         Costs page and your budget cap work from. A local model costs 0; a model that isn&apos;t listed at all is
         unknown rather than free, and its spend is not counted anywhere.
       </p>
 
-      <div className="card">
-        {models.length === 0 ? (
-          <p className="empty-state">No models listed yet.</p>
-        ) : (
-          <ul className="list">
-            {models.map((m) => (
-              <li key={rowKey(m)} className="list-row">
-                <span className="list-row-main">
-                  <span className="list-row-title data">{m.model}</span>
-                  <span className="list-row-meta">
-                    {providerLabel(m.providerId)} · in ${m.inputPer1M} / 1M · out ${m.outputPer1M} / 1M
-                  </span>
+      {models.length === 0 ? (
+        <EmptyState hint="Until a model is listed here, its calls are recorded at $0 and stay invisible to your budget cap.">
+          No models listed yet.
+        </EmptyState>
+      ) : (
+        <div className="rows" style={{ ["--cols" as string]: "minmax(0,1fr) 92px" } as React.CSSProperties}>
+          {models.map((m) => (
+            <div key={rowKey(m)} className="row">
+              <span className="row-main">
+                <span className="row-title data">{m.model}</span>
+                <span className="row-meta">
+                  {providerLabel(m.providerId)} · in ${m.inputPer1M} / 1M · out ${m.outputPer1M} / 1M
                 </span>
-                <span className="row-actions">
-                  <button onClick={() => openEdit(m)}>Edit</button>
-                  <button onClick={() => handleDelete(m)}>Remove</button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+              </span>
+              <span className="row-actions row-hover-actions">
+                <button className="icon-button" onClick={() => openEdit(m)} aria-label={`Edit prices for ${m.model}`} title="Edit prices">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                </button>
+                <button
+                  className="icon-button icon-button--danger"
+                  onClick={() => setConfirmRemove(m)}
+                  aria-label={`Remove ${m.model}`}
+                  title="Remove model"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
-        {status && (
-          <p role="alert" className={/failed/i.test(status) ? "status-line status-line--danger" : "status-line"}>
-            {status}
-          </p>
-        )}
-      </div>
+      <StatusMessage message={status} />
 
       {editing !== null && (
         <Modal
@@ -258,12 +280,24 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
 
           <p className="status-line">Leave both at 0 for a local model — that records it as genuinely free.</p>
 
-          {error && (
-            <p role="alert" className="status-line status-line--danger">
-              {error}
-            </p>
-          )}
+          <StatusMessage message={error} tone="danger" />
         </Modal>
+      )}
+
+      {confirmRemove && (
+        <ConfirmDialog
+          title="Remove model"
+          message={
+            <>
+              Remove {confirmRemove.model}? Its prices are forgotten, so any spend already recorded
+              against it stops being counted and any pipeline stage using it loses its cost figure.
+              The model itself is untouched at the provider.
+            </>
+          }
+          confirmLabel="Remove"
+          onConfirm={() => handleDelete(confirmRemove)}
+          onCancel={() => setConfirmRemove(null)}
+        />
       )}
     </section>
   );
