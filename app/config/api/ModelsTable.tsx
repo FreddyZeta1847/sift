@@ -24,9 +24,9 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addModel, updateModelPrices, deleteModel } from "./actions";
+import { addModel, updateModelPrices, deleteModel, fetchProviderModels } from "./actions";
 import { Modal } from "../../Modal";
 import type { ModelEntry, Provider } from "../../../lib/config/types";
 
@@ -46,6 +46,11 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
   const [editing, setEditing] = useState<"add" | ModelEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // Names the selected provider says it offers. Suggestions only — the field
+  // stays free text, so a provider that can't answer costs nothing.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [fetchNote, setFetchNote] = useState<string | null>(null);
+  const [isFetching, startFetch] = useTransition();
 
   const rowKey = (m: ModelEntry) => `${m.providerId}/${m.model}`;
   const providerLabel = (id: string) => providers.find((p) => p.id === id)?.label ?? id;
@@ -53,7 +58,27 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
   const openAdd = () => {
     setDraft(EMPTY_DRAFT);
     setError(null);
+    setSuggestions([]);
+    setFetchNote(null);
     setEditing("add");
+  };
+
+  // Provider changed, so any names already fetched belong to a different one.
+  const chooseProvider = (providerId: string) => {
+    setDraft({ ...draft, providerId, model: "" });
+    setSuggestions([]);
+    setFetchNote(null);
+  };
+
+  const handleFetchModels = () => {
+    setFetchNote(null);
+    startFetch(async () => {
+      const result = await fetchProviderModels(draft.providerId);
+      setSuggestions(result.models);
+      setFetchNote(
+        result.error ?? `${result.models.length} model${result.models.length === 1 ? "" : "s"} available.`
+      );
+    });
   };
 
   const openEdit = (m: ModelEntry) => {
@@ -167,7 +192,7 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
             <select
               value={draft.providerId}
               disabled={!isAdding}
-              onChange={(e) => setDraft({ ...draft, providerId: e.target.value })}
+              onChange={(e) => chooseProvider(e.target.value)}
             >
               <option value="">— select provider —</option>
               {providers.map((p) => (
@@ -180,13 +205,33 @@ export function ModelsTable({ providers, models }: ModelsTableProps) {
 
           <label>
             Model
+            {/* A datalist rather than a <select>: it autocompletes the
+                fetched names, still accepts anything typed (so a provider
+                that cannot list models, or one whose list is out of date, is
+                never a dead end), and copes with the several hundred entries
+                OpenRouter returns, which a dropdown would not. */}
             <input
               value={draft.model}
               disabled={!isAdding}
-              placeholder="e.g. gemini-3-flash-preview"
+              list="model-suggestions"
+              placeholder={suggestions.length > 0 ? "start typing to filter…" : "e.g. gemini-3-flash-preview"}
               onChange={(e) => setDraft({ ...draft, model: e.target.value })}
             />
+            <datalist id="model-suggestions">
+              {suggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </label>
+
+          {isAdding && (
+            <div className="row-actions">
+              <button onClick={handleFetchModels} disabled={!draft.providerId || isFetching}>
+                {isFetching ? "Asking provider…" : "Fetch available models"}
+              </button>
+              {fetchNote && <span className="status-line">{fetchNote}</span>}
+            </div>
+          )}
 
           <div className="modal-field-pair">
             <label>

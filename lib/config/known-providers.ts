@@ -69,6 +69,16 @@ export const KNOWN_PROVIDERS: KnownProviderPreset[] = [
     kind: "openai-compatible",
   },
   {
+    suggestedId: "lmstudio",
+    label: "LM Studio (local)",
+    // LM Studio's built-in server speaks OpenAI's shape on port 1234 by
+    // default. Same Docker caveat as Ollama below: from inside a container,
+    // reach the host with host.docker.internal instead of localhost.
+    baseUrl: "http://localhost:1234/v1",
+    kind: "openai-compatible",
+    requiresApiKey: false,
+  },
+  {
     suggestedId: "ollama",
     label: "Ollama (local)",
     // Ollama serves an OpenAI-compatible surface at /v1 alongside its own

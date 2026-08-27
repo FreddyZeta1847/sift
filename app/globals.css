@@ -1487,8 +1487,16 @@ h3:first-child { margin-top: 0; }
   justify-content: space-between;
   gap: var(--space-md);
   flex-wrap: wrap;
+  /* Breathing room before the column-header row that follows, which would
+     otherwise sit directly under the button. */
+  margin-bottom: var(--space-md);
 }
 .section-header > h2 { margin-bottom: 0; }
+/* The provider list insets its rows by --space-lg (see .provider-row--head),
+   so a button flush to the section edge overhangs the "Kind" column and the
+   right edge of every row below it. Match the inset and the button lines up
+   with the content it belongs to. */
+#providers .section-header { padding-right: var(--space-lg); }
 .section-action {
   flex-shrink: 0;
   background: var(--primary);

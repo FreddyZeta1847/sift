@@ -15,6 +15,12 @@ describe("KNOWN_PROVIDERS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it("offers an LM Studio preset on its default port", () => {
+    const lmstudio = KNOWN_PROVIDERS.find((p) => p.suggestedId === "lmstudio");
+    expect(lmstudio?.kind).toBe("openai-compatible");
+    expect(lmstudio?.baseUrl).toContain("1234");
+  });
+
   it("offers a local Ollama preset on its OpenAI-compatible surface", () => {
     const ollama = KNOWN_PROVIDERS.find((p) => p.suggestedId === "ollama");
     expect(ollama).toBeDefined();
@@ -35,9 +41,19 @@ describe("providerNeedsApiKey", () => {
     expect(providerNeedsApiKey({ id: "my-local-box", baseUrl: "http://localhost:11434/v1" })).toBe(false);
   });
 
-  it("is true for every hosted preset", () => {
-    for (const preset of KNOWN_PROVIDERS.filter((p) => p.suggestedId !== "ollama")) {
+  it("is true for every preset that hasn't opted out", () => {
+    // Derived from the flag rather than a hard-coded list of local providers,
+    // so adding the next self-hosted one doesn't break this test.
+    for (const preset of KNOWN_PROVIDERS.filter((p) => p.requiresApiKey !== false)) {
       expect(providerNeedsApiKey({ id: preset.suggestedId, baseUrl: preset.baseUrl })).toBe(true);
+    }
+  });
+
+  it("is false for every local preset", () => {
+    const local = KNOWN_PROVIDERS.filter((p) => p.requiresApiKey === false);
+    expect(local.map((p) => p.suggestedId).sort()).toEqual(["lmstudio", "ollama"]);
+    for (const preset of local) {
+      expect(providerNeedsApiKey({ id: preset.suggestedId, baseUrl: preset.baseUrl })).toBe(false);
     }
   });
 

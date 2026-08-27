@@ -57,6 +57,7 @@ import { getModels, saveModels, type ModelEntry } from "../../../lib/config/mode
 import { getSettings, saveSettings } from "../../../lib/config/settings";
 import { probeModelWithUsage, type ProbeResult } from "../../../lib/config/test-model-probe";
 import { tryLogNonPipelineCall } from "../../../lib/llm/non-pipeline-calls";
+import { listProviderModels } from "../../../lib/llm/list-models";
 import { invalidateModelHealth, startModelHealthCheck } from "../../../lib/health/model-health";
 import { safeWrite } from "../../../lib/config/safe-write";
 import type { Provider } from "../../../lib/config/types";
@@ -180,4 +181,23 @@ export async function deleteModel(providerId: string, model: string): Promise<Ac
   }
   const models = await getModels();
   return safeWrite(() => saveModels(models.filter((m) => !samePair(m, { providerId, model }))));
+}
+
+/**
+ * Asks a provider for its model list, so the Add-model card can suggest real
+ * names. Server-side because a browser cannot reach a local provider (CORS),
+ * and in Docker "localhost" means the container, not the user's machine.
+ *
+ * Returns the failure rather than throwing: not being able to list models is
+ * a missing convenience, not a broken page — the model field stays typeable.
+ */
+export async function fetchProviderModels(
+  providerId: string
+): Promise<{ models: string[]; error?: string }> {
+  const providers = await getProviders();
+  const provider = providers.find((p) => p.id === providerId);
+  if (!provider) {
+    return { models: [], error: `Provider "${providerId}" not found` };
+  }
+  return listProviderModels(provider);
 }
