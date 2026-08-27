@@ -61,6 +61,7 @@ import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAc
 import type { Provider, Settings } from "../../../lib/config/types";
 import type { ProbeResult } from "../../../lib/config/test-model-probe";
 import { KNOWN_PROVIDERS, providerNeedsApiKey } from "../../../lib/config/known-providers";
+import { useModelHealth } from "../../health/ModelHealthProvider";
 import { ModelSelect } from "./ModelSelect";
 import { ModelsTable } from "./ModelsTable";
 import type { ModelEntry } from "../../../lib/config/types";
@@ -139,6 +140,9 @@ export function ApiConfigForm({
   models: ModelEntry[];
 }) {
   const router = useRouter();
+  // Same lock as Run Now in the sidebar, from the same context so the two can
+  // never disagree — see app/health/ModelHealthProvider.tsx.
+  const { actionsLocked } = useModelHealth();
 
   const [newProvider, setNewProvider] = useState(EMPTY_NEW_PROVIDER);
   const [addStatus, setAddStatus] = useState<string | null>(null);
@@ -505,11 +509,16 @@ export function ApiConfigForm({
             />
           </div>
           <div className="row-actions">
-            <button onClick={handleTestCuration} disabled={isCurationProbing || !curationProviderId || !curationModel}>
+            <button
+              className={actionsLocked ? "is-locked" : undefined}
+              onClick={handleTestCuration}
+              disabled={isCurationProbing || actionsLocked || !curationProviderId || !curationModel}
+              title={actionsLocked ? "Testing models — available in a moment" : undefined}
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "-2px" }}>
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
-              {isCurationProbing ? "Testing…" : "Test this model"}
+              {isCurationProbing || actionsLocked ? "Testing…" : "Test this model"}
             </button>
             {curationProbeResult && (
               <span className={probeTone(curationProbeResult)} title={PROBE_EXPLANATIONS[curationProbeResult]}>
@@ -541,11 +550,16 @@ export function ApiConfigForm({
             />
           </div>
           <div className="row-actions">
-            <button onClick={handleTestDrafting} disabled={isDraftingProbing || !draftingProviderId || !draftingModel}>
+            <button
+              className={actionsLocked ? "is-locked" : undefined}
+              onClick={handleTestDrafting}
+              disabled={isDraftingProbing || actionsLocked || !draftingProviderId || !draftingModel}
+              title={actionsLocked ? "Testing models — available in a moment" : undefined}
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px", verticalAlign: "-2px" }}>
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
-              {isDraftingProbing ? "Testing…" : "Test this model"}
+              {isDraftingProbing || actionsLocked ? "Testing…" : "Test this model"}
             </button>
             {draftingProbeResult && (
               <span className={probeTone(draftingProbeResult)} title={PROBE_EXPLANATIONS[draftingProbeResult]}>

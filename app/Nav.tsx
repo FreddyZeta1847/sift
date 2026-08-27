@@ -31,6 +31,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { startRun, getRunStatus } from "./config/settings/actions";
+import { useModelHealth } from "./health/ModelHealthProvider";
 
 const LINKS = [
   { href: "/review", label: "Review" },
@@ -66,6 +67,11 @@ export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: Na
   const [stage, setStage] = useState<string | null>(initialInProgress?.currentStage ?? null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "error" } | null>(null);
   const isRunning = runningId !== null;
+  // Locked, not merely disabled: there is no point spending a whole pipeline
+  // run to discover a model is unreachable when a check is seconds away from
+  // saying so. Styled differently from the running state so the two reasons a
+  // button is unavailable never look identical.
+  const { actionsLocked } = useModelHealth();
 
   useEffect(() => {
     if (!toast) return;
@@ -114,9 +120,14 @@ export function Nav({ initialInProgress, lastRunFinishedAt, undecidedCount }: Na
           </div>
         </div>
 
-        <button className="sidebar-run" onClick={handleRunNow} disabled={isRunning}>
+        <button
+          className={actionsLocked ? "sidebar-run is-locked" : "sidebar-run"}
+          onClick={handleRunNow}
+          disabled={isRunning || actionsLocked}
+          title={actionsLocked ? "Testing models — available in a moment" : undefined}
+        >
           {isRunning && <span className="sidebar-run-spinner" />}
-          <span>{isRunning ? "Running…" : "Run Now"}</span>
+          <span>{isRunning ? "Running…" : actionsLocked ? "Testing models…" : "Run Now"}</span>
         </button>
 
         {isRunning && stage && (

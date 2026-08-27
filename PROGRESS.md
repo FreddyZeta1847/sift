@@ -24,3 +24,4 @@
 - 2026-08-06 — README updated (new feature documented, a dependency badge added)
 - 2026-08-06 — TRANSLATION: implementation issue logged and fixed (batched-inference artifact, architecture doc corrected)
 - 2026-08-27 — SCHEDULER: startup-path issue logged and fixed (server boot blocked by an automated trigger)
+- 2026-08-27 — MODEL-HEALTH: startup check surfaced in the UI; a runtime state-sharing issue logged and fixed

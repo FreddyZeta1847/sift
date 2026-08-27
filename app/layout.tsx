@@ -20,12 +20,22 @@
  * Every real page here needs live DB data anyway (no actual static
  * content exists in this app), so forcing the whole tree dynamic has no
  * downside.
+ *
+ * getModelHealth() is read synchronously and deliberately OUTSIDE the
+ * Promise.all below: it is an in-memory lookup, not I/O, so there is nothing
+ * to await. Note the layout only READS it — it never starts a check. Because
+ * this file is force-dynamic it re-renders on every navigation, so triggering
+ * work here would turn each page view into a pair of billable LLM calls. The
+ * only two things that start a check are process start (instrumentation.ts)
+ * and reassigning a model (app/config/api/actions.ts).
  */
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "./Nav";
 import { getInProgressRun, getMostRecentFinishedRun, getUndecidedPostCount } from "../lib/review/queries";
+import { getModelHealth } from "../lib/health/model-health";
+import { ModelHealthProvider } from "./health/ModelHealthProvider";
 
 const bricolageGrotesque = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -66,14 +76,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${bricolageGrotesque.variable} ${instrumentSans.variable} ${plexMono.variable}`}
     >
       <body>
-        <div className="app-shell">
-          <Nav
-            initialInProgress={inProgress}
-            lastRunFinishedAt={lastRun?.finishedAt ?? null}
-            undecidedCount={undecidedCount}
-          />
-          {children}
-        </div>
+        {/* Wraps Nav AND the route segment: the Run Now button and the "Test
+            this model" buttons live in sibling trees, and both have to agree
+            on whether they are locked. */}
+        <ModelHealthProvider initialHealth={getModelHealth()}>
+          <div className="app-shell">
+            <Nav
+              initialInProgress={inProgress}
+              lastRunFinishedAt={lastRun?.finishedAt ?? null}
+              undecidedCount={undecidedCount}
+            />
+            {children}
+          </div>
+        </ModelHealthProvider>
       </body>
     </html>
   );

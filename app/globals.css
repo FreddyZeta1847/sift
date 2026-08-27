@@ -1419,3 +1419,105 @@ h3:first-child { margin-top: 0; }
   accent-color: var(--primary);
   cursor: pointer;
 }
+
+/* ---------------------------------------------------------------------
+ * Model check: gate, banner, and the locked-button state.
+ *
+ * z-index: the gate sits at 30, above .toast's 20. A Run Now toast
+ * appearing on top of a modal that is explaining why Run Now is
+ * unavailable would be nonsense.
+ * ------------------------------------------------------------------ */
+.model-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  /* Tinted rather than opaque: the app is still there and still yours —
+     this screen is an explanation, not a door. */
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(3px);
+}
+.model-gate-card {
+  max-width: 26rem;
+  text-align: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl) var(--space-lg);
+  box-shadow: var(--shadow-float);
+}
+.model-gate-spinner {
+  display: inline-block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  animation: spin 0.8s linear infinite;
+}
+.model-gate-title { margin: var(--space-md) 0 var(--space-sm); }
+.model-gate-text { color: var(--muted); margin: 0 0 var(--space-lg); }
+.model-gate-skip {
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  cursor: pointer;
+}
+.model-gate-skip:hover { background: var(--primary-deep); }
+.model-gate-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: var(--space-md) 0 0;
+}
+
+.model-banner {
+  position: fixed;
+  top: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  max-width: min(46rem, calc(100vw - 2 * var(--space-lg)));
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-float);
+}
+.model-banner-body { display: flex; flex-direction: column; gap: 4px; }
+.model-banner-detail { font-size: 0.875rem; }
+.model-banner-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+}
+.model-banner-close:hover { opacity: 1; }
+.model-banner--ok { background: var(--success-bg); color: var(--success-deep); border-color: var(--success); }
+.model-banner--problem { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+/* Muted on purpose. "We stopped waiting" and "nothing configured yet" are
+   both states of not-knowing, and dressing either in red would be the exact
+   false alarm this whole feature exists to prevent. */
+.model-banner--muted { color: var(--muted); }
+
+/* Visibly different from a plain :disabled, because the reason differs: this
+   button is not unavailable, it is not available YET. Dotted underline and
+   the wait cursor read as "hold on", where the flat disabled state reads as
+   "not for you". */
+.is-locked {
+  opacity: 0.55;
+  cursor: progress;
+  text-decoration: underline dotted currentColor;
+  text-underline-offset: 3px;
+}

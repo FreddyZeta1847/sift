@@ -2,6 +2,20 @@
  * The per-process model-health singleton: one check per server process, held
  * in memory, read synchronously by anything that renders.
  *
+ * WHY THE STATE HANGS OFF globalThis AND NOT A MODULE-LEVEL `let`
+ * Next.js compiles instrumentation.ts into a DIFFERENT module graph from the
+ * app router, and in dev the router itself loads a module more than once. A
+ * module-level variable is therefore per-module-INSTANCE, not per process:
+ * measured directly, the instance that ran the check and the instance the
+ * layout read from were two different objects, so the layout only ever saw
+ * "unknown" and no gate or banner could ever appear.
+ *
+ * globalThis is the one thing every instance in a Node process genuinely
+ * shares — the same reason the well-known `globalThis.prisma` pattern exists.
+ * It also keeps the semantics we wanted for free: a new process starts with a
+ * fresh globalThis, so a stale verdict cannot outlive the process whose
+ * network and credentials made it true.
+ *
  * WHY IN MEMORY AND NOT PERSISTED
  * A probe result is only true for *this* process's network and credentials.
  * Writing it to settings or the database would mean showing a green tick from
@@ -40,19 +54,34 @@ const DEFAULT_DEPS: HealthDeps = {
   check: () => checkAssignedModels(),
 };
 
-let state: HealthState = { phase: "unknown" };
-// Guards re-entry synchronously. A promise-based guard would let two calls in
-// the same tick both slip through and pay for the same probes twice.
-let inFlight = false;
+interface HealthStore {
+  state: HealthState;
+  // Guards re-entry synchronously. A promise-based guard would let two calls
+  // in the same tick both slip through and pay for the same probes twice.
+  inFlight: boolean;
+}
+
+// Symbol.for keeps the key in the global registry, so every module instance
+// resolves the identical symbol without sharing an import.
+const STORE_KEY = Symbol.for("sift.modelHealth");
+
+type GlobalWithStore = typeof globalThis & { [STORE_KEY]?: HealthStore };
+
+function store(): HealthStore {
+  const g = globalThis as GlobalWithStore;
+  g[STORE_KEY] ??= { state: { phase: "unknown" }, inFlight: false };
+  return g[STORE_KEY];
+}
 
 export function getModelHealth(): HealthState {
-  return state;
+  return store().state;
 }
 
 export function startModelHealthCheck(deps: HealthDeps = DEFAULT_DEPS): void {
-  if (inFlight) return;
-  inFlight = true;
-  state = { phase: "checking", startedAt: Date.now() };
+  const s = store();
+  if (s.inFlight) return;
+  s.inFlight = true;
+  s.state = { phase: "checking", startedAt: Date.now() };
 
   void run(deps)
     .catch((err: unknown) => {
@@ -60,20 +89,21 @@ export function startModelHealthCheck(deps: HealthDeps = DEFAULT_DEPS): void {
       // rather than rethrow: see the header on why this must never escape.
       // eslint-disable-next-line no-console
       console.error(`[sift] Model health check failed: ${(err as Error).message}`);
-      state = settledFrom(inconclusiveResult("The model check could not be completed."));
+      store().state = settledFrom(inconclusiveResult("The model check could not be completed."));
     })
     .finally(() => {
-      inFlight = false;
+      store().inFlight = false;
     });
 }
 
 export function invalidateModelHealth(): void {
-  state = { phase: "unknown" };
+  store().state = { phase: "unknown" };
 }
 
 export function __resetForTests(): void {
-  state = { phase: "unknown" };
-  inFlight = false;
+  const s = store();
+  s.state = { phase: "unknown" };
+  s.inFlight = false;
 }
 
 async function run(deps: HealthDeps): Promise<void> {
@@ -81,16 +111,16 @@ async function run(deps: HealthDeps): Promise<void> {
   if (!settings.modelHealthCheckEnabled) {
     // Switched off: no calls, no spend, and — because "unknown" is the
     // never-gate phase — no startup screen and no locked buttons either.
-    state = { phase: "unknown" };
+    store().state = { phase: "unknown" };
     return;
   }
 
   try {
-    state = settledFrom(await deps.check());
+    store().state = settledFrom(await deps.check());
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(`[sift] Model health check failed: ${(err as Error).message}`);
-    state = settledFrom(inconclusiveResult("The model check could not be completed."));
+    store().state = settledFrom(inconclusiveResult("The model check could not be completed."));
   }
 }
 
