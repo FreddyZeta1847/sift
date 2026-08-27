@@ -95,11 +95,35 @@ function statusTone(message: string): string {
   return /failed/i.test(message) ? "status-line status-line--danger" : "status-line";
 }
 
-// Visual-only helper: colors a "test this model" probe result — "pass" is
-// the only outcome that means "safe to assign", every other ProbeResult
-// value is a problem worth flagging in `--danger`.
+// Visual-only helpers for a "test this model" probe result. "pass" is the
+// only outcome that means "safe to assign", but the failures are NOT
+// interchangeable, so they no longer all render the same red word.
+//
+// "inconclusive" in particular is deliberately muted, not `--danger`: it
+// means this test stopped waiting, not that the model is broken. Painting it
+// red is exactly the false alarm this vocabulary exists to prevent — see the
+// header of lib/config/test-model-probe.ts.
+const PROBE_LABELS: Record<ProbeResult, string> = {
+  pass: "pass",
+  fail: "bad output",
+  unreachable: "unreachable",
+  timeout: "provider timed out",
+  inconclusive: "no answer yet",
+};
+
+const PROBE_EXPLANATIONS: Record<ProbeResult, string> = {
+  pass: "The model returned valid structured output.",
+  fail: "The model answered, but not with the structured output the pipeline needs — try a stronger model.",
+  unreachable: "The call failed. Check the API key, the base URL and the model name.",
+  timeout: "The provider was given its full time allowance and never responded.",
+  inconclusive:
+    "The test stopped waiting before the provider answered. This is not a failure — raise the test limit in Settings to wait longer.",
+};
+
 function probeTone(result: ProbeResult): string {
-  return result === "pass" ? "data status-line--success" : "data status-line--danger";
+  if (result === "pass") return "data status-line--success";
+  if (result === "inconclusive") return "data status-line";
+  return "data status-line--danger";
 }
 
 export function ApiConfigForm({ providers, settings }: { providers: Provider[]; settings: Settings }) {
@@ -471,7 +495,11 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
               </svg>
               {isCurationProbing ? "Testing…" : "Test this model"}
             </button>
-            {curationProbeResult && <span className={probeTone(curationProbeResult)}>{curationProbeResult}</span>}
+            {curationProbeResult && (
+              <span className={probeTone(curationProbeResult)} title={PROBE_EXPLANATIONS[curationProbeResult]}>
+                {PROBE_LABELS[curationProbeResult]}
+              </span>
+            )}
           </div>
         </div>
 
@@ -501,7 +529,11 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
               </svg>
               {isDraftingProbing ? "Testing…" : "Test this model"}
             </button>
-            {draftingProbeResult && <span className={probeTone(draftingProbeResult)}>{draftingProbeResult}</span>}
+            {draftingProbeResult && (
+              <span className={probeTone(draftingProbeResult)} title={PROBE_EXPLANATIONS[draftingProbeResult]}>
+                {PROBE_LABELS[draftingProbeResult]}
+              </span>
+            )}
           </div>
         </div>
         </div>

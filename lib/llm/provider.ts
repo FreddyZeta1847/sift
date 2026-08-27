@@ -46,6 +46,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// A timed-out call and an overloaded-but-alive provider (429/503) are both
+// "TransientLlmError" as far as the retry loop is concerned, and that is
+// correct — both deserve a retry. But callers that REPORT on a provider need
+// to tell them apart: "the provider never answered" and "the provider said it
+// was busy" are different things to show a user. Rather than have every such
+// caller string-match the message, the timeout path marks its error and this
+// guard reads the mark. The Anthropic path throws the SDK's own error type
+// instead of ours, so its name is recognised here too.
+interface LlmTimeoutMark {
+  llmTimeout?: true;
+}
+
+export function isLlmTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return (err as Error & LlmTimeoutMark).llmTimeout === true || err.name === "APIConnectionTimeoutError";
+}
+
 export interface LlmMessage {
   role: "system" | "user";
   content: string;
@@ -95,6 +112,7 @@ async function callOpenAICompatibleOnce(
     if (err instanceof Error && err.name === "AbortError") {
       const timeoutErr = new Error(`LLM call failed: ${provider.baseUrl} timed out after ${LLM_TIMEOUT_MS}ms`);
       timeoutErr.name = "TransientLlmError";
+      (timeoutErr as Error & LlmTimeoutMark).llmTimeout = true;
       throw timeoutErr;
     }
     throw err;
