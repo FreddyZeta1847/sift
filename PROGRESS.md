@@ -23,3 +23,4 @@
 - 2026-08-06 — DRAFT-GENERATOR: doc drift corrected (a stale description reconciled with the real implementation)
 - 2026-08-06 — README updated (new feature documented, a dependency badge added)
 - 2026-08-06 — TRANSLATION: implementation issue logged and fixed (batched-inference artifact, architecture doc corrected)
+- 2026-08-27 — SCHEDULER: startup-path issue logged and fixed (server boot blocked by an automated trigger)
