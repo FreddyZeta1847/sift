@@ -21,7 +21,12 @@ export default async function SettingsPage() {
   const settings = await getSettings();
   return (
     <main>
-      <h1>Settings</h1>
+      <div className="page-head">
+        <div className="page-head-text">
+          <h1>Settings</h1>
+          <p className="page-head-sub">What the pipeline reads, when it runs, and how it writes.</p>
+        </div>
+      </div>
       <SettingsForm sources={sources} settings={settings} />
     </main>
   );

@@ -1,22 +1,26 @@
 /**
  * Interactive form for the Settings page (`/config/settings`).
  *
- * Client Component following the same interaction pattern established by
+ * Six panels: Sources, Schedule, Retention, Curation, Model checking,
+ * Voice profile. Schedule and Retention sit side by side because they are
+ * both small and both about *when* things happen; the rest run full width.
+ *
+ * Client Component following the same interaction pattern as
  * `app/config/api/ApiConfigForm.tsx`: local `useState` for in-progress
  * input, `useRouter().refresh()` after a successful mutation so the Server
  * Component re-fetches fresh `sources`/`settings` props, and a
- * `<p role="alert">{status}</p>` per section for both success and failure
- * messages.
+ * `<StatusMessage>` per panel for both success and failure.
  *
- * Sources are rendered directly from the `sources` prop (not copied into
- * local state) so a `router.refresh()` after toggle/add immediately reflects
- * the new list; only the add-source mini-form is local state, since that's
- * user-in-progress input. There is no delete-source action in this task's
- * scope — disabling via the toggle is the only way to remove a source from
- * active use. The add-source form starts collapsed behind a bare "+"
- * button (`showAddSource`), same pattern as ApiConfigForm's add-provider
- * "+ Add source" button in the section header, which opens an overlay card
- * (app/Modal.tsx) rather than unfolding a form inside the list.
+ * Statuses carry their tone rather than having it guessed from their own
+ * wording. This file used to test each message against /failed/i to decide
+ * whether to tint it red — a heuristic that rediscovers, from a string,
+ * something the handler that built the string already knew.
+ *
+ * Sources render directly from the `sources` prop (not copied into local
+ * state) so a `router.refresh()` after toggle/add immediately reflects the
+ * new list; only the add-source form is local state, since that is
+ * user-in-progress input. There is deliberately no delete-source action —
+ * disabling via the toggle is the only way to take a source out of use.
  *
  * Retention day-counts and curation's posts-per-run render as range
  * sliders (`.range-field`) with a live numeric readout instead of plain
@@ -36,14 +40,18 @@
  * section says the change takes effect immediately rather than on some future
  * scheduler check-in.
  *
- * Run Now itself now lives in the global top nav (see app/Nav.tsx) rather
- * than here — kicking off a pipeline run isn't a settings-configuration
- * action, and it needs to be reachable regardless of which page is open.
+ * Run Now lives in the sidebar (see app/Nav.tsx) rather than here — kicking
+ * off a pipeline run isn't a settings-configuration action, and it needs to
+ * be reachable regardless of which page is open.
  *
  * The voice profile is local state seeded from `settings.voiceProfile`.
  * Per this project's low-ceremony style, every field change (tone notes on
  * blur, example-post/interest add or remove immediately) saves the whole
- * assembled profile object rather than building a diffing form.
+ * assembled profile object rather than building a diffing form. Removing
+ * an example post or an interest asks first: it is an unrecoverable delete
+ * of something you typed by hand, and it used to happen on a single click
+ * with no confirmation while the Admin tables asked before deleting a log
+ * row.
  *
  * Retention pairs a range slider with an "unlimited" switch for each of
  * the two retention settings; checking "unlimited" passes `null` to
@@ -55,6 +63,12 @@
  * unlimited option — Curation Engine's input guard caps the candidate pool
  * at 40 regardless, see CURATION-ENGINE--ranking-logic) seeded from
  * `settings.curationTopN` and saved via `saveCurationTopN` on change.
+ *
+ * Model checking's four explanatory paragraphs are folded behind a
+ * disclosure. They are worth reading once and never again, and open by
+ * default they were the longest thing on the page — four paragraphs of
+ * prose wrapped around four sliders. The text is unchanged, including the
+ * live computed "roughly N minutes" figure.
  *
  * Schedule, voice profile, and retention all apply their local state change
  * optimistically and only persist afterward; each capture the pre-update
@@ -70,6 +84,10 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "../../Modal";
+import { ConfirmDialog } from "../../ConfirmDialog";
+import { StatusMessage } from "../../StatusMessage";
+import { Disclosure } from "../../Disclosure";
+import { EmptyState } from "../../EmptyState";
 import {
   toggleSource,
   addSource,
@@ -83,14 +101,10 @@ import type { Source, Settings, VoiceProfile } from "../../../lib/config/types";
 
 const EMPTY_NEW_SOURCE = { name: "", url: "", category: "" };
 
-// Visual-only helper: every failure message produced in this file follows
-// an "X failed: ..." shape (see the handlers below), so matching that
-// substring is enough to apply the danger tint without adding any new
-// state — a plain success sentence falls through to the default, quieter
-// `.status-line` tone.
-function statusTone(message: string): string {
-  return /failed/i.test(message) ? "status-line status-line--danger" : "status-line";
-}
+/** A panel's last result, carrying whether it succeeded rather than implying it. */
+type Status = { text: string; ok: boolean } | null;
+const ok = (text: string): Status => ({ text, ok: true });
+const failed = (text: string): Status => ({ text, ok: false });
 
 const DAYS: { key: string; label: string }[] = [
   { key: "mon", label: "Mon" },
@@ -117,23 +131,28 @@ function groupByCategory(sources: Source[]): [string, Source[]][] {
   return Array.from(groups.entries());
 }
 
+/** What a chip Remove is about to delete, kept until it is confirmed. */
+type PendingChipRemoval = { kind: "example" | "interest"; index: number; text: string };
+
 export function SettingsForm({ sources, settings }: { sources: Source[]; settings: Settings }) {
   const router = useRouter();
   const sourceGroups = groupByCategory(sources);
+  const enabledCount = sources.filter((s) => s.enabled).length;
 
   const [newSource, setNewSource] = useState(EMPTY_NEW_SOURCE);
-  const [addSourceStatus, setAddSourceStatus] = useState<string | null>(null);
+  const [addSourceStatus, setAddSourceStatus] = useState<Status>(null);
   const [toggleErrors, setToggleErrors] = useState<Record<string, string>>({});
   const [showAddSource, setShowAddSource] = useState(false);
 
   const [scheduleDays, setScheduleDays] = useState<string[]>(settings.scheduleDays);
   const [scheduleTime, setScheduleTime] = useState<string>(settings.scheduleTime);
-  const [scheduleStatus, setScheduleStatus] = useState<string | null>(null);
+  const [scheduleStatus, setScheduleStatus] = useState<Status>(null);
 
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile>(settings.voiceProfile);
   const [newExamplePost, setNewExamplePost] = useState("");
   const [newInterest, setNewInterest] = useState("");
-  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<Status>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<PendingChipRemoval | null>(null);
   // Snapshot of the voice profile as of the last focus on the tone-notes
   // textarea, used to revert the optimistic update on save failure — the
   // textarea mutates state on every keystroke, so the "previous" value for
@@ -144,16 +163,16 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
   const [candidateRetentionDays, setCandidateRetentionDays] = useState<number | null>(
     settings.candidateRetentionDays
   );
-  const [retentionStatus, setRetentionStatus] = useState<string | null>(null);
+  const [retentionStatus, setRetentionStatus] = useState<Status>(null);
 
   const [curationTopN, setCurationTopN] = useState<number>(settings.curationTopN);
-  const [curationTopNStatus, setCurationTopNStatus] = useState<string | null>(null);
+  const [curationTopNStatus, setCurationTopNStatus] = useState<Status>(null);
 
   const [checkEnabled, setCheckEnabled] = useState<boolean>(settings.modelHealthCheckEnabled);
   const [healthCheckSecs, setHealthCheckSecs] = useState<number>(Math.round(settings.healthCheckTimeoutMs / 1000));
   const [probeSecs, setProbeSecs] = useState<number>(Math.round(settings.probeTimeoutMs / 1000));
   const [llmCallSecs, setLlmCallSecs] = useState<number>(Math.round(settings.llmCallTimeoutMs / 1000));
-  const [modelCheckStatus, setModelCheckStatus] = useState<string | null>(null);
+  const [modelCheckStatus, setModelCheckStatus] = useState<Status>(null);
 
   const handleToggleSource = async (name: string) => {
     const result = await toggleSource(name);
@@ -172,10 +191,10 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     e.preventDefault();
     const result = await addSource(newSource);
     if (!result.ok) {
-      setAddSourceStatus(`Add failed: ${result.error}`);
+      setAddSourceStatus(failed(`Add failed: ${result.error}`));
       return;
     }
-    setAddSourceStatus("Source added.");
+    setAddSourceStatus(ok("Source added."));
     setNewSource(EMPTY_NEW_SOURCE);
     setShowAddSource(false);
     router.refresh();
@@ -196,10 +215,10 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     const result = await saveSchedule(next, scheduleTime);
     if (!result.ok) {
       setScheduleDays(previous);
-      setScheduleStatus(`Save failed: ${result.error}`);
+      setScheduleStatus(failed(`Save failed: ${result.error}`));
       return;
     }
-    setScheduleStatus("Schedule saved.");
+    setScheduleStatus(ok("Schedule saved."));
     router.refresh();
   };
 
@@ -209,10 +228,10 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     const result = await saveSchedule(scheduleDays, time);
     if (!result.ok) {
       setScheduleTime(previous);
-      setScheduleStatus(`Save failed: ${result.error}`);
+      setScheduleStatus(failed(`Save failed: ${result.error}`));
       return;
     }
-    setScheduleStatus("Schedule saved.");
+    setScheduleStatus(ok("Schedule saved."));
     router.refresh();
   };
 
@@ -220,10 +239,10 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     const result = await saveVoiceProfile(profile);
     if (!result.ok) {
       setVoiceProfile(previous);
-      setVoiceStatus(`Save failed: ${result.error}`);
+      setVoiceStatus(failed(`Save failed: ${result.error}`));
       return;
     }
-    setVoiceStatus("Voice profile saved.");
+    setVoiceStatus(ok("Voice profile saved."));
   };
 
   const handleToneNotesFocus = () => {
@@ -243,13 +262,6 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     persistVoiceProfile(next, previous);
   };
 
-  const handleRemoveExamplePost = (index: number) => {
-    const previous = voiceProfile;
-    const next = { ...voiceProfile, examplePosts: voiceProfile.examplePosts.filter((_, i) => i !== index) };
-    setVoiceProfile(next);
-    persistVoiceProfile(next, previous);
-  };
-
   const handleAddInterest = () => {
     if (!newInterest.trim()) return;
     const previous = voiceProfile;
@@ -259,10 +271,16 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     persistVoiceProfile(next, previous);
   };
 
-  const handleRemoveInterest = (index: number) => {
+  const confirmChipRemoval = () => {
+    if (!pendingRemoval) return;
+    const { kind, index } = pendingRemoval;
     const previous = voiceProfile;
-    const next = { ...voiceProfile, interests: voiceProfile.interests.filter((_, i) => i !== index) };
+    const next =
+      kind === "example"
+        ? { ...voiceProfile, examplePosts: voiceProfile.examplePosts.filter((_, i) => i !== index) }
+        : { ...voiceProfile, interests: voiceProfile.interests.filter((_, i) => i !== index) };
     setVoiceProfile(next);
+    setPendingRemoval(null);
     persistVoiceProfile(next, previous);
   };
 
@@ -276,10 +294,10 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     if (!result.ok) {
       setPostsRetentionDays(previousPosts);
       setCandidateRetentionDays(previousCandidates);
-      setRetentionStatus(`Save failed: ${result.error}`);
+      setRetentionStatus(failed(`Save failed: ${result.error}`));
       return;
     }
-    setRetentionStatus("Retention saved.");
+    setRetentionStatus(ok("Retention saved."));
   };
 
   const handlePostsRetentionChange = (value: number | null) => {
@@ -308,7 +326,19 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
       probeTimeoutMs: next.probe * 1000,
       llmCallTimeoutMs: next.llmCall * 1000,
     });
-    setModelCheckStatus(result.ok ? "Model checking saved." : `Save failed: ${result.error}`);
+    setModelCheckStatus(result.ok ? ok("Model checking saved.") : failed(`Save failed: ${result.error}`));
+  };
+
+  // All four sliders persist the whole set, so they share one committer.
+  const commitModelCheck = () =>
+    persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs });
+
+  // Sliders persist on release, not on change: dragging one fires `change`
+  // for every intermediate value, which would mean a file write per pixel.
+  const sliderCommitProps = {
+    onMouseUp: commitModelCheck,
+    onTouchEnd: commitModelCheck,
+    onKeyUp: commitModelCheck,
   };
 
   const handleCurationTopNChange = async (value: number) => {
@@ -317,53 +347,65 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     const result = await saveCurationTopN(value);
     if (!result.ok) {
       setCurationTopN(previous);
-      setCurationTopNStatus(`Save failed: ${result.error}`);
+      setCurationTopNStatus(failed(`Save failed: ${result.error}`));
       return;
     }
-    setCurationTopNStatus("Curation setting saved.");
+    setCurationTopNStatus(ok("Curation setting saved."));
   };
+
+  const deadProviderMinutes = Math.round((llmCallSecs * 3 + 10) / 60);
 
   return (
     <div className="config-page">
-      <section id="sources" className="card">
-        <div className="section-header">
+      <section className="panel" id="sources">
+        <div className="panel-head">
           <h2>Sources</h2>
-          <button className="section-action" onClick={() => setShowAddSource(true)}>
-            + Add source
-          </button>
+          <span className="panel-head-aside">
+            {/* The switches on each row are green; the count of them that are
+                on belongs in the same colour. */}
+            <span className="cell-yes">{enabledCount} enabled</span>
+            <button className="section-action" onClick={() => setShowAddSource(true)}>
+              + Add source
+            </button>
+          </span>
         </div>
-        {sourceGroups.map(([category, group]) => (
-          <div className="stage-block" key={category}>
-            <h3>
-              {category} <span className="status-line" style={{ display: "inline" }}>({group.length})</span>
-            </h3>
-            <ul className="list">
-              {group.map((s) => (
-                <li key={s.name} className="list-row">
-                  <span className="list-row-main">
-                    <span className="list-row-title">{s.name}</span>
-                    <span className="list-row-meta data">{s.url}</span>
-                  </span>
-                  <label className="switch" aria-label={`Enable ${s.name}`}>
-                    <input type="checkbox" checked={s.enabled} onChange={() => handleToggleSource(s.name)} />
-                    <span className="switch-track" />
-                  </label>
-                  {toggleErrors[s.name] && (
-                    <p className="status-line status-line--danger" role="alert">
-                      {toggleErrors[s.name]}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
 
-        {addSourceStatus && (
-          <p className={statusTone(addSourceStatus)} role="alert">
-            {addSourceStatus}
-          </p>
+        {sources.length === 0 ? (
+          <EmptyState hint="Add an RSS or Atom feed above — nothing is ingested until at least one is enabled.">
+            No sources yet.
+          </EmptyState>
+        ) : (
+          sourceGroups.map(([category, group]) => (
+            <div className="stage-block" key={category}>
+              <h3>
+                {category} <span className="h3-count">({group.length})</span>
+              </h3>
+              <div className="rows" style={{ ["--cols" as string]: "minmax(0,1fr) 44px" } as React.CSSProperties}>
+                {group.map((s) => (
+                  <div key={s.name}>
+                    <div className="row">
+                      <span className="row-main">
+                        <span className="row-title">{s.name}</span>
+                        <span className="row-meta data">{s.url}</span>
+                      </span>
+                      <label className="switch" aria-label={`Enable ${s.name}`}>
+                        <input type="checkbox" checked={s.enabled} onChange={() => handleToggleSource(s.name)} />
+                        <span className="switch-track" />
+                      </label>
+                    </div>
+                    {toggleErrors[s.name] && (
+                      <p className="row-note status-line--danger" role="alert">
+                        {toggleErrors[s.name]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
         )}
+
+        <StatusMessage message={addSourceStatus?.text} tone={addSourceStatus?.ok ? "success" : "danger"} />
 
         {showAddSource && (
           <Modal
@@ -372,7 +414,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             onClose={handleCancelAddSource}
             footer={
               <>
-                <button type="button" onClick={handleCancelAddSource}>
+                <button type="button" className="secondary" onClick={handleCancelAddSource}>
                   Cancel
                 </button>
                 <button
@@ -419,103 +461,106 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         )}
       </section>
 
-      <div className="stage-grid">
-      <section id="schedule" className="card">
-        <h2>Schedule</h2>
-        <p className="status-line">Schedule changes take effect immediately.</p>
-        <div className="day-toggle-group">
-          {DAYS.map(({ key, label }) => (
-            <label key={key} className="day-toggle">
-              <input type="checkbox" checked={scheduleDays.includes(key)} onChange={() => handleToggleDay(key)} />
-              {label}
+      {/* Both small, both about when things happen — they read better as a
+          pair than as two full-width bands. */}
+      <div className="panel-grid">
+        <section className="panel" id="schedule">
+          <div className="panel-head">
+            <h2>Schedule</h2>
+          </div>
+          <p className="panel-intro">Schedule changes take effect immediately.</p>
+          <div className="day-toggle-group">
+            {DAYS.map(({ key, label }) => (
+              <label key={key} className="day-toggle">
+                <input type="checkbox" checked={scheduleDays.includes(key)} onChange={() => handleToggleDay(key)} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <label>
+            Time (UTC)
+            <input type="time" value={scheduleTime} onChange={(e) => handleScheduleTimeChange(e.target.value)} />
+          </label>
+          <StatusMessage message={scheduleStatus?.text} tone={scheduleStatus?.ok ? "success" : "danger"} />
+        </section>
+
+        <section className="panel" id="retention">
+          <div className="panel-head">
+            <h2>Retention</h2>
+          </div>
+          <div className="field-row">
+            <label>
+              Posts retention (days)
+              <div className="range-field">
+                <input
+                  type="range"
+                  min={0}
+                  max={365}
+                  value={postsRetentionDays ?? 0}
+                  disabled={postsRetentionDays === null}
+                  onChange={(e) => handlePostsRetentionChange(Number(e.target.value))}
+                />
+                <span className="range-value data">
+                  {postsRetentionDays === null ? "Unlimited" : `${postsRetentionDays} day${postsRetentionDays === 1 ? "" : "s"}`}
+                </span>
+              </div>
             </label>
-          ))}
-        </div>
-        <label>
-          Time (UTC)
-          <input type="time" value={scheduleTime} onChange={(e) => handleScheduleTimeChange(e.target.value)} />
-        </label>
-        {scheduleStatus && (
-          <p className={statusTone(scheduleStatus)} role="alert">
-            {scheduleStatus}
-          </p>
-        )}
-      </section>
-
-      <section id="retention" className="card">
-        <h2>Retention</h2>
-        <div className="field-row">
-          <label>
-            Posts retention (days)
-            <div className="range-field">
-              <input
-                type="range"
-                min={0}
-                max={365}
-                value={postsRetentionDays ?? 0}
-                disabled={postsRetentionDays === null}
-                onChange={(e) => handlePostsRetentionChange(Number(e.target.value))}
-              />
-              <span className="range-value data">
-                {postsRetentionDays === null ? "Unlimited" : `${postsRetentionDays} day${postsRetentionDays === 1 ? "" : "s"}`}
+            <label className="checkbox-label">
+              <span className="switch">
+                <input
+                  type="checkbox"
+                  checked={postsRetentionDays === null}
+                  onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
+                />
+                <span className="switch-track" />
               </span>
-            </div>
-          </label>
-          <label className="checkbox-label">
-            <span className="switch">
-              <input
-                type="checkbox"
-                checked={postsRetentionDays === null}
-                onChange={(e) => handlePostsRetentionChange(e.target.checked ? null : 0)}
-              />
-              <span className="switch-track" />
-            </span>
-            Unlimited
-          </label>
-        </div>
+              Unlimited
+            </label>
+          </div>
 
-        <div className="field-row">
-          <label>
-            Candidate retention (days)
-            <div className="range-field">
-              <input
-                type="range"
-                min={0}
-                max={365}
-                value={candidateRetentionDays ?? 0}
-                disabled={candidateRetentionDays === null}
-                onChange={(e) => handleCandidateRetentionChange(Number(e.target.value))}
-              />
-              <span className="range-value data">
-                {candidateRetentionDays === null
-                  ? "Unlimited"
-                  : `${candidateRetentionDays} day${candidateRetentionDays === 1 ? "" : "s"}`}
+          <div className="field-row">
+            <label>
+              Candidate retention (days)
+              <div className="range-field">
+                <input
+                  type="range"
+                  min={0}
+                  max={365}
+                  value={candidateRetentionDays ?? 0}
+                  disabled={candidateRetentionDays === null}
+                  onChange={(e) => handleCandidateRetentionChange(Number(e.target.value))}
+                />
+                <span className="range-value data">
+                  {candidateRetentionDays === null
+                    ? "Unlimited"
+                    : `${candidateRetentionDays} day${candidateRetentionDays === 1 ? "" : "s"}`}
+                </span>
+              </div>
+            </label>
+            <label className="checkbox-label">
+              <span className="switch">
+                <input
+                  type="checkbox"
+                  checked={candidateRetentionDays === null}
+                  onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
+                />
+                <span className="switch-track" />
               </span>
-            </div>
-          </label>
-          <label className="checkbox-label">
-            <span className="switch">
-              <input
-                type="checkbox"
-                checked={candidateRetentionDays === null}
-                onChange={(e) => handleCandidateRetentionChange(e.target.checked ? null : 0)}
-              />
-              <span className="switch-track" />
-            </span>
-            Unlimited
-          </label>
-        </div>
+              Unlimited
+            </label>
+          </div>
 
-        {retentionStatus && (
-          <p className={statusTone(retentionStatus)} role="alert">
-            {retentionStatus}
-          </p>
-        )}
-      </section>
+          <StatusMessage message={retentionStatus?.text} tone={retentionStatus?.ok ? "success" : "danger"} />
+        </section>
       </div>
 
-      <section id="curation" className="card">
-        <h2>Curation</h2>
+      <section className="panel" id="curation">
+        <div className="panel-head">
+          <h2>Curation</h2>
+        </div>
+        <p className="panel-intro">
+          The upper bound — curation only picks fewer if fewer items are genuinely worth posting.
+        </p>
         <label>
           Posts per run
           <div className="range-field">
@@ -529,18 +574,13 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
             <span className="range-value data">{curationTopN} post{curationTopN === 1 ? "" : "s"}</span>
           </div>
         </label>
-        <p className="status-line">
-          The upper bound — curation only picks fewer if fewer items are genuinely worth posting.
-        </p>
-        {curationTopNStatus && (
-          <p className={statusTone(curationTopNStatus)} role="alert">
-            {curationTopNStatus}
-          </p>
-        )}
+        <StatusMessage message={curationTopNStatus?.text} tone={curationTopNStatus?.ok ? "success" : "danger"} />
       </section>
 
-      <section id="model-checking" className="card">
-        <h2>Model checking</h2>
+      <section className="panel" id="model-checking">
+        <div className="panel-head">
+          <h2>Model checking</h2>
+        </div>
 
         <label className="checkbox-row">
           <input
@@ -553,10 +593,6 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           />
           Check the assigned models when the app starts
         </label>
-        <p className="status-line">
-          Two small calls per server start, one per assigned model. Switch it off and nothing is checked, nothing is
-          locked, and nothing is spent.
-        </p>
 
         {checkEnabled && (
           <label>
@@ -569,9 +605,7 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
                 step={5}
                 value={healthCheckSecs}
                 onChange={(e) => setHealthCheckSecs(Number(e.target.value))}
-                onMouseUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
-                onTouchEnd={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
-                onKeyUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+                {...sliderCommitProps}
               />
               <span className="range-value data">{healthCheckSecs}s</span>
             </div>
@@ -588,17 +622,11 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
               step={5}
               value={probeSecs}
               onChange={(e) => setProbeSecs(Number(e.target.value))}
-              onMouseUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
-              onTouchEnd={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
-              onKeyUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              {...sliderCommitProps}
             />
             <span className="range-value data">{probeSecs}s</span>
           </div>
         </label>
-        <p className="status-line">
-          These two are how long <em>sift</em> waits, not how long the model gets. Run past either and the result is a
-          grey &ldquo;no answer yet&rdquo; — never a failure, because a slow model is not a broken one.
-        </p>
 
         <label>
           A pipeline call may take up to
@@ -610,28 +638,41 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
               step={30}
               value={llmCallSecs}
               onChange={(e) => setLlmCallSecs(Number(e.target.value))}
-              onMouseUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
-              onTouchEnd={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
-              onKeyUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              {...sliderCommitProps}
             />
             <span className="range-value data">{llmCallSecs}s</span>
           </div>
         </label>
-        <p className="status-line">
-          This one <em>is</em> the provider&rsquo;s allowance during a real run, and going over it is a genuine timeout.
-          A failed call is retried up to 3 times, so a dead provider costs roughly {Math.round((llmCallSecs * 3 + 10) / 60)} minute
-          {Math.round((llmCallSecs * 3 + 10) / 60) === 1 ? "" : "s"} before the run gives up.
-        </p>
 
-        {modelCheckStatus && (
-          <p className={statusTone(modelCheckStatus)} role="alert">
-            {modelCheckStatus}
-          </p>
-        )}
+        {/* Four paragraphs of prose wrapped around four sliders made this
+            the longest panel on the page, and it is all read-once
+            material. Folded, not cut — every word is here, including the
+            computed figure, which still recomputes as you drag. */}
+        <Disclosure label="What these limits actually mean">
+          <div className="disclosure-prose">
+            <p className="status-line">
+              Two small calls per server start, one per assigned model. Switch it off and nothing is checked, nothing is
+              locked, and nothing is spent.
+            </p>
+            <p className="status-line">
+              These two are how long <em>sift</em> waits, not how long the model gets. Run past either and the result is a
+              grey &ldquo;no answer yet&rdquo; — never a failure, because a slow model is not a broken one.
+            </p>
+            <p className="status-line">
+              This one <em>is</em> the provider&rsquo;s allowance during a real run, and going over it is a genuine timeout.
+              A failed call is retried up to 3 times, so a dead provider costs roughly {deadProviderMinutes} minute
+              {deadProviderMinutes === 1 ? "" : "s"} before the run gives up.
+            </p>
+          </div>
+        </Disclosure>
+
+        <StatusMessage message={modelCheckStatus?.text} tone={modelCheckStatus?.ok ? "success" : "danger"} />
       </section>
 
-      <section id="voice-profile" className="card">
-        <h2>Voice profile</h2>
+      <section className="panel" id="voice-profile">
+        <div className="panel-head">
+          <h2>Voice profile</h2>
+        </div>
         <label>
           Tone notes
           <textarea
@@ -642,48 +683,89 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
           />
         </label>
 
-        <div className="stage-block">
-          <h3>Example posts</h3>
-          <ul className="chip-list">
-            {voiceProfile.examplePosts.map((post, i) => (
-              <li key={`${post}-${i}`} className="chip-row">
-                <span>{post}</span>
-                <button onClick={() => handleRemoveExamplePost(i)}>Remove</button>
-              </li>
-            ))}
-          </ul>
-          <div className="field-row">
-            <input
-              placeholder="new example post"
-              value={newExamplePost}
-              onChange={(e) => setNewExamplePost(e.target.value)}
-            />
-            <button onClick={handleAddExamplePost}>Add example post</button>
+        <div className="panel-grid">
+          <div className="stage-block">
+            <h3>Example posts</h3>
+            {voiceProfile.examplePosts.length === 0 ? (
+              <p className="status-line">Nothing yet — add a post you liked writing.</p>
+            ) : (
+              <ul className="chip-list">
+                {voiceProfile.examplePosts.map((post, i) => (
+                  <li key={`${post}-${i}`} className="chip-row">
+                    <span>{post}</span>
+                    <button
+                      className="icon-button icon-button--danger"
+                      onClick={() => setPendingRemoval({ kind: "example", index: i, text: post })}
+                      aria-label="Remove example post"
+                      title="Remove"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="field-row">
+              <input
+                placeholder="new example post"
+                value={newExamplePost}
+                onChange={(e) => setNewExamplePost(e.target.value)}
+              />
+              <button onClick={handleAddExamplePost}>Add example post</button>
+            </div>
+          </div>
+
+          <div className="stage-block">
+            <h3>Interests</h3>
+            {voiceProfile.interests.length === 0 ? (
+              <p className="status-line">Nothing yet — add a topic you write about.</p>
+            ) : (
+              <ul className="chip-list">
+                {voiceProfile.interests.map((interest, i) => (
+                  <li key={`${interest}-${i}`} className="chip-row">
+                    <span>{interest}</span>
+                    <button
+                      className="icon-button icon-button--danger"
+                      onClick={() => setPendingRemoval({ kind: "interest", index: i, text: interest })}
+                      aria-label="Remove interest"
+                      title="Remove"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="field-row">
+              <input placeholder="new interest" value={newInterest} onChange={(e) => setNewInterest(e.target.value)} />
+              <button onClick={handleAddInterest}>Add interest</button>
+            </div>
           </div>
         </div>
 
-        <div className="stage-block">
-          <h3>Interests</h3>
-          <ul className="chip-list">
-            {voiceProfile.interests.map((interest, i) => (
-              <li key={`${interest}-${i}`} className="chip-row">
-                <span>{interest}</span>
-                <button onClick={() => handleRemoveInterest(i)}>Remove</button>
-              </li>
-            ))}
-          </ul>
-          <div className="field-row">
-            <input placeholder="new interest" value={newInterest} onChange={(e) => setNewInterest(e.target.value)} />
-            <button onClick={handleAddInterest}>Add interest</button>
-          </div>
-        </div>
-
-        {voiceStatus && (
-          <p className={statusTone(voiceStatus)} role="alert">
-            {voiceStatus}
-          </p>
-        )}
+        <StatusMessage message={voiceStatus?.text} tone={voiceStatus?.ok ? "success" : "danger"} />
       </section>
+
+      {pendingRemoval && (
+        <ConfirmDialog
+          title={pendingRemoval.kind === "example" ? "Remove example post" : "Remove interest"}
+          message={
+            <>
+              Remove &ldquo;{pendingRemoval.text}&rdquo;? It stops shaping how drafts are written, and it isn&apos;t
+              recoverable — you would have to type it again.
+            </>
+          }
+          confirmLabel="Remove"
+          onConfirm={confirmChipRemoval}
+          onCancel={() => setPendingRemoval(null)}
+        />
+      )}
     </div>
   );
 }

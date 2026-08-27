@@ -383,7 +383,7 @@ button.secondary:hover:not(:disabled) { background: var(--surface-raised); borde
 .panel-head-aside {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   flex-shrink: 0;
 }
 /* A sentence under the panel title explaining what the panel is for —
@@ -1165,6 +1165,8 @@ h3 {
   margin: var(--space-lg) 0 var(--space-xs);
 }
 h3:first-child { margin-top: 0; }
+/* The "(4)" after a category name — a count, not part of the heading. */
+.h3-count { font-weight: 400; color: var(--muted); }
 
 /* A labeled sub-group inside a section (model-assignment stage, voice
    profile's example-posts/interests clusters). */
@@ -1496,15 +1498,20 @@ h3:first-child { margin-top: 0; }
   flex-direction: column;
   gap: var(--space-xs);
 }
+/* A chip sits on `surface-raised`, one step deeper than the panel it is
+   in. It used to be `surface` — the same tone as the card around it — so
+   the chip's own shape was invisible and a list of them read as plain
+   lines of text. */
 .chip-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  background: var(--surface);
+  background: var(--surface-raised);
   border-radius: var(--radius-sm);
-  padding: var(--space-xs) var(--space-sm);
+  padding: 6px var(--space-sm) 6px var(--space-md);
 }
+.chip-row > span { min-width: 0; overflow-wrap: anywhere; }
 
 /* The one number that matters most on the Costs page — given real visual
    weight per PRODUCT.md's "trust through transparency" rather than
@@ -2026,3 +2033,12 @@ h3:first-child { margin-top: 0; }
 }
 .disclosure-toggle[aria-expanded="true"] .disclosure-caret { transform: rotate(90deg); }
 .disclosure-panel { animation: fade-slide-in var(--duration-base) var(--ease-standard); }
+/* Several paragraphs behind one disclosure — indented off the caret so
+   they read as belonging to the line that revealed them. */
+.disclosure-prose {
+  padding-left: 20px;
+  border-left: 2px solid var(--border);
+  margin-bottom: var(--space-sm);
+}
+.disclosure-prose p:first-child { margin-top: 0; }
+.disclosure-prose p:last-child { margin-bottom: 0; }
