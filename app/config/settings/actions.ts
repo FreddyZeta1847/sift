@@ -149,3 +149,26 @@ export async function saveCurationTopN(curationTopN: number): Promise<ActionResu
   const settings = await getSettings();
   return safeWrite(() => saveSettings({ ...settings, curationTopN }));
 }
+
+/**
+ * The model-checking settings: whether the automatic startup check runs at
+ * all, and the three time limits.
+ *
+ * Saved as one call because they are one decision. Splitting them would let a
+ * user leave the check enabled with a limit they had not meant to keep.
+ *
+ * The two probe limits are OUR patience — running past them reports
+ * "inconclusive", never a failure. llmCallTimeoutMs is different in kind: it
+ * is the allowance the provider itself gets inside a real pipeline call, and
+ * exceeding it is a genuine timeout that aborts the run. See
+ * lib/config/test-model-probe.ts.
+ */
+export async function saveModelCheckSettings(input: {
+  modelHealthCheckEnabled: boolean;
+  healthCheckTimeoutMs: number;
+  probeTimeoutMs: number;
+  llmCallTimeoutMs: number;
+}): Promise<ActionResult> {
+  const settings = await getSettings();
+  return safeWrite(() => saveSettings({ ...settings, ...input }));
+}

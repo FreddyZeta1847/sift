@@ -1400,3 +1400,22 @@ h3:first-child { margin-top: 0; }
    characters, and a full-width input would imply otherwise. */
 .models-table input[type="number"] { width: 7.5rem; }
 .models-table .row-actions { justify-content: flex-end; }
+
+/* A label that reads left-to-right instead of stacking, for the one control
+   in Settings that is a plain on/off checkbox. Every other field here puts
+   its label above its input, which is right for a value you type or drag but
+   wrong for a box you tick — the words are the thing being switched. */
+.checkbox-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}

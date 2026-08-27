@@ -75,6 +75,7 @@ import {
   saveVoiceProfile,
   saveRetention,
   saveCurationTopN,
+  saveModelCheckSettings,
 } from "./actions";
 import type { Source, Settings, VoiceProfile } from "../../../lib/config/types";
 
@@ -145,6 +146,12 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
 
   const [curationTopN, setCurationTopN] = useState<number>(settings.curationTopN);
   const [curationTopNStatus, setCurationTopNStatus] = useState<string | null>(null);
+
+  const [checkEnabled, setCheckEnabled] = useState<boolean>(settings.modelHealthCheckEnabled);
+  const [healthCheckSecs, setHealthCheckSecs] = useState<number>(Math.round(settings.healthCheckTimeoutMs / 1000));
+  const [probeSecs, setProbeSecs] = useState<number>(Math.round(settings.probeTimeoutMs / 1000));
+  const [llmCallSecs, setLlmCallSecs] = useState<number>(Math.round(settings.llmCallTimeoutMs / 1000));
+  const [modelCheckStatus, setModelCheckStatus] = useState<string | null>(null);
 
   const handleToggleSource = async (name: string) => {
     const result = await toggleSource(name);
@@ -283,6 +290,23 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
     const previousCandidates = candidateRetentionDays;
     setCandidateRetentionDays(value);
     persistRetention(postsRetentionDays, value, postsRetentionDays, previousCandidates);
+  };
+
+  // Seconds in the UI, milliseconds in storage: nobody thinks in milliseconds,
+  // and every consumer of these values takes milliseconds.
+  const persistModelCheck = async (next: {
+    enabled: boolean;
+    healthSecs: number;
+    probe: number;
+    llmCall: number;
+  }) => {
+    const result = await saveModelCheckSettings({
+      modelHealthCheckEnabled: next.enabled,
+      healthCheckTimeoutMs: next.healthSecs * 1000,
+      probeTimeoutMs: next.probe * 1000,
+      llmCallTimeoutMs: next.llmCall * 1000,
+    });
+    setModelCheckStatus(result.ok ? "Model checking saved." : `Save failed: ${result.error}`);
   };
 
   const handleCurationTopNChange = async (value: number) => {
@@ -498,6 +522,97 @@ export function SettingsForm({ sources, settings }: { sources: Source[]; setting
         {curationTopNStatus && (
           <p className={statusTone(curationTopNStatus)} role="alert">
             {curationTopNStatus}
+          </p>
+        )}
+      </section>
+
+      <section id="model-checking" className="card">
+        <h2>Model checking</h2>
+
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={checkEnabled}
+            onChange={(e) => {
+              setCheckEnabled(e.target.checked);
+              persistModelCheck({ enabled: e.target.checked, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs });
+            }}
+          />
+          Check the assigned models when the app starts
+        </label>
+        <p className="status-line">
+          Two small calls per server start, one per assigned model. Switch it off and nothing is checked, nothing is
+          locked, and nothing is spent.
+        </p>
+
+        {checkEnabled && (
+          <label>
+            Startup check gives up after
+            <div className="range-field">
+              <input
+                type="range"
+                min={5}
+                max={120}
+                step={5}
+                value={healthCheckSecs}
+                onChange={(e) => setHealthCheckSecs(Number(e.target.value))}
+                onMouseUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+                onTouchEnd={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+                onKeyUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              />
+              <span className="range-value data">{healthCheckSecs}s</span>
+            </div>
+          </label>
+        )}
+
+        <label>
+          &ldquo;Test this model&rdquo; gives up after
+          <div className="range-field">
+            <input
+              type="range"
+              min={5}
+              max={300}
+              step={5}
+              value={probeSecs}
+              onChange={(e) => setProbeSecs(Number(e.target.value))}
+              onMouseUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              onTouchEnd={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              onKeyUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+            />
+            <span className="range-value data">{probeSecs}s</span>
+          </div>
+        </label>
+        <p className="status-line">
+          These two are how long <em>sift</em> waits, not how long the model gets. Run past either and the result is a
+          grey &ldquo;no answer yet&rdquo; — never a failure, because a slow model is not a broken one.
+        </p>
+
+        <label>
+          A pipeline call may take up to
+          <div className="range-field">
+            <input
+              type="range"
+              min={30}
+              max={600}
+              step={30}
+              value={llmCallSecs}
+              onChange={(e) => setLlmCallSecs(Number(e.target.value))}
+              onMouseUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              onTouchEnd={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+              onKeyUp={() => persistModelCheck({ enabled: checkEnabled, healthSecs: healthCheckSecs, probe: probeSecs, llmCall: llmCallSecs })}
+            />
+            <span className="range-value data">{llmCallSecs}s</span>
+          </div>
+        </label>
+        <p className="status-line">
+          This one <em>is</em> the provider&rsquo;s allowance during a real run, and going over it is a genuine timeout.
+          A failed call is retried up to 3 times, so a dead provider costs roughly {Math.round((llmCallSecs * 3 + 10) / 60)} minute
+          {Math.round((llmCallSecs * 3 + 10) / 60) === 1 ? "" : "s"} before the run gives up.
+        </p>
+
+        {modelCheckStatus && (
+          <p className={statusTone(modelCheckStatus)} role="alert">
+            {modelCheckStatus}
           </p>
         )}
       </section>
