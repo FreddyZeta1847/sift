@@ -66,7 +66,7 @@ export async function generateDrafts(items: CuratedItem[], runId: number): Promi
   const promptText = buildDraftingPrompt(enriched, settings.voiceProfile);
   const promptTokens = Math.ceil(promptText.length / 4);
 
-  await assertBudgetAvailable(settings.draftingModel, promptTokens, MAX_OUTPUT_TOKENS);
+  await assertBudgetAvailable(provider.id, settings.draftingModel, promptTokens, MAX_OUTPUT_TOKENS);
 
   const result = await callLLM(
     provider,

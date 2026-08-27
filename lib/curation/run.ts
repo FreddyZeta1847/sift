@@ -164,7 +164,7 @@ export async function runCuration(runId: number): Promise<CuratedItem[]> {
   const promptText = buildRankingPrompt(guarded, settings.voiceProfile, shortlistSize);
   const promptTokens = Math.ceil(promptText.length / 4); // rough estimate, refined by real usage post-call
 
-  await assertBudgetAvailable(settings.curationModel, promptTokens, MAX_OUTPUT_TOKENS);
+  await assertBudgetAvailable(provider.id, settings.curationModel, promptTokens, MAX_OUTPUT_TOKENS);
 
   const result = await callLLM(
     provider,

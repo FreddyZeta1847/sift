@@ -60,7 +60,7 @@ import { useRouter } from "next/navigation";
 import { addProvider, updateProvider, deleteProvider, assignModels, probeModelAction } from "./actions";
 import type { Provider, Settings } from "../../../lib/config/types";
 import type { ProbeResult } from "../../../lib/config/test-model-probe";
-import { KNOWN_PROVIDERS } from "../../../lib/config/known-providers";
+import { KNOWN_PROVIDERS, providerNeedsApiKey } from "../../../lib/config/known-providers";
 
 const EMPTY_NEW_PROVIDER = {
   id: "",
@@ -322,7 +322,10 @@ export function ApiConfigForm({ providers, settings }: { providers: Provider[]; 
             ) : (
               <div key={p.id} className="provider-row provider-row--card">
                 <span className="provider-label-cell">
-                  {!p.apiKey && (
+                  {/* A blank key means "not set up yet" for a hosted provider,
+                      but a local one (Ollama) has no key to set — warning
+                      there would be permanent and wrong. */}
+                  {!p.apiKey && providerNeedsApiKey(p) && (
                     <span className="key-missing-icon" title="API key missing" aria-label="API key missing">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />

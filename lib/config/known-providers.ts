@@ -12,10 +12,20 @@
  * verified against a live key here — the exact endpoint path rarely
  * changes even when model names do, but confirm with "Test this model"
  * after adding a real key, same as any provider.
+ *
+ * `requiresApiKey` exists for Ollama, and for anything else self-hosted
+ * that may follow it: a local server has no key to paste, so the blank
+ * `apiKey` field that means "not set up yet" for every hosted provider
+ * means "correctly configured" here. Without this flag the API Config page
+ * would show a permanent red warning on a provider that is working fine.
  */
 import type { Provider } from "./types";
 
-export type KnownProviderPreset = Pick<Provider, "label" | "baseUrl" | "kind"> & { suggestedId: string };
+export type KnownProviderPreset = Pick<Provider, "label" | "baseUrl" | "kind"> & {
+  suggestedId: string;
+  /** Defaults to true — only a local/self-hosted provider sets this false. */
+  requiresApiKey?: boolean;
+};
 
 export const KNOWN_PROVIDERS: KnownProviderPreset[] = [
   {
@@ -58,4 +68,29 @@ export const KNOWN_PROVIDERS: KnownProviderPreset[] = [
     baseUrl: "https://api.deepseek.com",
     kind: "openai-compatible",
   },
+  {
+    suggestedId: "ollama",
+    label: "Ollama (local)",
+    // Ollama serves an OpenAI-compatible surface at /v1 alongside its own
+    // native API, so it needs no special provider kind. The default port is
+    // 11434; a user running it elsewhere just edits the Base URL.
+    //
+    // Note for Docker self-hosters: "localhost" inside the sift container is
+    // the container, not the host. Reaching an Ollama running on the host
+    // machine means http://host.docker.internal:11434/v1 instead.
+    baseUrl: "http://localhost:11434/v1",
+    kind: "openai-compatible",
+    // Ollama ignores the Authorization header entirely. Sending an empty
+    // Bearer token is harmless, and an empty key here is correct, not a
+    // half-finished setup.
+    requiresApiKey: false,
+  },
 ];
+
+// Matched by id OR baseUrl for the same reason isKnownProvider is in the
+// API Config form: a provider added by hand can carry a known endpoint under
+// a custom id, and the endpoint is the more stable signal of the two.
+export function providerNeedsApiKey(provider: Pick<Provider, "id" | "baseUrl">): boolean {
+  const preset = KNOWN_PROVIDERS.find((p) => p.suggestedId === provider.id || p.baseUrl === provider.baseUrl);
+  return preset?.requiresApiKey ?? true;
+}
