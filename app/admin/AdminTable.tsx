@@ -211,24 +211,3 @@ export function AdminTable<T>({
     </section>
   );
 }
-
-/**
- * A row timestamp, in the viewer's own timezone rather than the UTC value
- * the DB stores — this renders in the browser, and local time is what a
- * person reading a row expects to see.
- *
- * Shared because three of the four tables had a byte-identical private
- * copy of it. (Review's RunPicker deliberately does NOT use this: it
- * renders during SSR as well, so it has to pin locale and timezone to
- * avoid a hydration mismatch. See that file's header.)
- */
-export function formatAdminDate(d: Date | string | null): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleString(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}

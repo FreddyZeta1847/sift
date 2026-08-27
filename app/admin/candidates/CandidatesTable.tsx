@@ -14,7 +14,8 @@
  */
 "use client";
 
-import { AdminTable, formatAdminDate, type AdminColumn } from "../AdminTable";
+import { AdminTable, type AdminColumn } from "../AdminTable";
+import { LocalTime } from "../../LocalTime";
 import { deleteCandidateAction } from "../actions";
 import type { FilterField, FilterValues } from "../../FilterBar";
 import type { CandidateRowWithPost } from "../../../lib/admin/queries";
@@ -25,7 +26,7 @@ const COLUMNS: AdminColumn<CandidateRowWithPost>[] = [
   { label: "Has post", width: "78px", render: (c) => (c.hasPost ? "yes" : "no") },
   { label: "Run", width: "64px", render: (c) => <span className="data">#{c.runId}</span> },
   { label: "Source", width: "minmax(0,110px)", render: (c) => c.sourceName ?? "—" },
-  { label: "Created", width: "minmax(0,140px)", render: (c) => <span className="data">{formatAdminDate(c.createdAt)}</span> },
+  { label: "Created", width: "minmax(0,140px)", render: (c) => <LocalTime value={c.createdAt} className="data" /> },
   {
     label: "URL",
     width: "minmax(0,1fr)",

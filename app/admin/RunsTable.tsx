@@ -12,7 +12,8 @@
  */
 "use client";
 
-import { AdminTable, formatAdminDate, type AdminColumn } from "./AdminTable";
+import { AdminTable, type AdminColumn } from "./AdminTable";
+import { LocalTime } from "../LocalTime";
 import { deleteRunAction } from "./actions";
 import type { FilterField, FilterValues } from "../FilterBar";
 import type { RunRow } from "../../lib/review/queries";
@@ -30,8 +31,8 @@ const COLUMNS: AdminColumn<RunRow>[] = [
       </>
     ),
   },
-  { label: "Started", width: "minmax(0,1fr)", render: (r) => <span className="data">{formatAdminDate(r.startedAt)}</span> },
-  { label: "Finished", width: "minmax(0,1fr)", render: (r) => <span className="data">{formatAdminDate(r.finishedAt)}</span> },
+  { label: "Started", width: "minmax(0,1fr)", render: (r) => <LocalTime value={r.startedAt} className="data" /> },
+  { label: "Finished", width: "minmax(0,1fr)", render: (r) => <LocalTime value={r.finishedAt} className="data" /> },
 ];
 
 const FILTERS: FilterField[] = [

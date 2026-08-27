@@ -11,7 +11,8 @@
  */
 "use client";
 
-import { AdminTable, formatAdminDate, type AdminColumn } from "../AdminTable";
+import { AdminTable, type AdminColumn } from "../AdminTable";
+import { LocalTime } from "../../LocalTime";
 import { deleteLlmCallAction } from "../actions";
 import type { FilterField, FilterValues } from "../../FilterBar";
 import type { LlmCallRow } from "../../../lib/admin/queries";
@@ -21,7 +22,7 @@ const COLUMNS: AdminColumn<LlmCallRow>[] = [
   { label: "Run", width: "64px", render: (c) => <span className="data">#{c.runId}</span> },
   { label: "Provider", width: "minmax(0,1fr)", render: (c) => c.provider },
   { label: "Model", width: "minmax(0,1fr)", render: (c) => c.model },
-  { label: "Timestamp", width: "minmax(0,1fr)", render: (c) => <span className="data">{formatAdminDate(c.timestamp)}</span> },
+  { label: "Timestamp", width: "minmax(0,1fr)", render: (c) => <LocalTime value={c.timestamp} className="data" /> },
   {
     label: "Tokens",
     width: "minmax(0,110px)",

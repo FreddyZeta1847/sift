@@ -22,15 +22,8 @@
 import { useRouter } from "next/navigation";
 import { PostCard } from "../PostCard";
 import { EmptyState } from "../EmptyState";
+import { LocalTime, READABLE } from "../LocalTime";
 import type { PostRowWithSource } from "../../lib/admin/queries";
-
-function formatPostedAt(date: Date | null): string {
-  if (!date) return "";
-  return new Date(date).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 export function PostedList({
   rows,
@@ -77,7 +70,9 @@ export function PostedList({
                   </a>
                   {post.sourceName && <span className="tag">{post.sourceName}</span>}
                   {post.postedAt && (
-                    <span className="data post-card-when">Posted {formatPostedAt(post.postedAt)}</span>
+                    <span className="data post-card-when">
+                      Posted <LocalTime value={post.postedAt} options={READABLE} />
+                    </span>
                   )}
                 </>
               }
